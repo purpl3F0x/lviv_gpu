@@ -1,0 +1,3 @@
+[submodule "dv/verilaxi"]
+	path = dv/verilaxi
+	url = https://github.com/nelsoncsc/verilaxi

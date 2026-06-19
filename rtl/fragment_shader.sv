@@ -6,30 +6,16 @@
 
 `timescale 1ns / 1ns
 
-typedef enum logic [2:0] {
-  REPLACE = 0,
-  MODULATE = 1,
-  DECAL = 2,
-  BLEND = 3,
-  ADD = 4,
-  COLOR = 5
-} fragment_op_t;
-
-typedef struct packed {
-  logic [7:0] a;  // Alpha
-  logic [7:0] r;  // Red
-  logic [7:0] g;  // Green
-  logic [7:0] b;  // Blue
-} vec4_u8_t;
+import gpu_types_pkg::*;
 
 module fragment_shader (
     input logic clk,
-    input logic rst,
+    input logic rst_n,
 
     // Input Data
-    input vec4_u8_t     pixel_color,
-    input vec4_u8_t     texture_color,
-    input vec4_u8_t     env_color,
+    input color_argb_t     pixel_color,
+    input color_argb_t     texture_color,
+    input color_argb_t     env_color,
     input fragment_op_t op,
 
     // Handshake
@@ -37,7 +23,7 @@ module fragment_shader (
     // output logic ready,
 
     // Output Data
-    output vec4_u8_t fragment_color,
+    output color_argb_t fragment_color,
     output logic valid_out
 );
 
@@ -97,7 +83,7 @@ module fragment_shader (
   logic [7:0] div_r, div_g, div_b, div_a;
 
   always_ff @(posedge clk) begin
-    if (rst) begin
+    if (!rst_n) begin
       valid_s1 <= 1'b0;
       valid_s2 <= 1'b0;
       valid_s3 <= 1'b0;

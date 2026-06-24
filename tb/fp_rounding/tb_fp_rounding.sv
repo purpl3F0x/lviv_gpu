@@ -107,7 +107,7 @@ module tb_fp_clamping ();
     $display("[TB INFO] Starting Float Sweep from 0.0 to 4096.0...");
 
     // Sweep loop with fractional steps
-    for (shortreal r = 0.0; r <= 4096.0; r += 0.000001) begin
+    for (shortreal r = 0.0; r <= 4096.0; r += 0.00001) begin
       @(posedge clk);
       valid_in <= 1;
       r_rounded = $bitstoshortreal($shortrealtobits(r));

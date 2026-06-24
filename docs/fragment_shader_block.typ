@@ -1,4 +1,5 @@
 #import "@preview/circuiteria:0.2.0"
+#import "@preview/cetz:0.3.2": draw
 
 #set page(width: auto, height: auto, margin: 1cm)
 
@@ -11,13 +12,13 @@
     element.block(
       x: 0,
       y: 0,
-      w: 16,
-      h: 8,
+      w: 20,
+      h: 10,
       id: "shader",
       fill: util.colors.green,
       name: [
-        #text("Fragment Shader \n (Wasabi)", size: 16pt, weight: "bold") \
-        #text("5-stage pipline", size: 12pt, weight: "thin") \
+        #text("Fragment Shader \n (Wasabi)", size: 18pt, weight: "bold") \ \
+        #text("5-stage pipline", size: 10pt, weight: "thin") \
         // #v(0.5em)
         // #align(left)[
         //   _Operations:_ \
@@ -32,7 +33,7 @@
       ports: (
         west: (
           (id: "clk", name: "", clock: true, small: true),
-          (id: "rst", name: "rst"),
+          (id: "rst_n", name: [#overline("rst", stroke: 1pt)]),
           (id: "pixel_color", name: "pixel_color [31:0]"),
           (id: "texture_color", name: "texture_color [31:0]"),
           (id: "env_color", name: "env_color [31:0]"),
@@ -49,7 +50,7 @@
     )
 
     wire.stub("shader-port-clk", "west", name: "clk", length: stud_len)
-    wire.stub("shader-port-rst", "west", length: stud_len)
+    wire.stub("shader-port-rst_n", "west", length: stud_len)
     wire.stub("shader-port-pixel_color", "west", length: stud_len)
     wire.stub("shader-port-texture_color", "west", length: stud_len)
     wire.stub("shader-port-env_color", "west", length: stud_len)
@@ -59,5 +60,8 @@
     wire.stub("shader-port-ready", "east", length: stud_len)
     wire.stub("shader-port-fragment_color", "east", length: stud_len)
     wire.stub("shader-port-valid_out", "east", length: stud_len)
+
+    // Draw active-low bubble at rst_n port (shifted left by its radius so it touches the outer border)
+    draw.circle((rel: (-0.20, 0), to: "shader-port-rst_n"), radius: 0.15, fill: white, stroke: 1.5pt)
   })
 ]

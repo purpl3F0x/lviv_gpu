@@ -37,6 +37,10 @@ module fp_add_half_fast (
   // STAGE 2: Exponent-based Bit Injection and Packing
   // =========================================================================
   logic [31:0] final_output;
+  logic [ 4:0] shift_amt;
+  logic [22:0] bit_mask;
+  assign shift_amt = 5'(8'd149 - s1_exp);
+  assign bit_mask  = 23'd1 << shift_amt;
 
   always_comb begin
     if (s1_is_zero) begin
@@ -45,10 +49,6 @@ module fp_add_half_fast (
     end else begin
       // 127 <= E <= 140
       // Set the bit at index k = 149 - E in the mantissa.
-      logic [ 4:0] shift_amt;
-      logic [22:0] bit_mask;
-      shift_amt = 5'(8'd149 - s1_exp);
-      bit_mask  = 23'd1 << shift_amt;
       final_output = {1'b0, s1_exp, s1_mant | bit_mask};
     end
   end

@@ -18,9 +18,9 @@ module raster_frontend (
     // Output Handshake & Data
     input  logic           ready_in,
     output logic           valid_out,
-    output logic    [31:0] out_e0_row,
-    output logic    [31:0] out_e1_row,
-    output logic    [31:0] out_e2_row,
+    output logic    [31:0] out_e0_00,
+    output logic    [31:0] out_e1_00,
+    output logic    [31:0] out_e2_00,
     output logic    [31:0] out_e0_10,
     output logic    [31:0] out_e1_10,
     output logic    [31:0] out_e2_10,
@@ -30,29 +30,106 @@ module raster_frontend (
     output logic    [31:0] out_e0_11,
     output logic    [31:0] out_e1_11,
     output logic    [31:0] out_e2_11,
-    output logic    [31:0] out_e0_dx,
-    output logic    [31:0] out_e0_dy,
-    output logic    [31:0] out_e1_dx,
-    output logic    [31:0] out_e1_dy,
-    output logic    [31:0] out_e2_dx,
-    output logic    [31:0] out_e2_dy,
+    output logic    [31:0] out_e0_dx_2x,
+    output logic    [31:0] out_e0_dy_2x,
+    output logic    [31:0] out_e1_dx_2x,
+    output logic    [31:0] out_e1_dy_2x,
+    output logic    [31:0] out_e2_dx_2x,
+    output logic    [31:0] out_e2_dy_2x,
     output logic    [31:0] out_invArea,
     output vertex_t        out_v0,
     output vertex_t        out_v1,
     output vertex_t        out_v2,
-    output logic    [6:0]  out_minX_local,
-    output logic    [6:0]  out_minY_local,
-    output logic    [7:0]  out_width,
-    output logic    [7:0]  out_height
+    output logic    [ 7:0] out_minX_local,
+    output logic    [ 7:0] out_minY_local,
+    output logic    [ 7:0] out_width,
+    output logic    [ 7:0] out_height
 );
+  // --------------------------------------------------------------------------
+  // Tile ID Float ROMs
+  // --------------------------------------------------------------------------
+  localparam int MAX_RES = (MAX_RES_X > MAX_RES_Y) ? MAX_RES_X : MAX_RES_Y;
+  localparam int VAL_W = (MAX_RES) + 1;
+  localparam int NUM_TILES_X = MAX_RES_X / TILE_SIZE_X;
+  // localparam int NUM_TILES_Y = MAX_RES_Y / TILE_SIZE_Y;
 
-  // --------------------------------------------------------------------------
-  // Delay & Latency Configuration
-  // --------------------------------------------------------------------------
-  localparam int SUB_LATENCY = 11;
-  localparam int MUL_LATENCY = 8;
-  localparam int RECIP_LATENCY = 29;
-  localparam int CONV_LATENCY = 6;
+  function automatic logic [31:0] calc_tile_min_float(input int tile_id, input int tile_size);
+    int val;
+    logic [31:0] f;
+    val = tile_id * tile_size;
+    if (val == 0) begin
+      return 32'h0;  // 0.0f
+    end else begin
+      f = 32'b0;
+      for (int i = VAL_W - 1; i >= 0; i--) begin
+        if ((val & (1 << i)) != 0) begin
+          f[30:23] = 8'(127 + i);
+          f[22:0]  = (32'(val) << (23 - i)) & 23'h7fffff;
+          break;
+        end
+      end
+      return f;
+    end
+  endfunction
+
+  function automatic logic [31:0] calc_tile_max_float(input int tile_id, input int tile_size);
+    int val;
+    logic [31:0] f;
+    val = tile_id * tile_size + (tile_size - 1);
+    f   = 32'b0;
+    for (int i = VAL_W - 1; i >= 0; i--) begin
+      if ((val & (1 << i)) != 0) begin
+        f[30:23] = 8'(127 + i);
+        f[22:0]  = (32'(val) << (23 - i)) & 23'h7fffff;
+        break;
+      end
+    end
+    return f;
+  endfunction
+
+  typedef logic [31:0] float_rom_x_t[NUM_TILES_X];
+  // typedef logic [31:0] float_rom_y_t[NUM_TILES_Y];
+
+  function automatic float_rom_x_t init_rom_x_min();
+    float_rom_x_t rom;
+    for (int i = 0; i < NUM_TILES_X; i++) begin
+      rom[i] = calc_tile_min_float(i, TILE_SIZE_X);
+    end
+    return rom;
+  endfunction
+
+  function automatic float_rom_x_t init_rom_x_max();
+    float_rom_x_t rom;
+    for (int i = 0; i < NUM_TILES_X; i++) begin
+      rom[i] = calc_tile_max_float(i, TILE_SIZE_X);
+    end
+    return rom;
+  endfunction
+
+  // function automatic float_rom_y_t init_rom_y_min();
+  //   float_rom_y_t rom;
+  //   for (int i = 0; i < NUM_TILES_Y; i++) begin
+  //     rom[i] = calc_tile_min_float(i, TILE_SIZE_Y);
+  //   end
+  //   return rom;
+  // endfunction
+
+  // function automatic float_rom_y_t init_rom_y_max();
+  //   float_rom_y_t rom;
+  //   for (int i = 0; i < NUM_TILES_Y; i++) begin
+  //     rom[i] = calc_tile_max_float(i, TILE_SIZE_Y);
+  //   end
+  //   return rom;
+  // endfunction
+
+
+  // !: ONLY WORKS IF TILES ARE SQUARE
+  localparam logic [31:0] TILE_X_MIN_ROM[NUM_TILES_X] = init_rom_x_min();
+  localparam logic [31:0] TILE_X_MAX_ROM[NUM_TILES_X] = init_rom_x_max();
+  // localparam logic [31:0] TILE_Y_MIN_ROM[NUM_TILES_Y] = init_rom_y_min();
+  // localparam logic [31:0] TILE_Y_MAX_ROM[NUM_TILES_Y] = init_rom_y_max();
+
+
 
   // --------------------------------------------------------------------------
   // States and Registers
@@ -69,6 +146,9 @@ module raster_frontend (
   logic [TILE_ID_W_X-1:0] tile_x_id_reg;
   logic [TILE_ID_W_Y-1:0] tile_y_id_reg;
   vertex_t v0_reg, v1_reg, v2_reg;
+  logic [31:0] binMinX, binMaxX;
+  logic [31:0] binMinY, binMaxY;
+
 
   localparam int CYC_W = 8;
   logic [CYC_W-1:0] cycle_cnt;
@@ -77,779 +157,692 @@ module raster_frontend (
   // --------------------------------------------------------------------------
   // Internal Signal Declarations
   // --------------------------------------------------------------------------
-  logic [31:0] mul0_a, mul0_b, mul0_res;
-  logic [31:0] recip0_a, recip0_res;
-  logic        mul0_valid_in;
-  logic        recip0_valid_in;
+  logic [     15:0] bb_height_reg;
+  logic [     31:0] bb_max_x_reg;
+  logic [     31:0] bb_max_y_reg;
+  logic [     31:0] bb_min_x_reg;
+  logic [     31:0] bb_min_y_reg;
+  logic [     15:0] bb_start_x_reg;
+  logic [     15:0] bb_start_y_reg;
+  logic [     15:0] bb_width_reg;
+  logic [     31:0] e0_00_reg;
+  logic [     31:0] e0_01_reg;
+  logic [     31:0] e0_10_reg;
+  logic [     31:0] e0_11_reg;
+  logic [     31:0] e0_dx_2x_reg;
+  logic [     31:0] e0_dx_reg;
+  logic [     31:0] e0_dy_2x_reg;
+  logic [     31:0] e0_dy_reg;
+  logic [     31:0] e1_00_reg;
+  logic [     31:0] e1_01_reg;
+  logic [     31:0] e1_10_reg;
+  logic [     31:0] e1_11_reg;
+  logic [     31:0] e1_dx_2x_reg;
+  logic [     31:0] e1_dx_reg;
+  logic [     31:0] e1_dy_2x_reg;
+  logic [     31:0] e1_dy_reg;
+  logic [     31:0] e2_00_reg;
+  logic [     31:0] e2_01_reg;
+  logic [     31:0] e2_10_reg;
+  logic [     31:0] e2_11_reg;
+  logic [     31:0] e2_dx_2x_reg;
+  logic [     31:0] e2_dx_reg;
+  logic [     31:0] e2_dy_2x_reg;
+  logic [     31:0] e2_dy_reg;
+  logic [     31:0] invArea_reg;
+  logic [     31:0] p_min_x_reg;
+  logic [     31:0] p_min_y_reg;
+  logic [     31:0] tmp0;
+  logic [     31:0] tmp1;
+  logic [     31:0] tmp2;
+  logic [     31:0] tmp3;
+  logic [     31:0] tmp4;
+  logic [     31:0] tmp5;
+  logic [     31:0] tmp6;
+  logic [     15:0] tmp7;
+  logic [     31:0] tmp8;
+  logic [     31:0] tmp9;
+  logic [     31:0] tri_max_x_reg;
+  logic [     31:0] tri_max_y_reg;
+  logic [     31:0] tri_min_x_reg;
+  logic [     31:0] tri_min_y_reg;
 
-  logic [36:0] v0_fixed, v1_fixed, v2_fixed;
-  logic [31:0] conv_v0_a, conv_v1_a, conv_v2_a;
-  logic        conv_v0_v, conv_v1_v, conv_v2_v;
+  // --------------------------------------------------------------------------
+  // Modules Declerations
+  // --------------------------------------------------------------------------
 
-  logic signed [14:0] triMinX_reg, triMaxX_reg;
-  logic signed [14:0] triMinY_reg, triMaxY_reg;
-  logic signed [13:0] minX_reg, maxX_reg;
-  logic signed [13:0] minY_reg, maxY_reg;
-  logic [6:0] x_start_reg, y_start_reg;
-  logic [7:0] x_size_reg, y_size_reg;
+  logic [     31:0] fp32_to_int16_1_in;
+  logic [     15:0] fp32_to_int16_1_out;
+  logic             fp32_to_int16_1_valid_in;
+  fp32_to_int16 #(
+      .LATENCY(2)
+  ) u_fp32_to_int16_1 (
+      .aclk    (clk),
+      .aresetn (rst_n),
+      .aclken  (1'b1),
+      .valid_in(fp32_to_int16_1_valid_in),
+      .a       (fp32_to_int16_1_in),
+      .result  (fp32_to_int16_1_out)
+  );
 
-  logic [15:0] conv_x_a;
-  logic        conv_x_v;
-  logic [31:0] conv_x_res;
+  logic [31:0] fp_add_half_fast_1_in, fp_add_half_fast_1_out;
+  logic fp_add_half_fast_1_valid_in, fp_add_half_fast_1_valid_out;
+  fp_add_half_fast u_fp_add_half_fast_1 (
+      .clk      (clk),
+      .rst_n    (rst_n),
+      .valid_in (fp_add_half_fast_1_valid_in),
+      .f_in     (fp_add_half_fast_1_in),
+      .valid_out(fp_add_half_fast_1_valid_out),
+      .f_out    (fp_add_half_fast_1_out)
+  );
 
-  logic [31:0] p00_x_reg, p00_y_reg;
+  logic [31:0] fp_add_sub_1_a, fp_add_sub_1_b, fp_add_sub_1_res;
+  logic fp_add_sub_1_op, fp_add_sub_1_valid_in;
+  fp_add_sub #(
+      .LATENCY(8)
+  ) u_fp_add_sub_1 (
+      .aclk    (clk),
+      .aresetn (rst_n),
+      .aclken  (1'b1),
+      .op_sub  (fp_add_sub_1_op),
+      .valid_in(fp_add_sub_1_valid_in),
+      .a       (fp_add_sub_1_a),
+      .b       (fp_add_sub_1_b),
+      .result  (fp_add_sub_1_res)
+  );
 
-  logic [31:0] add_sub0_a, add_sub0_b, add_sub0_res;
-  logic        add_sub0_op;
-  logic        add_sub0_v;
+  logic [31:0] fp_add_sub_2_a, fp_add_sub_2_b, fp_add_sub_2_res;
+  logic fp_add_sub_2_op, fp_add_sub_2_valid_in;
+  fp_add_sub #(
+      .LATENCY(8)
+  ) u_fp_add_sub_2 (
+      .aclk    (clk),
+      .aresetn (rst_n),
+      .aclken  (1'b1),
+      .op_sub  (fp_add_sub_2_op),
+      .valid_in(fp_add_sub_2_valid_in),
+      .a       (fp_add_sub_2_a),
+      .b       (fp_add_sub_2_b),
+      .result  (fp_add_sub_2_res)
+  );
 
-  logic [31:0] add_sub1_a, add_sub1_b, add_sub1_res;
-  logic        add_sub1_op;
-  logic        add_sub1_v;
+  logic [31:0] fp_add_sub_3_a, fp_add_sub_3_b, fp_add_sub_3_res;
+  logic fp_add_sub_3_op, fp_add_sub_3_valid_in;
+  fp_add_sub #(
+      .LATENCY(8)
+  ) u_fp_add_sub_3 (
+      .aclk    (clk),
+      .aresetn (rst_n),
+      .aclken  (1'b1),
+      .op_sub  (fp_add_sub_3_op),
+      .valid_in(fp_add_sub_3_valid_in),
+      .a       (fp_add_sub_3_a),
+      .b       (fp_add_sub_3_b),
+      .result  (fp_add_sub_3_res)
+  );
 
-  logic [31:0] area_A_reg, area_B_reg;
-  logic [31:0] area_C_reg, area_D_reg;
-  logic [31:0] e0_A_reg, e0_dx_reg;
-  logic [31:0] e0_C_reg;
-  logic [31:0] e1_A_reg, e1_dx_reg;
-  logic [31:0] e1_C_reg;
-  logic [31:0] e2_A_reg, e2_dx_reg;
-  logic [31:0] e2_C_reg;
+  logic [31:0] fp_max_2_1_a, fp_max_2_1_b, fp_max_2_1_res;
+  logic fp_max_2_1_valid_in, fp_max_2_1_valid_out;
+  fp_max_2 u_fp_max_2_1 (
+      .clk      (clk),
+      .rst_n    (rst_n),
+      .valid_in (fp_max_2_1_valid_in),
+      .f_a      (fp_max_2_1_a),
+      .f_b      (fp_max_2_1_b),
+      .valid_out(fp_max_2_1_valid_out),
+      .f_max    (fp_max_2_1_res)
+  );
 
-  logic [31:0] area_E, area_F;
-  logic [31:0] e0_E, e0_F;
-  logic [31:0] e1_E, e1_F;
-  logic [31:0] e2_E, e2_F;
+  logic [31:0] fp_min_2_1_a, fp_min_2_1_b, fp_min_2_1_res;
+  logic fp_min_2_1_valid_in, fp_min_2_1_valid_out;
+  fp_min_2 u_fp_min_2_1 (
+      .clk      (clk),
+      .rst_n    (rst_n),
+      .valid_in (fp_min_2_1_valid_in),
+      .f_a      (fp_min_2_1_a),
+      .f_b      (fp_min_2_1_b),
+      .valid_out(fp_min_2_1_valid_out),
+      .f_min    (fp_min_2_1_res)
+  );
 
-  logic [31:0] area_G_reg;
-  logic [31:0] e0_row_reg;
-  logic [31:0] e1_row_reg;
-  logic [31:0] e2_row_reg;
-  logic [31:0] e0_dy_reg;
-  logic [31:0] e1_dy_reg;
-  logic [31:0] e2_dy_reg;
-
-  logic [31:0] invArea_reg;
-
-  logic [31:0] e0_dx_plus_dy, e1_dx_plus_dy, e2_dx_plus_dy;
-  logic [31:0] e0_10_reg, e0_01_reg, e0_11_reg;
-  logic [31:0] e1_10_reg, e1_01_reg, e1_11_reg;
-  logic [31:0] e2_10_reg, e2_01_reg;
-
+  logic [31:0] fp_mul_1_a, fp_mul_1_b, fp_mul_1_res;
+  logic fp_mul_1_valid_in;
   fp_mul #(
-      .LATENCY(MUL_LATENCY)
-  ) u_mul0 (
+      .LATENCY(5)
+  ) u_fp_mul_1 (
       .aclk    (clk),
       .aresetn (rst_n),
       .aclken  (1'b1),
-      .valid_in(mul0_valid_in),
-      .a       (mul0_a),
-      .b       (mul0_b),
-      .result  (mul0_res)
+      .valid_in(fp_mul_1_valid_in),
+      .a       (fp_mul_1_a),
+      .b       (fp_mul_1_b),
+      .result  (fp_mul_1_res)
   );
 
+  logic [31:0] fp_mul_2_a, fp_mul_2_b, fp_mul_2_res;
+  logic fp_mul_2_valid_in;
+  fp_mul #(
+      .LATENCY(5)
+  ) u_fp_mul_2 (
+      .aclk    (clk),
+      .aresetn (rst_n),
+      .aclken  (1'b1),
+      .valid_in(fp_mul_2_valid_in),
+      .a       (fp_mul_2_a),
+      .b       (fp_mul_2_b),
+      .result  (fp_mul_2_res)
+  );
+
+  logic [31:0] fp_recip_1_in, fp_recip_1_out;
+  logic fp_recip_1_valid_in;
   fp_recip #(
-      .LATENCY(RECIP_LATENCY)
-  ) u_recip0 (
+      .LATENCY(22)
+  ) u_fp_recip_1 (
       .aclk    (clk),
       .aresetn (rst_n),
       .aclken  (1'b1),
-      .valid_in(recip0_valid_in),
-      .a       (recip0_a),
-      .result  (recip0_res)
+      .valid_in(fp_recip_1_valid_in),
+      .a       (fp_recip_1_in),
+      .result  (fp_recip_1_out)
   );
 
-  // --------------------------------------------------------------------------
-  // Bounding Box Logic & Coordinates Converters
-  // --------------------------------------------------------------------------
-
-
-  fp_to_s14q23 #(
-      .LATENCY(CONV_LATENCY)
-  ) u_conv_v0 (
-      .aclk    (clk),
-      .aresetn (rst_n),
-      .aclken  (1'b1),
-      .valid_in(conv_v0_v),
-      .a       (conv_v0_a),
-      .result  (v0_fixed)
+  logic [15:0] int16_sub_1_a, int16_sub_1_b, int16_sub_1_res;
+  int16_sub u_int16_sub_1 (
+      .clken(1'b1),
+      .a    (int16_sub_1_a),
+      .b    (int16_sub_1_b),
+      .s    (int16_sub_1_res)
   );
 
-  fp_to_s14q23 #(
-      .LATENCY(CONV_LATENCY)
-  ) u_conv_v1 (
-      .aclk    (clk),
-      .aresetn (rst_n),
-      .aclken  (1'b1),
-      .valid_in(conv_v1_v),
-      .a       (conv_v1_a),
-      .result  (v1_fixed)
+  logic [31:0] tri_bb_min_max_1_a, tri_bb_min_max_1_b, tri_bb_min_max_1_c;
+  logic [31:0] tri_bb_min_max_1_min, tri_bb_min_max_1_max;
+  logic tri_bb_min_max_1_valid_in, tri_bb_min_max_1_valid_out;
+  tri_bb_min_max u_tri_bb_min_max_1 (
+      .clk        (clk),
+      .rst_n      (rst_n),
+      .valid_in   (tri_bb_min_max_1_valid_in),
+      .f_a        (tri_bb_min_max_1_a),
+      .f_b        (tri_bb_min_max_1_b),
+      .f_c        (tri_bb_min_max_1_c),
+      .valid_out  (tri_bb_min_max_1_valid_out),
+      .f_min_floor(tri_bb_min_max_1_min),
+      .f_max_ceil (tri_bb_min_max_1_max)
   );
 
-  fp_to_s14q23 #(
-      .LATENCY(CONV_LATENCY)
-  ) u_conv_v2 (
-      .aclk    (clk),
-      .aresetn (rst_n),
-      .aclken  (1'b1),
-      .valid_in(conv_v2_v),
-      .a       (conv_v2_a),
-      .result  (v2_fixed)
-  );
-
-  always_comb begin
-    conv_v0_a = 32'b0;
-    conv_v1_a = 32'b0;
-    conv_v2_a = 32'b0;
-    conv_v0_v = 1'b0;
-    conv_v1_v = 1'b0;
-    conv_v2_v = 1'b0;
-
-    if (state == ST_CALC) begin
-      if (cycle_cnt == 8'd1) begin
-        conv_v0_a = v0_reg.x;
-        conv_v1_a = v1_reg.x;
-        conv_v2_a = v2_reg.x;
-        conv_v0_v = 1'b1;
-        conv_v1_v = 1'b1;
-        conv_v2_v = 1'b1;
-      end else if (cycle_cnt == 8'd2) begin
-        conv_v0_a = v0_reg.y;
-        conv_v1_a = v1_reg.y;
-        conv_v2_a = v2_reg.y;
-        conv_v0_v = 1'b1;
-        conv_v1_v = 1'b1;
-        conv_v2_v = 1'b1;
-      end
-    end
-  end
-
-
-
-  function automatic logic signed [14:0] min3(logic signed [14:0] a, logic signed [14:0] b, logic signed [14:0] c);
-    logic signed [14:0] tmp;
-    tmp = (a < b) ? a : b;
-    return (tmp < c) ? tmp : c;
-  endfunction
-
-  function automatic logic signed [14:0] max3(logic signed [14:0] a, logic signed [14:0] b, logic signed [14:0] c);
-    logic signed [14:0] tmp;
-    tmp = (a > b) ? a : b;
-    return (tmp > c) ? tmp : c;
-  endfunction
-
-  // Combinational inputs to the min3/max3 at Cycle 7 & Cycle 8
-  logic signed [14:0] v0x_floor, v1x_floor, v2x_floor;
-  logic signed [14:0] v0x_ceil, v1x_ceil, v2x_ceil;
-  logic signed [14:0] triMinX, triMaxX;
-
-  assign v0x_floor = v0_fixed[36:23];
-  assign v1x_floor = v1_fixed[36:23];
-  assign v2x_floor = v2_fixed[36:23];
-  assign v0x_ceil  = (v0_fixed[22:0] == 23'd0) ? v0_fixed[36:23] : v0_fixed[36:23] + 15'sd1;
-  assign v1x_ceil  = (v1_fixed[22:0] == 23'd0) ? v1_fixed[36:23] : v1_fixed[36:23] + 15'sd1;
-  assign v2x_ceil  = (v2_fixed[22:0] == 23'd0) ? v2_fixed[36:23] : v2_fixed[36:23] + 15'sd1;
-
-  assign triMinX = min3(v0x_floor, v1x_floor, v2x_floor);
-  assign triMaxX = max3(v0x_ceil, v1x_ceil, v2x_ceil);
-
-  logic signed [14:0] v0y_floor, v1y_floor, v2y_floor;
-  logic signed [14:0] v0y_ceil, v1y_ceil, v2y_ceil;
-  logic signed [14:0] triMinY, triMaxY;
-
-  assign v0y_floor = v0_fixed[36:23];
-  assign v1y_floor = v1_fixed[36:23];
-  assign v2y_floor = v2_fixed[36:23];
-  assign v0y_ceil  = (v0_fixed[22:0] == 23'd0) ? v0_fixed[36:23] : v0_fixed[36:23] + 15'sd1;
-  assign v1y_ceil  = (v1_fixed[22:0] == 23'd0) ? v1_fixed[36:23] : v1_fixed[36:23] + 15'sd1;
-  assign v2y_ceil  = (v2_fixed[22:0] == 23'd0) ? v2_fixed[36:23] : v2_fixed[36:23] + 15'sd1;
-
-  assign triMinY = min3(v0y_floor, v1y_floor, v2y_floor);
-  assign triMaxY = max3(v0y_ceil, v1y_ceil, v2y_ceil);
-
-  // Align/Intersect combinational logic
-  logic [13:0] binMinX, binMinY, binMaxX, binMaxY;
-  assign binMinX = {tile_x_id_reg, 7'b0};
-  assign binMinY = {tile_y_id_reg, 7'b0};
-  assign binMaxX = binMinX + 14'd127;
-  assign binMaxY = binMinY + 14'd127;
-
-  logic signed [13:0] triMinX_aligned, triMaxX_aligned;
-  assign triMinX_aligned = triMinX_reg & 14'h3FFE;
-  assign triMaxX_aligned = triMaxX_reg | 14'h0001;
-
-  logic signed [13:0] minX, maxX_temp, maxX;
-  assign minX = (signed'(binMinX) > triMinX_aligned) ? signed'(binMinX) : triMinX_aligned;
-  assign maxX_temp = (signed'(binMaxX) < triMaxX_aligned) ? signed'(binMaxX) : triMaxX_aligned;
-  assign maxX = (maxX_temp <= minX) ? (minX + 14'sd1) : maxX_temp;
-
-  logic signed [13:0] triMinY_aligned, triMaxY_aligned;
-  assign triMinY_aligned = triMinY_reg & 14'h3FFE;
-  assign triMaxY_aligned = triMaxY_reg | 14'h0001;
-
-  logic signed [13:0] minY, maxY_temp, maxY;
-  assign minY = (signed'(binMinY) > triMinY_aligned) ? signed'(binMinY) : triMinY_aligned;
-  assign maxY_temp = (signed'(binMaxY) < triMaxY_aligned) ? signed'(binMaxY) : triMaxY_aligned;
-  assign maxY = (maxY_temp <= minY) ? (minY + 14'sd1) : maxY_temp;
-
-  logic signed [15:0] x0_q2, y0_q2;
-  assign x0_q2 = {minX, 2'b10};
-  assign y0_q2 = {minY, 2'b10};
-
-
-
-  s14_q2_to_fp #(
-      .LATENCY(CONV_LATENCY)
-  ) u_conv_x (
-      .aclk    (clk),
-      .aresetn (rst_n),
-      .aclken  (1'b1),
-      .valid_in(conv_x_v),
-      .a       (conv_x_a),
-      .result  (conv_x_res)
-  );
-
-  always_comb begin
-    conv_x_a = 16'b0;
-    conv_x_v = 1'b0;
-
-    if (state == ST_CALC) begin
-      case (cycle_cnt)
-        8'd8: begin
-          conv_x_a = x0_q2;
-          conv_x_v = 1'b1;
-        end
-        8'd9: begin
-          conv_x_a = y0_q2;
-          conv_x_v = 1'b1;
-        end
-        default: ;
-      endcase
-    end
-  end
-
-
-
+  // ---------------- Sequential Latch FSM ----------------
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      p00_x_reg <= 32'b0;
-      p00_y_reg <= 32'b0;
-    end else if (state == ST_CALC) begin
-      if (cycle_cnt == 8'd14) begin
-        p00_x_reg <= conv_x_res;
-      end else if (cycle_cnt == 8'd15) begin
-        p00_y_reg <= conv_x_res;
-      end
-    end
-  end
-
-  // --------------------------------------------------------------------------
-  // Quad-Pixel Edge Calculation FP Add/Sub Units: 2 instances
-  // --------------------------------------------------------------------------
-
-
-  fp_add_sub #(
-      .LATENCY(11)
-  ) u_add_sub0 (
-      .aclk    (clk),
-      .aresetn (rst_n),
-      .aclken  (1'b1),
-      .op_sub  (add_sub0_op),
-      .valid_in(add_sub0_v),
-      .a       (add_sub0_a),
-      .b       (add_sub0_b),
-      .result  (add_sub0_res)
-  );
-
-  fp_add_sub #(
-      .LATENCY(11)
-  ) u_add_sub1 (
-      .aclk    (clk),
-      .aresetn (rst_n),
-      .aclken  (1'b1),
-      .op_sub  (add_sub1_op),
-      .valid_in(add_sub1_v),
-      .a       (add_sub1_a),
-      .b       (add_sub1_b),
-      .result  (add_sub1_res)
-  );
-
-  always_comb begin
-    mul0_a = 32'b0;
-    mul0_b = 32'b0;
-    mul0_valid_in = 1'b0;
-
-    if (state == ST_CALC) begin
-      case (cycle_cnt)
-        8'd12: begin
-          mul0_a = area_A_reg;
-          mul0_b = area_B_reg;
-          mul0_valid_in = 1'b1;
-        end
-        8'd13: begin
-          mul0_a = area_C_reg;
-          mul0_b = area_D_reg;
-          mul0_valid_in = 1'b1;
-        end
-        8'd25: begin
-          mul0_a = add_sub0_res;
-          mul0_b = e0_dx_reg;
-          mul0_valid_in = 1'b1;
-        end
-        8'd26: begin
-          mul0_a = e1_A_reg;
-          mul0_b = e1_dx_reg;
-          mul0_valid_in = 1'b1;
-        end
-        8'd27: begin
-          mul0_a = e0_C_reg;
-          mul0_b = e0_dy_reg;
-          mul0_valid_in = 1'b1;
-        end
-        8'd28: begin
-          mul0_a = e1_C_reg;
-          mul0_b = e1_dy_reg;
-          mul0_valid_in = 1'b1;
-        end
-        8'd29: begin
-          mul0_a = e2_A_reg;
-          mul0_b = e2_dx_reg;
-          mul0_valid_in = 1'b1;
-        end
-        8'd30: begin
-          mul0_a = e2_C_reg;
-          mul0_b = e2_dy_reg;
-          mul0_valid_in = 1'b1;
-        end
-        default: ;
-      endcase
-    end
-  end
-
-  always_comb begin
-    recip0_a = 32'b0;
-    recip0_valid_in = 1'b0;
-
-    if (state == ST_CALC) begin
-      case (cycle_cnt)
-        8'd32: begin
-          recip0_a = add_sub1_res;
-          recip0_valid_in = 1'b1;
-        end
-        default: ;
-      endcase
-    end
-  end
-
-  always_comb begin
-    add_sub0_a = 32'b0;
-    add_sub0_b = 32'b0;
-    add_sub0_op = 1'b0;
-    add_sub0_v = 1'b0;
-
-    add_sub1_a = 32'b0;
-    add_sub1_b = 32'b0;
-    add_sub1_op = 1'b0;
-    add_sub1_v = 1'b0;
-
-    if (state == ST_READ_V2 && valid_in) begin
-      // Transition/Cycle 0 subtraction
-      add_sub0_a = vertex_in.x;
-      add_sub0_b = v0_reg.x;
-      add_sub0_op = 1'b1; // sub
-      add_sub0_v = 1'b1;
-
-      add_sub1_a = v1_reg.y;
-      add_sub1_b = v0_reg.y;
-      add_sub1_op = 1'b1; // sub
-      add_sub1_v = 1'b1;
+      bb_height_reg <= 16'b0;
+      bb_max_x_reg <= 32'b0;
+      bb_max_y_reg <= 32'b0;
+      bb_min_x_reg <= 32'b0;
+      bb_min_y_reg <= 32'b0;
+      bb_start_x_reg <= 16'b0;
+      bb_start_y_reg <= 16'b0;
+      bb_width_reg <= 16'b0;
+      e0_00_reg <= 32'b0;
+      e0_01_reg <= 32'b0;
+      e0_10_reg <= 32'b0;
+      e0_11_reg <= 32'b0;
+      e0_dx_2x_reg <= 32'b0;
+      e0_dx_reg <= 32'b0;
+      e0_dy_2x_reg <= 32'b0;
+      e0_dy_reg <= 32'b0;
+      e1_00_reg <= 32'b0;
+      e1_01_reg <= 32'b0;
+      e1_10_reg <= 32'b0;
+      e1_11_reg <= 32'b0;
+      e1_dx_2x_reg <= 32'b0;
+      e1_dx_reg <= 32'b0;
+      e1_dy_2x_reg <= 32'b0;
+      e1_dy_reg <= 32'b0;
+      e2_00_reg <= 32'b0;
+      e2_01_reg <= 32'b0;
+      e2_10_reg <= 32'b0;
+      e2_11_reg <= 32'b0;
+      e2_dx_2x_reg <= 32'b0;
+      e2_dx_reg <= 32'b0;
+      e2_dy_2x_reg <= 32'b0;
+      e2_dy_reg <= 32'b0;
+      invArea_reg <= 32'b0;
+      p_min_x_reg <= 32'b0;
+      p_min_y_reg <= 32'b0;
+      tmp0 <= 32'b0;
+      tmp1 <= 32'b0;
+      tmp2 <= 32'b0;
+      tmp3 <= 32'b0;
+      tmp4 <= 32'b0;
+      tmp5 <= 32'b0;
+      tmp6 <= 32'b0;
+      tmp7 <= 16'b0;
+      tmp8 <= 32'b0;
+      tmp9 <= 32'b0;
+      tri_max_x_reg <= 32'b0;
+      tri_max_y_reg <= 32'b0;
+      tri_min_x_reg <= 32'b0;
+      tri_min_y_reg <= 32'b0;
     end else if (state == ST_CALC) begin
       case (cycle_cnt)
-        // Cycle 1 subtraction: area_C, area_D
-        8'd1: begin
-          add_sub0_a = v2_reg.y;
-          add_sub0_b = v0_reg.y;
-          add_sub0_op = 1'b1;
-          add_sub0_v = 1'b1;
-
-          add_sub1_a = v1_reg.x;
-          add_sub1_b = v0_reg.x;
-          add_sub1_op = 1'b1;
-          add_sub1_v = 1'b1;
-        end
-        // Cycle 2 subtraction: e0_dx
-        8'd2: begin
-          add_sub1_a = v2_reg.y;
-          add_sub1_b = v1_reg.y;
-          add_sub1_op = 1'b1;
-          add_sub1_v = 1'b1;
-        end
-        // Cycle 3 subtraction: e0_dy
-        8'd3: begin
-          add_sub1_a = v1_reg.x;
-          add_sub1_b = v2_reg.x;
-          add_sub1_op = 1'b1;
-          add_sub1_v = 1'b1;
-        end
-        // Cycle 4 subtraction: e1_dx
-        8'd4: begin
-          add_sub1_a = v0_reg.y;
-          add_sub1_b = v2_reg.y;
-          add_sub1_op = 1'b1;
-          add_sub1_v = 1'b1;
-        end
-        // Cycle 5 subtraction: e1_dy
         8'd5: begin
-          add_sub1_a = v2_reg.x;
-          add_sub1_b = v0_reg.x;
-          add_sub1_op = 1'b1;
-          add_sub1_v = 1'b1;
+          tri_min_x_reg <= tri_bb_min_max_1_min;
+          tri_max_x_reg <= tri_bb_min_max_1_max;
         end
-        // Cycle 6 subtraction: e2_dx
         8'd6: begin
-          add_sub1_a = v1_reg.y;
-          add_sub1_b = v0_reg.y;
-          add_sub1_op = 1'b1;
-          add_sub1_v = 1'b1;
+          tri_min_y_reg <= tri_bb_min_max_1_min;
+          tri_max_y_reg <= tri_bb_min_max_1_max;
         end
-        // Cycle 7 subtraction: e2_dy
         8'd7: begin
-          add_sub1_a = v0_reg.x;
-          add_sub1_b = v1_reg.x;
-          add_sub1_op = 1'b1;
-          add_sub1_v = 1'b1;
-        end
-        // Cycle 14 subtraction: e0_A, e1_A
-        8'd14: begin
-          add_sub0_a = conv_x_res;
-          add_sub0_b = v1_reg.x;
-          add_sub0_op = 1'b1;
-          add_sub0_v = 1'b1;
-
-          add_sub1_a = conv_x_res;
-          add_sub1_b = v2_reg.x;
-          add_sub1_op = 1'b1;
-          add_sub1_v = 1'b1;
-        end
-        // Cycle 15 subtraction: e2_A, e0_C
-        8'd15: begin
-          add_sub0_a = p00_x_reg;
-          add_sub0_b = v0_reg.x;
-          add_sub0_op = 1'b1;
-          add_sub0_v = 1'b1;
-
-          add_sub1_a = conv_x_res;
-          add_sub1_b = v1_reg.y;
-          add_sub1_op = 1'b1;
-          add_sub1_v = 1'b1;
-        end
-        // Cycle 16 subtraction: e1_C, e2_C
-        8'd16: begin
-          add_sub0_a = p00_y_reg;
-          add_sub0_b = v2_reg.y;
-          add_sub0_op = 1'b1;
-          add_sub0_v = 1'b1;
-
-          add_sub1_a = p00_y_reg;
-          add_sub1_b = v0_reg.y;
-          add_sub1_op = 1'b1;
-          add_sub1_v = 1'b1;
-        end
-        // Cycle 20 additions: e0_dx_plus_dy, e1_dx_plus_dy
-        8'd20: begin
-          add_sub0_a = e0_dx_reg;
-          add_sub0_b = e0_dy_reg;
-          add_sub0_op = 1'b0; // add
-          add_sub0_v = 1'b1;
-
-          add_sub1_a = e1_dx_reg;
-          add_sub1_b = e1_dy_reg;
-          add_sub1_op = 1'b0; // add
-          add_sub1_v = 1'b1;
-        end
-        // Cycle 21 addition and subtraction: e2_dx_plus_dy, area_G
-        8'd21: begin
-          add_sub0_a = e2_dx_reg;
-          add_sub0_b = e2_dy_reg;
-          add_sub0_op = 1'b0; // add
-          add_sub0_v = 1'b1;
-
-          add_sub1_a = area_E;
-          add_sub1_b = mul0_res;
-          add_sub1_op = 1'b1; // sub
-          add_sub1_v = 1'b1;
-        end
-        // Cycle 35 subtraction: e0_row
-        8'd35: begin
-          add_sub0_a = e0_E;
-          add_sub0_b = mul0_res;
-          add_sub0_op = 1'b1;
-          add_sub0_v = 1'b1;
-        end
-        // Cycle 36 subtraction: e1_row
-        8'd36: begin
-          add_sub0_a = e1_E;
-          add_sub0_b = mul0_res;
-          add_sub0_op = 1'b1;
-          add_sub0_v = 1'b1;
-        end
-        // Cycle 38 subtraction: e2_row
-        8'd38: begin
-          add_sub0_a = e2_E;
-          add_sub0_b = mul0_res;
-          add_sub0_op = 1'b1;
-          add_sub0_v = 1'b1;
-        end
-        // Cycle 45 additions: e0_10, e0_01
-        8'd45: begin
-          add_sub0_a = e0_row_reg;
-          add_sub0_b = e0_dx_reg;
-          add_sub0_op = 1'b0; // add
-          add_sub0_v = 1'b1;
-
-          add_sub1_a = e0_row_reg;
-          add_sub1_b = e0_dy_reg;
-          add_sub1_op = 1'b0; // add
-          add_sub1_v = 1'b1;
-        end
-        // Cycle 46 addition: e0_11
-        8'd46: begin
-          add_sub0_a = e0_row_reg;
-          add_sub0_b = e0_dx_plus_dy;
-          add_sub0_op = 1'b0;
-          add_sub0_v = 1'b1;
-        end
-        // Cycle 47 additions: e1_10, e1_01
-        8'd47: begin
-          add_sub0_a = e1_row_reg;
-          add_sub0_b = e1_dx_reg;
-          add_sub0_op = 1'b0;
-          add_sub0_v = 1'b1;
-
-          add_sub1_a = e1_row_reg;
-          add_sub1_b = e1_dy_reg;
-          add_sub1_op = 1'b0;
-          add_sub1_v = 1'b1;
-        end
-        // Cycle 48 addition: e1_11
-        8'd48: begin
-          add_sub0_a = e1_row_reg;
-          add_sub0_b = e1_dx_plus_dy;
-          add_sub0_op = 1'b0;
-          add_sub0_v = 1'b1;
-        end
-        // Cycle 49 additions: e2_10, e2_01
-        8'd49: begin
-          add_sub0_a = e2_row_reg;
-          add_sub0_b = e2_dx_reg;
-          add_sub0_op = 1'b0;
-          add_sub0_v = 1'b1;
-
-          add_sub1_a = e2_row_reg;
-          add_sub1_b = e2_dy_reg;
-          add_sub1_op = 1'b0;
-          add_sub1_v = 1'b1;
-        end
-        // Cycle 50 addition: e2_11
-        8'd50: begin
-          add_sub0_a = e2_row_reg;
-          add_sub0_b = e2_dx_plus_dy;
-          add_sub0_op = 1'b0;
-          add_sub0_v = 1'b1;
-        end
-        default: ;
-      endcase
-    end
-  end
-
-
-
-  // --------------------------------------------------------------------------
-  // FSM Cycle and Latency Calculations
-  // --------------------------------------------------------------------------
-  localparam int CYC_LATCH_INVAREA = 61;
-
-  always_ff @(posedge clk) begin
-    if (!rst_n) begin
-      area_A_reg  <= '0;
-      area_B_reg  <= '0;
-      area_C_reg  <= '0;
-      area_D_reg  <= '0;
-      e0_A_reg    <= '0;
-      e0_dx_reg   <= '0;
-      e0_C_reg    <= '0;
-      e1_A_reg    <= '0;
-      e1_dx_reg   <= '0;
-      e1_C_reg    <= '0;
-      e2_A_reg    <= '0;
-      e2_dx_reg   <= '0;
-      e2_C_reg    <= '0;
-      area_E      <= '0;
-      area_F      <= '0;
-      e0_E        <= '0;
-      e0_F        <= '0;
-      e1_E        <= '0;
-      e1_F        <= '0;
-      e2_E        <= '0;
-      e2_F        <= '0;
-      area_G_reg  <= '0;
-      e0_row_reg  <= '0;
-      e1_row_reg  <= '0;
-      e2_row_reg  <= '0;
-      e0_dy_reg   <= '0;
-      e1_dy_reg   <= '0;
-      e2_dy_reg   <= '0;
-      invArea_reg <= '0;
-      minX_reg    <= '0;
-      minY_reg    <= '0;
-      maxX_reg    <= '0;
-      maxY_reg    <= '0;
-      triMinX_reg <= '0;
-      triMaxX_reg <= '0;
-      triMinY_reg <= '0;
-      triMaxY_reg <= '0;
-      e0_dx_plus_dy <= '0;
-      e1_dx_plus_dy <= '0;
-      e2_dx_plus_dy <= '0;
-      e0_10_reg   <= '0;
-      e0_01_reg   <= '0;
-      e0_11_reg   <= '0;
-      e1_10_reg   <= '0;
-      e1_01_reg   <= '0;
-      e1_11_reg   <= '0;
-      e2_10_reg   <= '0;
-      e2_01_reg   <= '0;
-      x_start_reg <= '0;
-      y_start_reg <= '0;
-      x_size_reg  <= '0;
-      y_size_reg  <= '0;
-    end else if (state == ST_CALC) begin
-      case (cycle_cnt)
-        8'd7: begin
-          triMinX_reg <= triMinX;
-          triMaxX_reg <= triMaxX;
+          bb_min_x_reg <= fp_max_2_1_res;
+          bb_max_x_reg <= fp_min_2_1_res;
         end
         8'd8: begin
-          triMinY_reg <= triMinY;
-          triMaxY_reg <= triMaxY;
-          minX_reg    <= minX;
-          maxX_reg    <= maxX;
-          y_start_reg <= minX[6:0];
-          x_size_reg  <= 8'(maxX - minX);
+          e0_dx_reg <= fp_add_sub_1_res;
+          e2_dx_reg <= fp_add_sub_2_res;
+          e2_dy_reg <= fp_add_sub_3_res;
+          bb_min_y_reg <= fp_max_2_1_res;
+          bb_max_y_reg <= fp_min_2_1_res;
         end
         8'd9: begin
-          minY_reg    <= minY;
-          maxY_reg    <= maxY;
-          x_start_reg <= minY[6:0];
-          y_size_reg  <= 8'(maxY - minY);
+          e0_dy_reg <= fp_add_sub_1_res;
+          e1_dy_reg <= fp_add_sub_2_res;
+        end
+        8'd10: begin
+          e1_dx_reg <= fp_add_sub_3_res;
+          tmp0 <= fp_add_sub_1_res;
+          p_min_x_reg <= fp_add_half_fast_1_out;
         end
         8'd11: begin
-          area_A_reg <= add_sub0_res;
-          area_B_reg <= add_sub1_res;
+          tmp1 <= fp_add_sub_2_res;
+          p_min_y_reg <= fp_add_half_fast_1_out;
         end
         8'd12: begin
-          area_C_reg <= add_sub0_res;
-          area_D_reg <= add_sub1_res;
+          bb_start_y_reg <= fp32_to_int16_1_out;
         end
         8'd13: begin
-          e0_dx_reg  <= add_sub1_res;
+          tmp2 <= fp32_to_int16_1_out;
         end
         8'd14: begin
-          e0_dy_reg  <= add_sub1_res;
-        end
-        8'd15: begin
-          e1_dx_reg  <= add_sub1_res;
+          tmp7 <= fp32_to_int16_1_out;
+          bb_height_reg <= int16_sub_1_res;
         end
         8'd16: begin
-          e1_dy_reg  <= add_sub1_res;
+          tmp5 <= fp_mul_1_res;
+          bb_start_x_reg <= fp32_to_int16_1_out;
         end
         8'd17: begin
-          e2_dx_reg  <= add_sub1_res;
+          e2_dy_2x_reg <= fp_add_sub_1_res;
+          tmp6 <= fp_mul_2_res;
         end
         8'd18: begin
-          e2_dy_reg  <= add_sub1_res;
+          e0_dy_2x_reg <= fp_add_sub_3_res;
+          e1_dy_2x_reg <= fp_add_sub_2_res;
+        end
+        8'd19: begin
+          tmp3 <= fp_add_sub_1_res;
+          tmp4 <= fp_add_sub_2_res;
+          e1_dx_2x_reg <= fp_add_sub_3_res;
         end
         8'd20: begin
-          area_E     <= mul0_res;
+          tmp0 <= fp_add_sub_1_res;
+          tmp1 <= fp_add_sub_2_res;
         end
         8'd21: begin
-          area_F     <= mul0_res;
+          tmp8 <= fp_add_sub_3_res;
+          tmp9 <= fp_add_sub_1_res;
+        end
+        8'd22: begin
+          e0_dx_2x_reg <= fp_add_sub_2_res;
+          e2_dx_2x_reg <= fp_add_sub_1_res;
         end
         8'd25: begin
-          e0_A_reg   <= add_sub0_res;
-          e1_A_reg   <= add_sub1_res;
+          tmp3 <= fp_mul_1_res;
+          tmp2 <= fp_mul_2_res;
         end
         8'd26: begin
-          e2_A_reg   <= add_sub0_res;
-          e0_C_reg   <= add_sub1_res;
+          tmp1 <= fp_mul_1_res;
+          tmp0 <= fp_mul_2_res;
         end
         8'd27: begin
-          e1_C_reg   <= add_sub0_res;
-          e2_C_reg   <= add_sub1_res;
+          tmp4 <= fp_mul_1_res;
+          tmp5 <= fp_mul_2_res;
         end
-        8'd31: begin
-          e0_dx_plus_dy <= add_sub0_res;
-          e1_dx_plus_dy <= add_sub1_res;
-        end
-        8'd32: begin
-          e2_dx_plus_dy <= add_sub0_res;
-          area_G_reg    <= add_sub1_res;
-        end
-        8'd33: begin
-          e0_E       <= mul0_res;
-        end
-        8'd34: begin
-          e1_E       <= mul0_res;
+        8'd30: begin
+          tmp6 <= fp_add_sub_3_res;
         end
         8'd35: begin
-          e0_F       <= mul0_res;
+          e2_00_reg <= fp_add_sub_1_res;
         end
         8'd36: begin
-          e1_F       <= mul0_res;
+          e0_00_reg <= fp_add_sub_2_res;
+          e1_00_reg <= fp_add_sub_3_res;
         end
-        8'd37: begin
-          e2_E       <= mul0_res;
+        8'd44: begin
+          e2_10_reg <= fp_add_sub_1_res;
         end
-        8'd38: begin
-          e2_F       <= mul0_res;
-        end
-        8'd46: begin
-          e0_row_reg <= add_sub0_res;
+        8'd45: begin
+          e0_10_reg <= fp_add_sub_2_res;
+          e1_10_reg <= fp_add_sub_3_res;
         end
         8'd47: begin
-          e1_row_reg <= add_sub0_res;
+          e0_01_reg <= fp_add_sub_1_res;
+          e1_01_reg <= fp_add_sub_2_res;
         end
-        8'd49: begin
-          e2_row_reg <= add_sub0_res;
+        8'd50: begin
+          e2_01_reg <= fp_add_sub_3_res;
         end
-        8'd56: begin
-          e0_10_reg  <= add_sub0_res;
-          e0_01_reg  <= add_sub1_res;
+        8'd53: begin
+          invArea_reg <= fp_recip_1_out;
+          e2_11_reg   <= fp_add_sub_1_res;
         end
-        8'd57: begin
-          e0_11_reg  <= add_sub0_res;
-        end
-        8'd58: begin
-          e1_10_reg  <= add_sub0_res;
-          e1_01_reg  <= add_sub1_res;
-        end
-        8'd59: begin
-          e1_11_reg  <= add_sub0_res;
-        end
-        8'd60: begin
-          e2_10_reg  <= add_sub0_res;
-          e2_01_reg  <= add_sub1_res;
-        end
-        8'd61: begin
-          invArea_reg <= recip0_res;
+        8'd54: begin
+          e0_11_reg <= fp_add_sub_2_res;
+          e1_11_reg <= fp_add_sub_3_res;
+          bb_width_reg <= int16_sub_1_res;
         end
         default: ;
       endcase
     end
   end
 
-  // Ready to accept data if we are in reading states
+  // ---------------- Combinational Launch FSM ----------------
+
+  always_comb begin
+    fp32_to_int16_1_in = 32'b0;
+    fp32_to_int16_1_valid_in = 1'b0;
+    fp_add_half_fast_1_in = 32'b0;
+    fp_add_half_fast_1_valid_in = 1'b0;
+    fp_add_sub_1_a = 32'b0;
+    fp_add_sub_1_b = 32'b0;
+    fp_add_sub_1_op = 1'b0;
+    fp_add_sub_1_valid_in = 1'b0;
+    fp_add_sub_2_a = 32'b0;
+    fp_add_sub_2_b = 32'b0;
+    fp_add_sub_2_op = 1'b0;
+    fp_add_sub_2_valid_in = 1'b0;
+    fp_add_sub_3_a = 32'b0;
+    fp_add_sub_3_b = 32'b0;
+    fp_add_sub_3_op = 1'b0;
+    fp_add_sub_3_valid_in = 1'b0;
+    fp_max_2_1_a = 32'b0;
+    fp_max_2_1_b = 32'b0;
+    fp_max_2_1_valid_in = 1'b0;
+    fp_min_2_1_a = 32'b0;
+    fp_min_2_1_b = 32'b0;
+    fp_min_2_1_valid_in = 1'b0;
+    fp_mul_1_a = 32'b0;
+    fp_mul_1_b = 32'b0;
+    fp_mul_1_valid_in = 1'b0;
+    fp_mul_2_a = 32'b0;
+    fp_mul_2_b = 32'b0;
+    fp_mul_2_valid_in = 1'b0;
+    fp_recip_1_in = 32'b0;
+    fp_recip_1_valid_in = 1'b0;
+    int16_sub_1_a = 16'b0;
+    int16_sub_1_b = 16'b0;
+    tri_bb_min_max_1_a = 32'b0;
+    tri_bb_min_max_1_b = 32'b0;
+    tri_bb_min_max_1_c = 32'b0;
+    tri_bb_min_max_1_valid_in = 1'b0;
+
+    if (state == ST_CALC) begin
+      case (cycle_cnt)
+        8'd0: begin
+          fp_add_sub_1_a = v2_reg.y;
+          fp_add_sub_1_b = v1_reg.y;
+          fp_add_sub_1_op = 1'b1;
+          fp_add_sub_1_valid_in = 1'b1;
+          fp_add_sub_2_a = v1_reg.y;
+          fp_add_sub_2_b = v0_reg.y;
+          fp_add_sub_2_op = 1'b1;
+          fp_add_sub_2_valid_in = 1'b1;
+          fp_add_sub_3_a = v0_reg.x;
+          fp_add_sub_3_b = v1_reg.x;
+          fp_add_sub_3_op = 1'b1;
+          fp_add_sub_3_valid_in = 1'b1;
+          tri_bb_min_max_1_a = v0_reg.x;
+          tri_bb_min_max_1_b = v1_reg.x;
+          tri_bb_min_max_1_c = v2_reg.x;
+          tri_bb_min_max_1_valid_in = 1'b1;
+        end
+        8'd1: begin
+          fp_add_sub_1_a = v1_reg.x;
+          fp_add_sub_1_b = v2_reg.x;
+          fp_add_sub_1_op = 1'b1;
+          fp_add_sub_1_valid_in = 1'b1;
+          fp_add_sub_2_a = v2_reg.x;
+          fp_add_sub_2_b = v0_reg.x;
+          fp_add_sub_2_op = 1'b1;
+          fp_add_sub_2_valid_in = 1'b1;
+          tri_bb_min_max_1_a = v0_reg.y;
+          tri_bb_min_max_1_b = v1_reg.y;
+          tri_bb_min_max_1_c = v2_reg.y;
+          tri_bb_min_max_1_valid_in = 1'b1;
+        end
+        8'd2: begin
+          fp_add_sub_3_a = v0_reg.y;
+          fp_add_sub_3_b = v2_reg.y;
+          fp_add_sub_3_op = 1'b1;
+          fp_add_sub_3_valid_in = 1'b1;
+          fp_add_sub_1_a = v1_reg.x;
+          fp_add_sub_1_b = v0_reg.x;
+          fp_add_sub_1_op = 1'b1;
+          fp_add_sub_1_valid_in = 1'b1;
+        end
+        8'd3: begin
+          fp_add_sub_2_a = v2_reg.y;
+          fp_add_sub_2_b = v0_reg.y;
+          fp_add_sub_2_op = 1'b1;
+          fp_add_sub_2_valid_in = 1'b1;
+        end
+        8'd6: begin
+          fp_max_2_1_a = tri_min_x_reg;
+          fp_max_2_1_b = binMinX;
+          fp_max_2_1_valid_in = 1'b1;
+          fp_min_2_1_a = tri_max_x_reg;
+          fp_min_2_1_b = binMaxX;
+          fp_min_2_1_valid_in = 1'b1;
+        end
+        8'd7: begin
+          fp_max_2_1_a = tri_min_y_reg;
+          fp_max_2_1_b = binMinY;
+          fp_max_2_1_valid_in = 1'b1;
+          fp_min_2_1_a = tri_max_y_reg;
+          fp_min_2_1_b = binMaxY;
+          fp_min_2_1_valid_in = 1'b1;
+        end
+        8'd8: begin
+          fp_add_half_fast_1_in = bb_min_x_reg;
+          fp_add_half_fast_1_valid_in = 1'b1;
+        end
+        8'd9: begin
+          fp_add_half_fast_1_in = bb_min_y_reg;
+          fp_add_half_fast_1_valid_in = 1'b1;
+          fp_add_sub_1_a = e2_dy_reg;
+          fp_add_sub_1_b = e2_dy_reg;
+          fp_add_sub_1_op = 1'b0;
+          fp_add_sub_1_valid_in = 1'b1;
+        end
+        8'd10: begin
+          fp_add_sub_3_a = e0_dy_reg;
+          fp_add_sub_3_b = e0_dy_reg;
+          fp_add_sub_3_op = 1'b0;
+          fp_add_sub_3_valid_in = 1'b1;
+          fp_add_sub_2_a = e1_dy_reg;
+          fp_add_sub_2_b = e1_dy_reg;
+          fp_add_sub_2_op = 1'b0;
+          fp_add_sub_2_valid_in = 1'b1;
+          fp32_to_int16_1_in = bb_min_y_reg;
+          fp32_to_int16_1_valid_in = 1'b1;
+        end
+        8'd11: begin
+          fp_mul_1_a = e1_dy_reg;
+          fp_mul_1_b = e2_dx_reg;
+          fp_mul_1_valid_in = 1'b1;
+          fp_add_sub_1_a = p_min_x_reg;
+          fp_add_sub_1_b = v2_reg.x;
+          fp_add_sub_1_op = 1'b1;
+          fp_add_sub_1_valid_in = 1'b1;
+          fp_add_sub_2_a = p_min_x_reg;
+          fp_add_sub_2_b = v0_reg.x;
+          fp_add_sub_2_op = 1'b1;
+          fp_add_sub_2_valid_in = 1'b1;
+          fp_add_sub_3_a = e1_dx_reg;
+          fp_add_sub_3_b = e1_dx_reg;
+          fp_add_sub_3_op = 1'b0;
+          fp_add_sub_3_valid_in = 1'b1;
+          fp32_to_int16_1_in = bb_max_y_reg;
+          fp32_to_int16_1_valid_in = 1'b1;
+        end
+        8'd12: begin
+          fp_mul_2_a = tmp1;
+          fp_mul_2_b = tmp0;
+          fp_mul_2_valid_in = 1'b1;
+          fp_add_sub_1_a = p_min_x_reg;
+          fp_add_sub_1_b = v1_reg.x;
+          fp_add_sub_1_op = 1'b1;
+          fp_add_sub_1_valid_in = 1'b1;
+          fp_add_sub_2_a = p_min_y_reg;
+          fp_add_sub_2_b = v0_reg.y;
+          fp_add_sub_2_op = 1'b1;
+          fp_add_sub_2_valid_in = 1'b1;
+          fp32_to_int16_1_in = bb_max_x_reg;
+          fp32_to_int16_1_valid_in = 1'b1;
+        end
+        8'd13: begin
+          fp_add_sub_3_a = p_min_y_reg;
+          fp_add_sub_3_b = v1_reg.y;
+          fp_add_sub_3_op = 1'b1;
+          fp_add_sub_3_valid_in = 1'b1;
+          fp_add_sub_1_a = p_min_y_reg;
+          fp_add_sub_1_b = v2_reg.y;
+          fp_add_sub_1_op = 1'b1;
+          fp_add_sub_1_valid_in = 1'b1;
+        end
+        8'd14: begin
+          fp_add_sub_2_a = e0_dx_reg;
+          fp_add_sub_2_b = e0_dx_reg;
+          fp_add_sub_2_op = 1'b0;
+          fp_add_sub_2_valid_in = 1'b1;
+          fp_add_sub_1_a = e2_dx_reg;
+          fp_add_sub_1_b = e2_dx_reg;
+          fp_add_sub_1_op = 1'b0;
+          fp_add_sub_1_valid_in = 1'b1;
+          fp32_to_int16_1_in = bb_min_x_reg;
+          fp32_to_int16_1_valid_in = 1'b1;
+          int16_sub_1_a = tmp2[15:0];
+          int16_sub_1_b = bb_start_y_reg[15:0];
+        end
+        8'd20: begin
+          fp_mul_1_a = e1_dx_reg;
+          fp_mul_1_b = tmp3;
+          fp_mul_1_valid_in = 1'b1;
+          fp_mul_2_a = e2_dx_reg;
+          fp_mul_2_b = tmp4;
+          fp_mul_2_valid_in = 1'b1;
+        end
+        8'd21: begin
+          fp_mul_1_a = e0_dx_reg;
+          fp_mul_1_b = tmp0;
+          fp_mul_1_valid_in = 1'b1;
+          fp_mul_2_a = e2_dy_reg;
+          fp_mul_2_b = tmp1;
+          fp_mul_2_valid_in = 1'b1;
+        end
+        8'd22: begin
+          fp_add_sub_3_a = tmp5;
+          fp_add_sub_3_b = tmp6;
+          fp_add_sub_3_op = 1'b1;
+          fp_add_sub_3_valid_in = 1'b1;
+          fp_mul_1_a = e0_dy_reg;
+          fp_mul_1_b = tmp8;
+          fp_mul_1_valid_in = 1'b1;
+          fp_mul_2_a = e1_dy_reg;
+          fp_mul_2_b = tmp9;
+          fp_mul_2_valid_in = 1'b1;
+        end
+        8'd27: begin
+          fp_add_sub_1_a = tmp2;
+          fp_add_sub_1_b = tmp0;
+          fp_add_sub_1_op = 1'b0;
+          fp_add_sub_1_valid_in = 1'b1;
+        end
+        8'd28: begin
+          fp_add_sub_2_a = tmp1;
+          fp_add_sub_2_b = tmp4;
+          fp_add_sub_2_op = 1'b0;
+          fp_add_sub_2_valid_in = 1'b1;
+          fp_add_sub_3_a = tmp3;
+          fp_add_sub_3_b = tmp5;
+          fp_add_sub_3_op = 1'b0;
+          fp_add_sub_3_valid_in = 1'b1;
+        end
+        8'd31: begin
+          fp_recip_1_in = tmp6;
+          fp_recip_1_valid_in = 1'b1;
+        end
+        8'd36: begin
+          fp_add_sub_1_a = e2_00_reg;
+          fp_add_sub_1_b = e2_dx_reg;
+          fp_add_sub_1_op = 1'b0;
+          fp_add_sub_1_valid_in = 1'b1;
+        end
+        8'd37: begin
+          fp_add_sub_2_a = e0_00_reg;
+          fp_add_sub_2_b = e0_dx_reg;
+          fp_add_sub_2_op = 1'b0;
+          fp_add_sub_2_valid_in = 1'b1;
+          fp_add_sub_3_a = e1_00_reg;
+          fp_add_sub_3_b = e1_dx_reg;
+          fp_add_sub_3_op = 1'b0;
+          fp_add_sub_3_valid_in = 1'b1;
+        end
+        8'd39: begin
+          fp_add_sub_1_a = e0_00_reg;
+          fp_add_sub_1_b = e0_dy_reg;
+          fp_add_sub_1_op = 1'b0;
+          fp_add_sub_1_valid_in = 1'b1;
+          fp_add_sub_2_a = e1_00_reg;
+          fp_add_sub_2_b = e1_dy_reg;
+          fp_add_sub_2_op = 1'b0;
+          fp_add_sub_2_valid_in = 1'b1;
+        end
+        8'd42: begin
+          fp_add_sub_3_a = e2_00_reg;
+          fp_add_sub_3_b = e2_dy_reg;
+          fp_add_sub_3_op = 1'b0;
+          fp_add_sub_3_valid_in = 1'b1;
+        end
+        8'd45: begin
+          fp_add_sub_1_a = e2_10_reg;
+          fp_add_sub_1_b = e2_dy_reg;
+          fp_add_sub_1_op = 1'b0;
+          fp_add_sub_1_valid_in = 1'b1;
+        end
+        8'd46: begin
+          fp_add_sub_2_a = e0_10_reg;
+          fp_add_sub_2_b = e0_dy_reg;
+          fp_add_sub_2_op = 1'b0;
+          fp_add_sub_2_valid_in = 1'b1;
+          fp_add_sub_3_a = e1_10_reg;
+          fp_add_sub_3_b = e1_dy_reg;
+          fp_add_sub_3_op = 1'b0;
+          fp_add_sub_3_valid_in = 1'b1;
+        end
+        8'd54: begin
+          int16_sub_1_a = tmp7[15:0];
+          int16_sub_1_b = bb_start_x_reg[15:0];
+        end
+        default: ;
+      endcase
+    end
+  end
+
   assign ready_out = (state == ST_READ_V0 || state == ST_READ_V1 || state == ST_READ_V2);
+
+  // --------------------------------------------------------------------------
+  // FSM State and Cycle Counter Logic
+  // --------------------------------------------------------------------------
+  localparam int NUM_OF_PIPELINE_STAGES = 55;
 
   always_ff @(posedge clk) begin
     if (!rst_n) begin
@@ -858,13 +851,13 @@ module raster_frontend (
     end else begin
       state <= next_state;
       if (state == ST_CALC) begin
-        if (cycle_cnt == CYC_W'(CYC_LATCH_INVAREA)) begin
+        if (cycle_cnt == CYC_W'(NUM_OF_PIPELINE_STAGES)) begin
           cycle_cnt <= '0;
         end else begin
           cycle_cnt <= cycle_cnt + 1;
         end
       end else if (next_state == ST_CALC) begin
-        cycle_cnt <= CYC_W'(1);
+        cycle_cnt <= CYC_W'(0);
       end else begin
         cycle_cnt <= '0;
       end
@@ -877,7 +870,7 @@ module raster_frontend (
       ST_READ_V0: if (valid_in) next_state = ST_READ_V1;
       ST_READ_V1: if (valid_in) next_state = ST_READ_V2;
       ST_READ_V2: if (valid_in) next_state = ST_CALC;
-      ST_CALC:    if (cycle_cnt == CYC_W'(CYC_LATCH_INVAREA)) begin
+      ST_CALC:    if (cycle_cnt == CYC_W'(NUM_OF_PIPELINE_STAGES)) begin
                     next_state = ST_STALL;
                   end else begin
                     next_state = ST_CALC;
@@ -898,6 +891,10 @@ module raster_frontend (
           v0_reg <= vertex_in;
           tile_x_id_reg <= tile_x_id;
           tile_y_id_reg <= tile_y_id;
+          binMinX <= TILE_X_MIN_ROM[tile_x_id];
+          binMaxX <= TILE_X_MAX_ROM[tile_x_id];
+          binMinY <= TILE_X_MIN_ROM[tile_y_id];
+          binMaxY <= TILE_X_MAX_ROM[tile_y_id];
         end
         ST_READ_V1: v1_reg <= vertex_in;
         ST_READ_V2: v2_reg <= vertex_in;
@@ -907,12 +904,16 @@ module raster_frontend (
   end
 
 
+
+  // --------------------------------------------------------------------------
+  // Output Ports Buffering
+  // --------------------------------------------------------------------------
   always_ff @(posedge clk) begin
     if (!rst_n) begin
       out_data_valid <= 1'b0;
-      out_e0_row     <= 32'b0;
-      out_e1_row     <= 32'b0;
-      out_e2_row     <= 32'b0;
+      out_e0_00      <= 32'b0;
+      out_e1_00      <= 32'b0;
+      out_e2_00      <= 32'b0;
       out_e0_10      <= 32'b0;
       out_e1_10      <= 32'b0;
       out_e2_10      <= 32'b0;
@@ -922,26 +923,26 @@ module raster_frontend (
       out_e0_11      <= 32'b0;
       out_e1_11      <= 32'b0;
       out_e2_11      <= 32'b0;
-      out_e0_dx      <= 32'b0;
-      out_e0_dy      <= 32'b0;
-      out_e1_dx      <= 32'b0;
-      out_e1_dy      <= 32'b0;
-      out_e2_dx      <= 32'b0;
-      out_e2_dy      <= 32'b0;
+      out_e0_dx_2x   <= 32'b0;
+      out_e0_dy_2x   <= 32'b0;
+      out_e1_dx_2x   <= 32'b0;
+      out_e1_dy_2x   <= 32'b0;
+      out_e2_dx_2x   <= 32'b0;
+      out_e2_dy_2x   <= 32'b0;
       out_invArea    <= 32'b0;
       out_v0         <= '0;
       out_v1         <= '0;
       out_v2         <= '0;
-      out_minX_local <= 7'b0;
-      out_minY_local <= 7'b0;
+      out_minX_local <= 8'b0;
+      out_minY_local <= 8'b0;
       out_width      <= 8'b0;
       out_height     <= 8'b0;
     end else begin
-      if (state == ST_CALC && cycle_cnt == CYC_W'(CYC_LATCH_INVAREA)) begin
+      if (state == ST_CALC && cycle_cnt == CYC_W'(NUM_OF_PIPELINE_STAGES)) begin
         out_data_valid <= 1'b1;
-        out_e0_row     <= e0_row_reg;
-        out_e1_row     <= e1_row_reg;
-        out_e2_row     <= e2_row_reg;
+        out_e0_00      <= e0_00_reg;
+        out_e1_00      <= e1_00_reg;
+        out_e2_00      <= e2_00_reg;
         out_e0_10      <= e0_10_reg;
         out_e1_10      <= e1_10_reg;
         out_e2_10      <= e2_10_reg;
@@ -950,21 +951,21 @@ module raster_frontend (
         out_e2_01      <= e2_01_reg;
         out_e0_11      <= e0_11_reg;
         out_e1_11      <= e1_11_reg;
-        out_e2_11      <= add_sub0_res;
-        out_e0_dx      <= e0_dx_reg;
-        out_e0_dy      <= e0_dy_reg;
-        out_e1_dx      <= e1_dx_reg;
-        out_e1_dy      <= e1_dy_reg;
-        out_e2_dx      <= e2_dx_reg;
-        out_e2_dy      <= e2_dy_reg;
-        out_invArea    <= recip0_res;
+        out_e2_11      <= e2_11_reg;
+        out_e0_dx_2x   <= e0_dx_2x_reg;
+        out_e0_dy_2x   <= e0_dy_2x_reg;
+        out_e1_dx_2x   <= e1_dx_2x_reg;
+        out_e1_dy_2x   <= e1_dy_2x_reg;
+        out_e2_dx_2x   <= e2_dx_2x_reg;
+        out_e2_dy_2x   <= e2_dy_2x_reg;
+        out_invArea    <= invArea_reg;
         out_v0         <= v0_reg;
         out_v1         <= v1_reg;
         out_v2         <= v2_reg;
-        out_minX_local <= x_start_reg;
-        out_minY_local <= y_start_reg;
-        out_width      <= x_size_reg;
-        out_height     <= y_size_reg;
+        out_minX_local <= bb_start_x_reg[7:0] % TILE_SIZE_X;
+        out_minY_local <= bb_start_y_reg[7:0] % TILE_SIZE_Y;
+        out_width      <= bb_width_reg;
+        out_height     <= bb_height_reg;
       end else if (state == ST_STALL && ready_in) begin
         out_data_valid <= 1'b0;
       end

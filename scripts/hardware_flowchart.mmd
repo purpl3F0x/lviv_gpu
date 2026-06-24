@@ -1,0 +1,384 @@
+flowchart LR
+    fp_add_sub_1["fp_add_sub_1\nfp_add_sub_1"]
+    fp_add_sub_4["fp_add_sub_2\nfp_add_sub_4"]
+    tri_bb_min_max1["tri_bb_min_max_1\ntri_bb_min_max1"]
+    fp_add_sub_5["fp_add_sub_1\nfp_add_sub_5"]
+    tri_bb_min_max2["tri_bb_min_max_1\ntri_bb_min_max2"]
+    fp_add_sub_7["fp_add_sub_2\nfp_add_sub_7"]
+    fp_add_sub_8["fp_add_sub_1\nfp_add_sub_8"]
+    fp_add_sub_2["fp_add_sub_1\nfp_add_sub_2"]
+    fp_add_sub_3["fp_add_sub_2\nfp_add_sub_3"]
+    fp_add_sub_6["fp_add_sub_1\nfp_add_sub_6"]
+    fp_max_2_1["fp_max_2_1\nfp_max_2_1"]
+    fp_min_2_1["fp_min_2_1\nfp_min_2_1"]
+    fp_max_2_2["fp_max_2_1\nfp_max_2_2"]
+    fp_min_2_2["fp_min_2_1\nfp_min_2_2"]
+    fp_add_half_fast_1["fp_add_half_fast_1\nfp_add_half_fast_1"]
+    fp32_to_int16_3["fp32_to_int16_1\nfp32_to_int16_3"]
+    fp_add_half_fast_2["fp_add_half_fast_1\nfp_add_half_fast_2"]
+    fp_mul_1["fp_mul_1\nfp_mul_1"]
+    fp_add_sub_31["fp_add_sub_2\nfp_add_sub_31"]
+    fp_add_sub_32["fp_add_sub_1\nfp_add_sub_32"]
+    fp32_to_int16_2["fp32_to_int16_1\nfp32_to_int16_2"]
+    fp_mul_2["fp_mul_2\nfp_mul_2"]
+    fp_add_sub_10["fp_add_sub_1\nfp_add_sub_10"]
+    fp_add_sub_13["fp_add_sub_2\nfp_add_sub_13"]
+    fp32_to_int16_4["fp32_to_int16_1\nfp32_to_int16_4"]
+    fp_add_sub_16["fp_add_sub_1\nfp_add_sub_16"]
+    fp_add_sub_17["fp_add_sub_2\nfp_add_sub_17"]
+    fp_add_sub_11["fp_add_sub_1\nfp_add_sub_11"]
+    fp_add_sub_14["fp_add_sub_2\nfp_add_sub_14"]
+    int16_add_sub_2["int16_add_sub_1\nint16_add_sub_2"]
+    fp32_to_int16_1["fp32_to_int16_1\nfp32_to_int16_1"]
+    fp_add_sub_30["fp_add_sub_1\nfp_add_sub_30"]
+    fp_add_sub_9["fp_add_sub_2\nfp_add_sub_9"]
+    fp_mul_3["fp_mul_1\nfp_mul_3"]
+    fp_mul_5["fp_mul_2\nfp_mul_5"]
+    fp_mul_7["fp_mul_1\nfp_mul_7"]
+    fp_mul_8["fp_mul_2\nfp_mul_8"]
+    fp_mul_4["fp_mul_1\nfp_mul_4"]
+    fp_mul_6["fp_mul_2\nfp_mul_6"]
+    fp_add_sub_28["fp_add_sub_1\nfp_add_sub_28"]
+    fp_add_sub_29["fp_add_sub_2\nfp_add_sub_29"]
+    fp_add_sub_18["fp_add_sub_1\nfp_add_sub_18"]
+    fp_add_sub_12["fp_add_sub_2\nfp_add_sub_12"]
+    fp_add_sub_15["fp_add_sub_1\nfp_add_sub_15"]
+    fp_recip_1["fp_recip_1\nfp_recip_1"]
+    fp_add_sub_33["fp_add_sub_1\nfp_add_sub_33"]
+    fp_add_sub_21["fp_add_sub_2\nfp_add_sub_21"]
+    fp_add_sub_19["fp_add_sub_1\nfp_add_sub_19"]
+    fp_add_sub_20["fp_add_sub_2\nfp_add_sub_20"]
+    fp_add_sub_23["fp_add_sub_1\nfp_add_sub_23"]
+    fp_add_sub_22["fp_add_sub_2\nfp_add_sub_22"]
+    fp_add_sub_24["fp_add_sub_1\nfp_add_sub_24"]
+    fp_add_sub_27["fp_add_sub_2\nfp_add_sub_27"]
+    fp_add_sub_25["fp_add_sub_1\nfp_add_sub_25"]
+    fp_add_sub_26["fp_add_sub_2\nfp_add_sub_26"]
+    int16_add_sub_1["int16_add_sub_1\nint16_add_sub_1"]
+    R_tmp2(["tmp2"])
+    R_tmp3(["tmp3"])
+    R_tmp0(["tmp0"])
+    R_tmp1(["tmp1"])
+    R_tmp6(["tmp6"])
+    R_tmp4(["tmp4"])
+    R_tmp5(["tmp5"])
+    R_fp_mul_2_a_src_reg(["fp_mul_2_a_src_reg"])
+    R_fp_mul_2_b_src_reg(["fp_mul_2_b_src_reg"])
+    R_tmp8(["tmp8"])
+    R_tmp7(["tmp7"])
+    R_tmp9(["tmp9"])
+    R_fp32_to_int16_1_in_src_reg(["fp32_to_int16_1_in_src_reg"])
+    R_int16_add_sub_1_a_src_reg(["int16_add_sub_1_a_src_reg"])
+    R_fp_add_sub_2_a_src_reg(["fp_add_sub_2_a_src_reg"])
+    R_e1_dy_2x_reg(["e1_dy_2x_reg"])
+    R_e2_dx_2x_reg(["e2_dx_2x_reg"])
+    R_bb_start_y_reg(["bb_start_y_reg"])
+    R_fp_add_sub_2_b_src_reg(["fp_add_sub_2_b_src_reg"])
+    R_fp_mul_1_b_src_reg(["fp_mul_1_b_src_reg"])
+    R_bb_height_reg(["bb_height_reg"])
+    R_bb_start_x_reg(["bb_start_x_reg"])
+    R_e1_dx_2x_reg(["e1_dx_2x_reg"])
+    R_fp_recip_1_in_src_reg(["fp_recip_1_in_src_reg"])
+    R_fp_add_sub_1_a_src_reg(["fp_add_sub_1_a_src_reg"])
+    R_fp_add_sub_1_b_src_reg(["fp_add_sub_1_b_src_reg"])
+    R_e0_dx_2x_reg(["e0_dx_2x_reg"])
+    R_e0_dy_2x_reg(["e0_dy_2x_reg"])
+    R_e2_00_reg(["e2_00_reg"])
+    R_e0_00_reg(["e0_00_reg"])
+    R_e1_00_reg(["e1_00_reg"])
+    R_invArea_reg(["invArea_reg"])
+    R_e2_dy_2x_reg(["e2_dy_2x_reg"])
+    R_e2_10_reg(["e2_10_reg"])
+    R_e0_10_reg(["e0_10_reg"])
+    R_e1_10_reg(["e1_10_reg"])
+    R_e1_01_reg(["e1_01_reg"])
+    R_e0_01_reg(["e0_01_reg"])
+    R_e2_01_reg(["e2_01_reg"])
+    R_e2_11_reg(["e2_11_reg"])
+    R_e0_11_reg(["e0_11_reg"])
+    R_e1_11_reg(["e1_11_reg"])
+    R_bb_width_reg(["bb_width_reg"])
+    L_v2_reg_y(["v2_reg.y"])
+    L_v1_reg_y(["v1_reg.y"])
+    L_v2_reg_x(["v2_reg.x"])
+    L_v0_reg_x(["v0_reg.x"])
+    L_v1_reg_x(["v1_reg.x"])
+    L_v0_reg_y(["v0_reg.y"])
+    L_binMinX(["binMinX"])
+    L_binMaxX(["binMaxX"])
+    L_binMinY(["binMinY"])
+    L_binMaxY(["binMaxY"])
+    fp_add_sub_1 --> R_tmp2
+    fp_add_sub_4 --> R_tmp3
+    tri_bb_min_max1 --> R_tmp0
+    tri_bb_min_max1 --> R_tmp1
+    fp_add_sub_5 --> R_tmp6
+    tri_bb_min_max2 --> R_tmp4
+    tri_bb_min_max2 --> R_tmp5
+    fp_add_sub_7 --> R_fp_mul_2_a_src_reg
+    fp_add_sub_8 --> R_fp_mul_2_b_src_reg
+    fp_add_sub_2 --> R_tmp8
+    fp_add_sub_3 --> R_tmp7
+    fp_add_sub_6 --> R_tmp9
+    fp_max_2_1 --> R_tmp0
+    fp_min_2_1 --> R_fp32_to_int16_1_in_src_reg
+    fp_max_2_2 --> R_tmp1
+    fp_min_2_2 --> R_fp32_to_int16_1_in_src_reg
+    fp_add_half_fast_1 --> R_tmp4
+    fp32_to_int16_3 --> R_int16_add_sub_1_a_src_reg
+    fp_add_half_fast_2 --> R_tmp5
+    fp_mul_1 --> R_fp_add_sub_2_a_src_reg
+    fp_add_sub_31 --> R_e1_dy_2x_reg
+    fp_add_sub_32 --> R_e2_dx_2x_reg
+    fp32_to_int16_2 --> R_bb_start_y_reg
+    fp_mul_2 --> R_fp_add_sub_2_b_src_reg
+    fp_add_sub_10 --> R_fp_mul_1_b_src_reg
+    fp_add_sub_13 --> R_fp_mul_2_b_src_reg
+    fp32_to_int16_4 --> R_int16_add_sub_1_a_src_reg
+    fp_add_sub_16 --> R_fp_mul_1_b_src_reg
+    fp_add_sub_17 --> R_fp_mul_2_b_src_reg
+    fp_add_sub_11 --> R_fp_mul_1_b_src_reg
+    fp_add_sub_14 --> R_fp_mul_2_b_src_reg
+    int16_add_sub_2 --> R_bb_height_reg
+    fp32_to_int16_1 --> R_bb_start_x_reg
+    fp_add_sub_30 --> R_e1_dx_2x_reg
+    fp_add_sub_9 --> R_fp_recip_1_in_src_reg
+    fp_mul_3 --> R_fp_add_sub_2_a_src_reg
+    fp_mul_5 --> R_fp_add_sub_1_a_src_reg
+    fp_mul_7 --> R_fp_add_sub_1_a_src_reg
+    fp_mul_8 --> R_fp_add_sub_1_b_src_reg
+    fp_mul_4 --> R_fp_add_sub_2_b_src_reg
+    fp_mul_6 --> R_fp_add_sub_1_b_src_reg
+    fp_add_sub_28 --> R_e0_dx_2x_reg
+    fp_add_sub_29 --> R_e0_dy_2x_reg
+    fp_add_sub_18 --> R_e2_00_reg
+    fp_add_sub_12 --> R_e0_00_reg
+    fp_add_sub_15 --> R_e1_00_reg
+    fp_recip_1 --> R_invArea_reg
+    fp_add_sub_33 --> R_e2_dy_2x_reg
+    fp_add_sub_21 --> R_e2_10_reg
+    fp_add_sub_19 --> R_e0_10_reg
+    fp_add_sub_20 --> R_e1_10_reg
+    fp_add_sub_23 --> R_e1_01_reg
+    fp_add_sub_22 --> R_e0_01_reg
+    fp_add_sub_24 --> R_e2_01_reg
+    fp_add_sub_27 --> R_e2_11_reg
+    fp_add_sub_25 --> R_e0_11_reg
+    fp_add_sub_26 --> R_e1_11_reg
+    int16_add_sub_1 --> R_bb_width_reg
+    L_v2_reg_y --> fp_add_sub_1
+    L_v1_reg_y --> fp_add_sub_1
+    L_v2_reg_x --> fp_add_sub_4
+    L_v0_reg_x --> fp_add_sub_4
+    L_v0_reg_x --> tri_bb_min_max1
+    L_v1_reg_x --> tri_bb_min_max1
+    L_v2_reg_x --> tri_bb_min_max1
+    L_v1_reg_y --> fp_add_sub_5
+    L_v0_reg_y --> fp_add_sub_5
+    L_v0_reg_y --> tri_bb_min_max2
+    L_v1_reg_y --> tri_bb_min_max2
+    L_v2_reg_y --> tri_bb_min_max2
+    L_v2_reg_y --> fp_add_sub_7
+    L_v0_reg_y --> fp_add_sub_7
+    L_v1_reg_x --> fp_add_sub_8
+    L_v0_reg_x --> fp_add_sub_8
+    L_v1_reg_x --> fp_add_sub_2
+    L_v2_reg_x --> fp_add_sub_2
+    L_v0_reg_y --> fp_add_sub_3
+    L_v2_reg_y --> fp_add_sub_3
+    L_v0_reg_x --> fp_add_sub_6
+    L_v1_reg_x --> fp_add_sub_6
+    L_binMinX --> fp_max_2_1
+    L_binMaxX --> fp_min_2_1
+    L_binMinY --> fp_max_2_2
+    L_binMaxY --> fp_min_2_2
+    L_v1_reg_x --> fp_add_sub_10
+    L_v2_reg_x --> fp_add_sub_13
+    L_v0_reg_x --> fp_add_sub_16
+    L_v0_reg_y --> fp_add_sub_17
+    L_v1_reg_y --> fp_add_sub_11
+    L_v2_reg_y --> fp_add_sub_14
+    R_tmp3 --> fp_mul_1
+    R_tmp6 --> fp_mul_1
+    R_fp_mul_2_a_src_reg --> fp_mul_2
+    R_fp_mul_2_b_src_reg --> fp_mul_2
+    R_fp_add_sub_2_a_src_reg --> fp_add_sub_9
+    R_fp_add_sub_2_b_src_reg --> fp_add_sub_9
+    R_fp_recip_1_in_src_reg --> fp_recip_1
+    R_tmp0 --> fp_max_2_1
+    R_tmp4 --> fp_max_2_2
+    R_tmp1 --> fp_min_2_1
+    R_tmp5 --> fp_min_2_2
+    R_tmp0 --> fp_add_half_fast_1
+    R_tmp1 --> fp_add_half_fast_2
+    R_tmp4 --> fp_add_sub_10
+    R_tmp2 --> fp_mul_3
+    R_fp_mul_1_b_src_reg --> fp_mul_3
+    R_tmp5 --> fp_add_sub_11
+    R_tmp8 --> fp_mul_4
+    R_fp_mul_1_b_src_reg --> fp_mul_4
+    R_fp_add_sub_2_a_src_reg --> fp_add_sub_12
+    R_fp_add_sub_2_b_src_reg --> fp_add_sub_12
+    R_tmp4 --> fp_add_sub_13
+    R_tmp7 --> fp_mul_5
+    R_fp_mul_2_b_src_reg --> fp_mul_5
+    R_tmp5 --> fp_add_sub_14
+    R_tmp3 --> fp_mul_6
+    R_fp_mul_2_b_src_reg --> fp_mul_6
+    R_fp_add_sub_1_a_src_reg --> fp_add_sub_15
+    R_fp_add_sub_1_b_src_reg --> fp_add_sub_15
+    R_tmp4 --> fp_add_sub_16
+    R_tmp6 --> fp_mul_7
+    R_fp_mul_1_b_src_reg --> fp_mul_7
+    R_tmp5 --> fp_add_sub_17
+    R_tmp9 --> fp_mul_8
+    R_fp_mul_2_b_src_reg --> fp_mul_8
+    R_fp_add_sub_1_a_src_reg --> fp_add_sub_18
+    R_fp_add_sub_1_b_src_reg --> fp_add_sub_18
+    R_e0_00_reg --> fp_add_sub_19
+    R_tmp2 --> fp_add_sub_19
+    R_e1_00_reg --> fp_add_sub_20
+    R_tmp7 --> fp_add_sub_20
+    R_e2_00_reg --> fp_add_sub_21
+    R_tmp6 --> fp_add_sub_21
+    R_e0_00_reg --> fp_add_sub_22
+    R_tmp8 --> fp_add_sub_22
+    R_e1_00_reg --> fp_add_sub_23
+    R_tmp3 --> fp_add_sub_23
+    R_e2_00_reg --> fp_add_sub_24
+    R_tmp9 --> fp_add_sub_24
+    R_e0_10_reg --> fp_add_sub_25
+    R_tmp8 --> fp_add_sub_25
+    R_e1_10_reg --> fp_add_sub_26
+    R_tmp3 --> fp_add_sub_26
+    R_e2_10_reg --> fp_add_sub_27
+    R_tmp9 --> fp_add_sub_27
+    R_tmp2 --> fp_add_sub_28
+    R_tmp2 --> fp_add_sub_28
+    R_tmp8 --> fp_add_sub_29
+    R_tmp8 --> fp_add_sub_29
+    R_tmp7 --> fp_add_sub_30
+    R_tmp7 --> fp_add_sub_30
+    R_tmp3 --> fp_add_sub_31
+    R_tmp3 --> fp_add_sub_31
+    R_tmp6 --> fp_add_sub_32
+    R_tmp6 --> fp_add_sub_32
+    R_tmp9 --> fp_add_sub_33
+    R_tmp9 --> fp_add_sub_33
+    R_tmp0 --> fp32_to_int16_1
+    R_tmp1 --> fp32_to_int16_2
+    R_fp32_to_int16_1_in_src_reg --> fp32_to_int16_3
+    R_int16_add_sub_1_a_src_reg --> int16_add_sub_1
+    R_bb_start_x_reg --> int16_add_sub_1
+    R_fp32_to_int16_1_in_src_reg --> fp32_to_int16_4
+    R_int16_add_sub_1_a_src_reg --> int16_add_sub_2
+    R_bb_start_y_reg --> int16_add_sub_2
+    style fp_add_sub_1 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_4 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style tri_bb_min_max1 fill:#277da1,stroke:#333,stroke-width:2px
+    style fp_add_sub_5 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style tri_bb_min_max2 fill:#277da1,stroke:#333,stroke-width:2px
+    style fp_add_sub_7 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_8 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_2 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_3 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_6 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_max_2_1 fill:#f94144,stroke:#333,stroke-width:2px
+    style fp_min_2_1 fill:#f3722c,stroke:#333,stroke-width:2px
+    style fp_max_2_2 fill:#f94144,stroke:#333,stroke-width:2px
+    style fp_min_2_2 fill:#f3722c,stroke:#333,stroke-width:2px
+    style fp_add_half_fast_1 fill:#90be6d,stroke:#333,stroke-width:2px
+    style fp32_to_int16_3 fill:#577590,stroke:#333,stroke-width:2px
+    style fp_add_half_fast_2 fill:#90be6d,stroke:#333,stroke-width:2px
+    style fp_mul_1 fill:#90be6d,stroke:#333,stroke-width:2px
+    style fp_add_sub_31 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_32 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp32_to_int16_2 fill:#577590,stroke:#333,stroke-width:2px
+    style fp_mul_2 fill:#90be6d,stroke:#333,stroke-width:2px
+    style fp_add_sub_10 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_13 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp32_to_int16_4 fill:#577590,stroke:#333,stroke-width:2px
+    style fp_add_sub_16 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_17 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_11 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_14 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style int16_add_sub_2 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp32_to_int16_1 fill:#577590,stroke:#333,stroke-width:2px
+    style fp_add_sub_30 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_9 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_mul_3 fill:#90be6d,stroke:#333,stroke-width:2px
+    style fp_mul_5 fill:#90be6d,stroke:#333,stroke-width:2px
+    style fp_mul_7 fill:#90be6d,stroke:#333,stroke-width:2px
+    style fp_mul_8 fill:#90be6d,stroke:#333,stroke-width:2px
+    style fp_mul_4 fill:#90be6d,stroke:#333,stroke-width:2px
+    style fp_mul_6 fill:#90be6d,stroke:#333,stroke-width:2px
+    style fp_add_sub_28 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_29 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_18 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_12 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_15 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_recip_1 fill:#f94144,stroke:#333,stroke-width:2px
+    style fp_add_sub_33 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_21 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_19 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_20 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_23 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_22 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_24 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_27 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_25 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style fp_add_sub_26 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style int16_add_sub_1 fill:#f9c74f,stroke:#333,stroke-width:2px
+    style R_fp_recip_1_in_src_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e2_11_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e0_10_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e1_dy_2x_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e2_10_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_invArea_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_bb_start_x_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_fp_add_sub_2_b_src_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_tmp9 fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_tmp7 fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_tmp1 fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e0_01_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_fp_mul_2_b_src_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e2_dy_2x_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e1_11_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_bb_width_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_fp_add_sub_1_a_src_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_fp_mul_1_b_src_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_tmp0 fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e2_01_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_tmp5 fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e2_dx_2x_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e0_00_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e1_10_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e0_11_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_fp_add_sub_2_a_src_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_bb_start_y_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_tmp6 fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e0_dx_2x_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_fp_mul_2_a_src_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_fp_add_sub_1_b_src_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_bb_height_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e1_00_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_tmp8 fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e0_dy_2x_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_tmp4 fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e2_00_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e1_dx_2x_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_e1_01_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_int16_add_sub_1_a_src_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_fp32_to_int16_1_in_src_reg fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_tmp3 fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style R_tmp2 fill:#d8d8d8,stroke:#888,stroke-width:1px
+    style L_v0_reg_y fill:#c8e6fa,stroke:#888,stroke-width:1px
+    style L_binMaxX fill:#c8e6fa,stroke:#888,stroke-width:1px
+    style L_v1_reg_x fill:#c8e6fa,stroke:#888,stroke-width:1px
+    style L_v2_reg_y fill:#c8e6fa,stroke:#888,stroke-width:1px
+    style L_v1_reg_y fill:#c8e6fa,stroke:#888,stroke-width:1px
+    style L_binMinY fill:#c8e6fa,stroke:#888,stroke-width:1px
+    style L_v2_reg_x fill:#c8e6fa,stroke:#888,stroke-width:1px
+    style L_binMinX fill:#c8e6fa,stroke:#888,stroke-width:1px
+    style L_binMaxY fill:#c8e6fa,stroke:#888,stroke-width:1px
+    style L_v0_reg_x fill:#c8e6fa,stroke:#888,stroke-width:1px

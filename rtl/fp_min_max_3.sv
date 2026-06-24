@@ -12,88 +12,84 @@ module fp_min_max_3 (
     output logic [31:0] f_max
 );
 
-  // Pipeline tracking
-  logic [1:0] v_pipe;
+  //-----------------------------------------------------------------
+  // Combinational IEEE-754 Less-Than Function
+  //-----------------------------------------------------------------
+  function automatic logic fp_lt(input logic [31:0] x, input logic [31:0] y);
+    logic sign_x, sign_y;
+    logic [30:0] mag_x, mag_y;
+
+    sign_x = x[31];
+    sign_y = y[31];
+    mag_x  = x[30:0];
+    mag_y  = y[30:0];
+
+    if (mag_x == 31'd0 && mag_y == 31'd0) begin
+      return 1'b0;
+    end else if (sign_x != sign_y) begin
+      return sign_x;
+    end else if (sign_x) begin
+      return mag_x > mag_y;
+    end else begin
+      return mag_x < mag_y;
+    end
+  endfunction
+
+  //-----------------------------------------------------------------
+  // Pipeline Stage 1 Registers
+  //-----------------------------------------------------------------
+  logic        valid_s1;
+  logic [31:0] s1_min_ab;
+  logic [31:0] s1_max_ab;
+  logic [31:0] s1_f_c;
 
   always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) v_pipe <= '0;
-    else v_pipe <= {v_pipe[0], valid_in};
-  end
-
-  // =========================================================================
-  // STAGE 1: Parallel Pairwise Comparisons
-  // =========================================================================
-  // Helper signals to evaluate magnitude properties for IEEE-754 signed floats
-  logic a_lt_b, a_lt_c;
-
-  // Combinatorial comparison lookahead (handles negative signs correctly)
-  always_comb begin
-    // A < B evaluation
-    if (f_a[31] != f_b[31]) begin
-      a_lt_b = f_a[31];  // If signs differ, the negative one is smaller
-    end else if (f_a[31]) begin
-      a_lt_b = (f_a[30:0] > f_b[30:0]);  // Both negative: larger magnitude is smaller
+    if (!rst_n) begin
+      valid_s1  <= 1'b0;
+      s1_min_ab <= 32'd0;
+      s1_max_ab <= 32'd0;
+      s1_f_c    <= 32'd0;
     end else begin
-      a_lt_b = (f_a[30:0] < f_b[30:0]);  // Both positive: smaller magnitude is smaller
-    end
+      valid_s1 <= valid_in;
 
-    // A < C evaluation
-    if (f_a[31] != f_c[31]) begin
-      a_lt_c = f_a[31];
-    end else if (f_a[31]) begin
-      a_lt_c = (f_a[30:0] > f_c[30:0]);
-    end else begin
-      a_lt_c = (f_a[30:0] < f_c[30:0]);
+      // Compare A and B
+      if (fp_lt(f_a, f_b)) begin
+        s1_min_ab <= f_a;
+        s1_max_ab <= f_b;
+      end else begin
+        s1_min_ab <= f_b;
+        s1_max_ab <= f_a;
+      end
+
+      // Pass C through Stage 1
+      s1_f_c <= f_c;
     end
   end
 
-  // Stage 1 Registers
-  logic [31:0] s1_max_ab, s1_min_ab;
-  logic [31:0] f_c_r1;
-  logic        s1_a_lt_c;
-
-  always_ff @(posedge clk) begin
-    s1_max_ab <= a_lt_b ? f_b : f_a;
-    s1_min_ab <= a_lt_b ? f_a : f_b;
-    f_c_r1    <= f_c;
-    s1_a_lt_c <= a_lt_c;
-  end
-
-  // =========================================================================
-  // STAGE 2: Final Sorting and Resolution
-  // =========================================================================
-  logic max_ab_lt_c, min_ab_lt_c;
-
-  always_comb begin
-    // Compare max(A,B) vs C
-    if (s1_max_ab[31] != f_c_r1[31]) begin
-      max_ab_lt_c = s1_max_ab[31];
-    end else if (s1_max_ab[31]) begin
-      max_ab_lt_c = (s1_max_ab[30:0] > f_c_r1[30:0]);
-    end else begin
-      max_ab_lt_c = (s1_max_ab[30:0] < f_c_r1[30:0]);
-    end
-
-    // Compare min(A,B) vs C
-    if (s1_min_ab[31] != f_c_r1[31]) begin
-      min_ab_lt_c = s1_min_ab[31];
-    end else if (s1_min_ab[31]) begin
-      min_ab_lt_c = (s1_min_ab[30:0] > f_c_r1[30:0]);
-    end else begin
-      min_ab_lt_c = (s1_min_ab[30:0] < f_c_r1[30:0]);
-    end
-  end
-
-  // Stage 2 Output Multiplexing Registers
+  //-----------------------------------------------------------------
+  // Pipeline Stage 2 Registers (Outputs)
+  //-----------------------------------------------------------------
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       valid_out <= 1'b0;
-      f_min     <= '0;
-      f_max     <= '0;
+      f_min     <= 32'd0;
+      f_max     <= 32'd0;
     end else begin
-      valid_out <= v_pipe[0];
-      f_max     <= max_ab_lt_c ? f_c_r1 : s1_max_ab;
-      f_min     <= min_ab_lt_c ? s1_min_ab : f_c_r1;
+      valid_out <= valid_s1;
+
+      // Final Min Calculation: Min( Min(A,B), C )
+      if (fp_lt(s1_min_ab, s1_f_c)) begin
+        f_min <= s1_min_ab;
+      end else begin
+        f_min <= s1_f_c;
+      end
+
+      // Final Max Calculation: Max( Max(A,B), C )
+      if (fp_lt(s1_max_ab, s1_f_c)) begin
+        f_max <= s1_f_c;
+      end else begin
+        f_max <= s1_max_ab;
+      end
     end
   end
 

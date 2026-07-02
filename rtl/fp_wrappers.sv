@@ -13,6 +13,9 @@
 `ifdef SIMULATION
   `define SIM_MODE
 `endif
+`ifdef __ICARUS__
+  `define SIM_MODE
+`endif
 
 `ifdef VERILATOR
 import "DPI-C" function shortreal dpi_bits_to_float(input int unsigned bits);
@@ -43,9 +46,7 @@ module fp_add #(
 `ifdef SIM_MODE
   shortreal a_real, b_real, res_real;
   logic [31:0] res_bits;
-
-  // Size LATENCY+1 ensures array is valid even if LATENCY=0
-  logic [31:0] pipeline [LATENCY+1];
+  logic [31:0] pipeline [LATENCY];
 
   assign a_real   = `BITSTOSHORTREAL(a);
   assign b_real   = `BITSTOSHORTREAL(b);
@@ -65,7 +66,7 @@ module fp_add #(
     end
   end
 
-  assign result = (LATENCY == 0) ? res_bits : pipeline[LATENCY-1];
+  assign result = pipeline[LATENCY-1];
 
 `else
   // Xilinx IP instantiation for Synthesis
@@ -103,7 +104,7 @@ module fp_sub #(
 `ifdef SIM_MODE
   shortreal a_real, b_real, res_real;
   logic [31:0] res_bits;
-  logic [31:0] pipeline [LATENCY+1];
+  logic [31:0] pipeline [LATENCY];
 
   assign a_real   = `BITSTOSHORTREAL(a);
   assign b_real   = `BITSTOSHORTREAL(b);
@@ -123,7 +124,7 @@ module fp_sub #(
     end
   end
 
-  assign result = (LATENCY == 0) ? res_bits : pipeline[LATENCY-1];
+  assign result = pipeline[LATENCY-1];
 
 `else
   // Xilinx IP instantiation for Synthesis
@@ -160,7 +161,7 @@ module fp_mul #(
 `ifdef SIM_MODE
   shortreal a_real, b_real, res_real;
   logic [31:0] res_bits;
-  logic [31:0] pipeline [LATENCY+1];
+  logic [31:0] pipeline [LATENCY];
 
   assign a_real   = `BITSTOSHORTREAL(a);
   assign b_real   = `BITSTOSHORTREAL(b);
@@ -180,7 +181,7 @@ module fp_mul #(
     end
   end
 
-  assign result = (LATENCY == 0) ? res_bits : pipeline[LATENCY-1];
+  assign result = pipeline[LATENCY-1];
 
 `else
   // Xilinx IP instantiation for Synthesis
@@ -192,6 +193,67 @@ module fp_mul #(
       .s_axis_a_tdata      (a),
       .s_axis_b_tvalid     (valid_in),
       .s_axis_b_tdata      (b),
+      .m_axis_result_tvalid(),
+      .m_axis_result_tdata (result)
+  );
+`endif
+
+endmodule
+
+// ============================================================================
+// Floating-Point Fused Multiply-Add: (a * b) + c
+// ============================================================================
+module fp_fma #(
+    parameter int LATENCY = 19  // Default latency for Xilinx FP FMA
+) (
+    input  logic        aclk,
+    input  logic        aresetn,
+    input  logic        aclken,
+    input  logic        valid_in,
+    input  logic [31:0] a,
+    input  logic [31:0] b,
+    input  logic [31:0] c,
+    output logic [31:0] result
+);
+
+`ifdef SIM_MODE
+  shortreal a_real, b_real, c_real, res_real;
+  logic [31:0] res_bits;
+  logic [31:0] pipeline [LATENCY];
+
+  assign a_real   = `BITSTOSHORTREAL(a);
+  assign b_real   = `BITSTOSHORTREAL(b);
+  assign c_real   = `BITSTOSHORTREAL(c);
+  assign res_real = (a_real * b_real) + c_real;
+  assign res_bits = `SHORTREALTOBITS(res_real);
+
+  always_ff @(posedge aclk) begin
+    if (!aresetn) begin
+      for (int i = 0; i < LATENCY; i++) begin
+        pipeline[i] <= 32'b0;
+      end
+    end else if (aclken) begin
+      pipeline[0] <= res_bits;
+      for (int i = 1; i < LATENCY; i++) begin
+        pipeline[i] <= pipeline[i-1];
+      end
+    end
+  end
+
+  assign result = pipeline[LATENCY-1];
+
+`else
+  // Xilinx IP instantiation for Synthesis
+  xil_fp_fma xil_fp_fma_inst (
+      .aclk                (aclk),
+      .aresetn             (aresetn),
+      .aclken              (aclken),
+      .s_axis_a_tvalid     (valid_in),
+      .s_axis_a_tdata      (a),
+      .s_axis_b_tvalid     (valid_in),
+      .s_axis_b_tdata      (b),
+      .s_axis_c_tvalid     (valid_in),
+      .s_axis_c_tdata      (c),
       .m_axis_result_tvalid(),
       .m_axis_result_tdata (result)
   );
@@ -216,7 +278,7 @@ module fp_recip #(
 `ifdef SIM_MODE
   shortreal a_real, res_real;
   logic [31:0] res_bits;
-  logic [31:0] pipeline [LATENCY+1];
+  logic [31:0] pipeline [LATENCY];
 
   assign a_real   = `BITSTOSHORTREAL(a);
   assign res_real = 1.0 / a_real;
@@ -235,7 +297,7 @@ module fp_recip #(
     end
   end
 
-  assign result = (LATENCY == 0) ? res_bits : pipeline[LATENCY-1];
+  assign result = pipeline[LATENCY-1];
 
 `else
   // Xilinx IP instantiation for Synthesis
@@ -273,8 +335,8 @@ module fp_add_sub #(
 `ifdef SIM_MODE
   shortreal a_real, b_real, res_real;
   logic [31:0] res_bits;
-  logic [31:0] pipeline [LATENCY+1];
-  logic        valid_pipe [LATENCY+1];
+  logic [31:0] pipeline [LATENCY];
+  logic        valid_pipe [LATENCY];
 
   assign a_real   = `BITSTOSHORTREAL(a);
   assign b_real   = `BITSTOSHORTREAL(b);
@@ -297,8 +359,8 @@ module fp_add_sub #(
     end
   end
 
-  assign result    = (LATENCY == 0) ? res_bits : pipeline[LATENCY-1];
-  assign valid_out = (LATENCY == 0) ? valid_in : valid_pipe[LATENCY-1];
+  assign result    = pipeline[LATENCY-1];
+  assign valid_out = valid_pipe[LATENCY-1];
 
 `else
   // Xilinx IP instantiation for Synthesis
@@ -336,7 +398,7 @@ module fp32_to_int16 #(
 `ifdef SIM_MODE
   shortreal a_real;
   logic [15:0] res_bits;
-  logic [15:0] pipeline [LATENCY+1];
+  logic [15:0] pipeline [LATENCY];
 
   assign a_real   = `BITSTOSHORTREAL(a);
   assign res_bits = 16'(int'(a_real));
@@ -354,7 +416,7 @@ module fp32_to_int16 #(
     end
   end
 
-  assign result = (LATENCY == 0) ? res_bits : pipeline[LATENCY-1];
+  assign result = pipeline[LATENCY-1];
 
 `else
   // Xilinx IP instantiation for Synthesis

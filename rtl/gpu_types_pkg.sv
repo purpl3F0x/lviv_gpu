@@ -14,6 +14,7 @@ package gpu_types_pkg;
   // Calculated Widths
   parameter int TILE_ID_W_X = $clog2(MAX_RES_X / TILE_SIZE_X);
   parameter int TILE_ID_W_Y = $clog2(MAX_RES_Y / TILE_SIZE_Y);
+  parameter int PIXEL_ADDR_W = $clog2(TILE_SIZE_X * TILE_SIZE_Y);
 
   typedef enum logic [2:0] {
     REPLACE = 0,

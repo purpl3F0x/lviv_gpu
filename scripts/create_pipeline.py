@@ -376,17 +376,203 @@ class HardwareDAG:
                 return reg_name_by_node[prod]
             return self._leaf_expr_to_rtl(signal_obj.expr)
 
-        launch_by_cycle = {}
+        # -----------------------------------------------------------------
+        # Build per-op input-register data structures
+        # -----------------------------------------------------------------
+        COMB_UNITS = {"int16_add_sub"}  # no valid_in strobe needed
+
+        def _unit_base(hw_type, inst):
+            return (
+                f"int16_sub_{inst}"
+                if hw_type == "int16_add_sub"
+                else f"{hw_type}_{inst}"
+            )
+
+        def _op_input_assignments(op):
+            """Return [(lhs_reg, rhs_rtl)] for all input regs of this op."""
+            hw_type = self.ops[op][0]
+            inst = op_unit_idx[op]
+            base = _unit_base(hw_type, inst)
+            inputs = self.op_inputs.get(op, ())
+            a = []
+            if hw_type == "fp_add_sub":
+                op_sub = self.ops[op][3] == "-"
+                a += [(f"{base}_a_reg", signal_to_rtl(inputs[0]))]
+                a += [(f"{base}_b_reg", signal_to_rtl(inputs[1]))]
+                a += [(f"{base}_op_reg", f"1'b{1 if op_sub else 0}")]
+                a += [(f"{base}_valid_in_reg", "1'b1")]
+            elif hw_type in ("fp_add", "fp_sub", "fp_mul"):
+                a += [(f"{base}_a_reg", signal_to_rtl(inputs[0]))]
+                a += [(f"{base}_b_reg", signal_to_rtl(inputs[1]))]
+                a += [(f"{base}_valid_in_reg", "1'b1")]
+            elif hw_type == "fp_recip":
+                a += [(f"{base}_in_reg", signal_to_rtl(inputs[0]))]
+                a += [(f"{base}_valid_in_reg", "1'b1")]
+            elif hw_type == "tri_bb_min_max":
+                a += [(f"{base}_a_reg", signal_to_rtl(inputs[0]))]
+                a += [(f"{base}_b_reg", signal_to_rtl(inputs[1]))]
+                a += [(f"{base}_c_reg", signal_to_rtl(inputs[2]))]
+                a += [(f"{base}_valid_in_reg", "1'b1")]
+            elif hw_type in ("fp_min_2", "fp_max_2"):
+                a += [(f"{base}_a_reg", signal_to_rtl(inputs[0]))]
+                a += [(f"{base}_b_reg", signal_to_rtl(inputs[1]))]
+                a += [(f"{base}_valid_in_reg", "1'b1")]
+            elif hw_type == "fp_add_half_fast":
+                a += [(f"{base}_in_reg", signal_to_rtl(inputs[0]))]
+                a += [(f"{base}_valid_in_reg", "1'b1")]
+            elif hw_type == "fp32_to_int16":
+                a += [(f"{base}_in_reg", signal_to_rtl(inputs[0]))]
+                a += [(f"{base}_valid_in_reg", "1'b1")]
+            elif hw_type == "int16_add_sub":
+                a += [(f"{base}_a_reg", f"{signal_to_rtl(inputs[0])}[15:0]")]
+                a += [(f"{base}_b_reg", f"{signal_to_rtl(inputs[1])}[15:0]")]
+            return a
+
+        # Collect input register declarations (deduplicated by name)
+        input_reg_decls = {}  # name -> bit-width
+        for op in sorted_ops:
+            hw_type = self.ops[op][0]
+            if hw_type not in hw_limits:
+                continue
+            inst = op_unit_idx[op]
+            base = _unit_base(hw_type, inst)
+            if hw_type == "fp_add_sub":
+                input_reg_decls.update(
+                    {
+                        f"{base}_a_reg": 32,
+                        f"{base}_b_reg": 32,
+                        f"{base}_op_reg": 1,
+                        f"{base}_valid_in_reg": 1,
+                    }
+                )
+            elif hw_type in ("fp_add", "fp_sub", "fp_mul"):
+                input_reg_decls.update(
+                    {
+                        f"{base}_a_reg": 32,
+                        f"{base}_b_reg": 32,
+                        f"{base}_valid_in_reg": 1,
+                    }
+                )
+            elif hw_type == "fp_recip":
+                input_reg_decls.update(
+                    {f"{base}_in_reg": 32, f"{base}_valid_in_reg": 1}
+                )
+            elif hw_type == "tri_bb_min_max":
+                input_reg_decls.update(
+                    {
+                        f"{base}_a_reg": 32,
+                        f"{base}_b_reg": 32,
+                        f"{base}_c_reg": 32,
+                        f"{base}_valid_in_reg": 1,
+                    }
+                )
+            elif hw_type in ("fp_min_2", "fp_max_2"):
+                input_reg_decls.update(
+                    {
+                        f"{base}_a_reg": 32,
+                        f"{base}_b_reg": 32,
+                        f"{base}_valid_in_reg": 1,
+                    }
+                )
+            elif hw_type == "fp_add_half_fast":
+                input_reg_decls.update(
+                    {f"{base}_in_reg": 32, f"{base}_valid_in_reg": 1}
+                )
+            elif hw_type == "fp32_to_int16":
+                input_reg_decls.update(
+                    {f"{base}_in_reg": 32, f"{base}_valid_in_reg": 1}
+                )
+            elif hw_type == "int16_add_sub":
+                input_reg_decls.update({f"{base}_a_reg": 16, f"{base}_b_reg": 16})
+
+        # Bucket assignments for the sequential FSM
+        #   setup_by_cycle[N-1]  – load input regs for op starting at cycle N (N > 0)
+        #   precalc_setup        – same for N == 0 (before entering ST_CALC)
+        #   clear_valid_by_cycle – deassert valid_in the cycle after the op fires
+        setup_by_cycle = {}
+        precalc_setup = []
+        clear_valid_by_cycle = {}
         latch_by_cycle = {}
 
         for op in sorted_ops:
-            hw_type, lat = self.ops[op][0], self.ops[op][1]
+            hw_type = self.ops[op][0]
             if hw_type not in hw_limits:
                 continue
             start_t = start_times[op]
-            launch_by_cycle.setdefault(start_t, []).append(op)
+            lat = self.ops[op][1]
+            inst = op_unit_idx[op]
+            base = _unit_base(hw_type, inst)
+            assigns = _op_input_assignments(op)
+
+            if start_t > 0:
+                setup_by_cycle.setdefault(start_t - 1, []).extend(assigns)
+            else:
+                precalc_setup.extend(assigns)
+
+            if hw_type not in COMB_UNITS:
+                clear_valid_by_cycle.setdefault(start_t, []).append((base, hw_type))
+
             latch_by_cycle.setdefault(start_t + lat, []).append(op)
 
+        # -----------------------------------------------------------------
+        # Merge all sequential events: key = cycle, value = [SV stmt strs]
+        # -----------------------------------------------------------------
+        seq_events = {}
+
+        def _ev(cycle, s):
+            seq_events.setdefault(cycle, []).append(s)
+
+        # Input-reg loading at N-1
+        for cycle, assigns in setup_by_cycle.items():
+            for lhs, rhs in assigns:
+                _ev(cycle, f"{lhs} <= {rhs};")
+
+        # valid_in clear at N (skip if another op sets it to 1 at the same cycle)
+        for cycle, unit_list in clear_valid_by_cycle.items():
+            setup_here = setup_by_cycle.get(cycle, [])
+            seen_clears = set()
+            for base, hw_type in unit_list:
+                key = f"{base}_valid_in_reg"
+                if key not in seen_clears:
+                    if not any(lhs == key for lhs, _ in setup_here):
+                        _ev(cycle, f"{key} <= 1'b0;")
+                    seen_clears.add(key)
+
+        # Output latching at N+L
+        for cycle, ops_list in latch_by_cycle.items():
+            for op in ops_list:
+                hw_type = self.ops[op][0]
+                inst = op_unit_idx[op]
+                if hw_type == "fp_add_sub":
+                    _ev(cycle, f"{reg_name_by_node[op]} <= fp_add_sub_{inst}_res;")
+                elif hw_type == "fp_add":
+                    _ev(cycle, f"{reg_name_by_node[op]} <= fp_add_{inst}_res;")
+                elif hw_type == "fp_sub":
+                    _ev(cycle, f"{reg_name_by_node[op]} <= fp_sub_{inst}_res;")
+                elif hw_type == "fp_mul":
+                    _ev(cycle, f"{reg_name_by_node[op]} <= fp_mul_{inst}_res;")
+                elif hw_type == "fp_recip":
+                    _ev(cycle, f"{reg_name_by_node[op]} <= fp_recip_{inst}_out;")
+                elif hw_type == "tri_bb_min_max":
+                    min_reg, max_reg = tri_reg_pair_by_node[op]
+                    _ev(cycle, f"{min_reg} <= tri_bb_min_max_{inst}_min;")
+                    _ev(cycle, f"{max_reg} <= tri_bb_min_max_{inst}_max;")
+                elif hw_type == "fp_min_2":
+                    _ev(cycle, f"{reg_name_by_node[op]} <= fp_min_2_{inst}_res;")
+                elif hw_type == "fp_max_2":
+                    _ev(cycle, f"{reg_name_by_node[op]} <= fp_max_2_{inst}_res;")
+                elif hw_type == "fp_add_half_fast":
+                    _ev(
+                        cycle, f"{reg_name_by_node[op]} <= fp_add_half_fast_{inst}_out;"
+                    )
+                elif hw_type == "fp32_to_int16":
+                    _ev(cycle, f"{reg_name_by_node[op]} <= fp32_to_int16_{inst}_out;")
+                elif hw_type == "int16_add_sub":
+                    _ev(cycle, f"{reg_name_by_node[op]} <= int16_sub_{inst}_res;")
+
+        # -----------------------------------------------------------------
+        # Emit RTL text
+        # -----------------------------------------------------------------
         lines = []
         lines.append("// AUTO-GENERATED FROM scripts/create_pipeline.py")
         lines.append(
@@ -394,364 +580,204 @@ class HardwareDAG:
         )
         lines.append("")
 
-        lines.append("// Pipelined registers generated by schedule (named + temp)")
+        lines.append("// ---- Unit input registers (one DFF per port) ----")
+        for reg in sorted(input_reg_decls.keys()):
+            w = input_reg_decls[reg]
+            lines.append(f"logic [{w-1}:0] {reg};")
+        lines.append("")
+
+        lines.append("// ---- Pipeline output/intermediate registers ----")
         for reg in sorted(reg_width_by_name.keys()):
             w = reg_width_by_name[reg]
             lines.append(f"logic [{w-1}:0] {reg};")
         lines.append("")
 
         lines.append(
-            "// ---------------- Unit Declarations + Instantiations ----------------"
+            "// ---------------- Unit Instantiations (ports tied to input regs) ----------------"
         )
         for hw_type in sorted(unit_count.keys()):
             count = unit_count[hw_type]
             for idx in range(1, count + 1):
                 if hw_type == "fp_add_sub":
                     base = f"fp_add_sub_{idx}"
-                    lines.append(f"logic [31:0] {base}_a, {base}_b, {base}_res;")
-                    lines.append(f"logic {base}_op, {base}_valid_in;")
+                    lines.append(f"logic [31:0] {base}_res;")
                     lines.append(
                         f"fp_add_sub #(.LATENCY({self.latencies[hw_type]})) u_{base} ("
                     )
                     lines.append("    .aclk    (clk),")
                     lines.append("    .aresetn (rst_n),")
                     lines.append("    .aclken  (1'b1),")
-                    lines.append(f"    .op_sub  ({base}_op),")
-                    lines.append(f"    .valid_in({base}_valid_in),")
-                    lines.append(f"    .a       ({base}_a),")
-                    lines.append(f"    .b       ({base}_b),")
+                    lines.append(f"    .op_sub  ({base}_op_reg),")
+                    lines.append(f"    .valid_in({base}_valid_in_reg),")
+                    lines.append(f"    .a       ({base}_a_reg),")
+                    lines.append(f"    .b       ({base}_b_reg),")
                     lines.append(f"    .result  ({base}_res)")
                     lines.append(");")
                 elif hw_type == "fp_add":
                     base = f"fp_add_{idx}"
-                    lines.append(f"logic [31:0] {base}_a, {base}_b, {base}_res;")
-                    lines.append(f"logic {base}_valid_in;")
+                    lines.append(f"logic [31:0] {base}_res;")
                     lines.append(
                         f"fp_add #(.LATENCY({self.latencies[hw_type]})) u_{base} ("
                     )
                     lines.append("    .aclk    (clk),")
                     lines.append("    .aresetn (rst_n),")
                     lines.append("    .aclken  (1'b1),")
-                    lines.append(f"    .valid_in({base}_valid_in),")
-                    lines.append(f"    .a       ({base}_a),")
-                    lines.append(f"    .b       ({base}_b),")
+                    lines.append(f"    .valid_in({base}_valid_in_reg),")
+                    lines.append(f"    .a       ({base}_a_reg),")
+                    lines.append(f"    .b       ({base}_b_reg),")
                     lines.append(f"    .result  ({base}_res)")
                     lines.append(");")
                 elif hw_type == "fp_sub":
                     base = f"fp_sub_{idx}"
-                    lines.append(f"logic [31:0] {base}_a, {base}_b, {base}_res;")
-                    lines.append(f"logic {base}_valid_in;")
+                    lines.append(f"logic [31:0] {base}_res;")
                     lines.append(
                         f"fp_sub #(.LATENCY({self.latencies[hw_type]})) u_{base} ("
                     )
                     lines.append("    .aclk    (clk),")
                     lines.append("    .aresetn (rst_n),")
                     lines.append("    .aclken  (1'b1),")
-                    lines.append(f"    .valid_in({base}_valid_in),")
-                    lines.append(f"    .a       ({base}_a),")
-                    lines.append(f"    .b       ({base}_b),")
+                    lines.append(f"    .valid_in({base}_valid_in_reg),")
+                    lines.append(f"    .a       ({base}_a_reg),")
+                    lines.append(f"    .b       ({base}_b_reg),")
                     lines.append(f"    .result  ({base}_res)")
                     lines.append(");")
                 elif hw_type == "fp_mul":
                     base = f"fp_mul_{idx}"
-                    lines.append(f"logic [31:0] {base}_a, {base}_b, {base}_res;")
-                    lines.append(f"logic {base}_valid_in;")
+                    lines.append(f"logic [31:0] {base}_res;")
                     lines.append(
                         f"fp_mul #(.LATENCY({self.latencies[hw_type]})) u_{base} ("
                     )
                     lines.append("    .aclk    (clk),")
                     lines.append("    .aresetn (rst_n),")
                     lines.append("    .aclken  (1'b1),")
-                    lines.append(f"    .valid_in({base}_valid_in),")
-                    lines.append(f"    .a       ({base}_a),")
-                    lines.append(f"    .b       ({base}_b),")
+                    lines.append(f"    .valid_in({base}_valid_in_reg),")
+                    lines.append(f"    .a       ({base}_a_reg),")
+                    lines.append(f"    .b       ({base}_b_reg),")
                     lines.append(f"    .result  ({base}_res)")
                     lines.append(");")
                 elif hw_type == "fp_recip":
                     base = f"fp_recip_{idx}"
-                    lines.append(f"logic [31:0] {base}_in, {base}_out;")
-                    lines.append(f"logic {base}_valid_in;")
+                    lines.append(f"logic [31:0] {base}_out;")
                     lines.append(
                         f"fp_recip #(.LATENCY({self.latencies[hw_type]})) u_{base} ("
                     )
                     lines.append("    .aclk    (clk),")
                     lines.append("    .aresetn (rst_n),")
                     lines.append("    .aclken  (1'b1),")
-                    lines.append(f"    .valid_in({base}_valid_in),")
-                    lines.append(f"    .a       ({base}_in),")
+                    lines.append(f"    .valid_in({base}_valid_in_reg),")
+                    lines.append(f"    .a       ({base}_in_reg),")
                     lines.append(f"    .result  ({base}_out)")
                     lines.append(");")
                 elif hw_type == "tri_bb_min_max":
                     base = f"tri_bb_min_max_{idx}"
-                    lines.append(f"logic [31:0] {base}_a, {base}_b, {base}_c;")
                     lines.append(f"logic [31:0] {base}_min, {base}_max;")
-                    lines.append(f"logic {base}_valid_in, {base}_valid_out;")
+                    lines.append(f"logic {base}_valid_out;")
                     lines.append(f"tri_bb_min_max u_{base} (")
                     lines.append("    .clk        (clk),")
                     lines.append("    .rst_n      (rst_n),")
-                    lines.append(f"    .valid_in   ({base}_valid_in),")
-                    lines.append(f"    .f_a        ({base}_a),")
-                    lines.append(f"    .f_b        ({base}_b),")
-                    lines.append(f"    .f_c        ({base}_c),")
+                    lines.append(f"    .valid_in   ({base}_valid_in_reg),")
+                    lines.append(f"    .f_a        ({base}_a_reg),")
+                    lines.append(f"    .f_b        ({base}_b_reg),")
+                    lines.append(f"    .f_c        ({base}_c_reg),")
                     lines.append(f"    .valid_out  ({base}_valid_out),")
                     lines.append(f"    .f_min_floor({base}_min),")
                     lines.append(f"    .f_max_ceil ({base}_max)")
                     lines.append(");")
                 elif hw_type == "fp_min_2":
                     base = f"fp_min_2_{idx}"
-                    lines.append(f"logic [31:0] {base}_a, {base}_b, {base}_res;")
-                    lines.append(f"logic {base}_valid_in, {base}_valid_out;")
+                    lines.append(f"logic [31:0] {base}_res;")
+                    lines.append(f"logic {base}_valid_out;")
                     lines.append(f"fp_min_2 u_{base} (")
                     lines.append("    .clk      (clk),")
                     lines.append("    .rst_n    (rst_n),")
-                    lines.append(f"    .valid_in ({base}_valid_in),")
-                    lines.append(f"    .f_a      ({base}_a),")
-                    lines.append(f"    .f_b      ({base}_b),")
+                    lines.append(f"    .valid_in ({base}_valid_in_reg),")
+                    lines.append(f"    .f_a      ({base}_a_reg),")
+                    lines.append(f"    .f_b      ({base}_b_reg),")
                     lines.append(f"    .valid_out({base}_valid_out),")
                     lines.append(f"    .f_min    ({base}_res)")
                     lines.append(");")
                 elif hw_type == "fp_max_2":
                     base = f"fp_max_2_{idx}"
-                    lines.append(f"logic [31:0] {base}_a, {base}_b, {base}_res;")
-                    lines.append(f"logic {base}_valid_in, {base}_valid_out;")
+                    lines.append(f"logic [31:0] {base}_res;")
+                    lines.append(f"logic {base}_valid_out;")
                     lines.append(f"fp_max_2 u_{base} (")
                     lines.append("    .clk      (clk),")
                     lines.append("    .rst_n    (rst_n),")
-                    lines.append(f"    .valid_in ({base}_valid_in),")
-                    lines.append(f"    .f_a      ({base}_a),")
-                    lines.append(f"    .f_b      ({base}_b),")
+                    lines.append(f"    .valid_in ({base}_valid_in_reg),")
+                    lines.append(f"    .f_a      ({base}_a_reg),")
+                    lines.append(f"    .f_b      ({base}_b_reg),")
                     lines.append(f"    .valid_out({base}_valid_out),")
                     lines.append(f"    .f_max    ({base}_res)")
                     lines.append(");")
                 elif hw_type == "fp_add_half_fast":
                     base = f"fp_add_half_fast_{idx}"
-                    lines.append(f"logic [31:0] {base}_in, {base}_out;")
-                    lines.append(f"logic {base}_valid_in, {base}_valid_out;")
+                    lines.append(f"logic [31:0] {base}_out;")
+                    lines.append(f"logic {base}_valid_out;")
                     lines.append(f"fp_add_half_fast u_{base} (")
                     lines.append("    .clk      (clk),")
                     lines.append("    .rst_n    (rst_n),")
-                    lines.append(f"    .valid_in ({base}_valid_in),")
-                    lines.append(f"    .f_in     ({base}_in),")
+                    lines.append(f"    .valid_in ({base}_valid_in_reg),")
+                    lines.append(f"    .f_in     ({base}_in_reg),")
                     lines.append(f"    .valid_out({base}_valid_out),")
                     lines.append(f"    .f_out    ({base}_out)")
                     lines.append(");")
                 elif hw_type == "fp32_to_int16":
                     base = f"fp32_to_int16_{idx}"
-                    lines.append(f"logic [31:0] {base}_in;")
                     lines.append(f"logic [15:0] {base}_out;")
-                    lines.append(f"logic {base}_valid_in;")
                     lines.append(
                         f"fp32_to_int16 #(.LATENCY({self.latencies[hw_type]})) u_{base} ("
                     )
                     lines.append("    .aclk    (clk),")
                     lines.append("    .aresetn (rst_n),")
                     lines.append("    .aclken  (1'b1),")
-                    lines.append(f"    .valid_in({base}_valid_in),")
-                    lines.append(f"    .a       ({base}_in),")
+                    lines.append(f"    .valid_in({base}_valid_in_reg),")
+                    lines.append(f"    .a       ({base}_in_reg),")
                     lines.append(f"    .result  ({base}_out)")
                     lines.append(");")
                 elif hw_type == "int16_add_sub":
                     base = f"int16_sub_{idx}"
-                    lines.append(f"logic [15:0] {base}_a, {base}_b, {base}_res;")
+                    lines.append(f"logic [15:0] {base}_res;")
                     lines.append(f"int16_sub u_{base} (")
                     lines.append("    .clken(1'b1),")
-                    lines.append(f"    .a    ({base}_a),")
-                    lines.append(f"    .b    ({base}_b),")
+                    lines.append(f"    .a    ({base}_a_reg),")
+                    lines.append(f"    .b    ({base}_b_reg),")
                     lines.append(f"    .s    ({base}_res)")
                     lines.append(");")
                 lines.append("")
 
-        lines.append("// ---------------- Sequential Latch FSM ----------------")
+        # ---- Merged sequential FSM: input-reg setup + output latching ----
+        lines.append(
+            "// ---------------- Sequential FSM (input setup @ N-1, output latch @ N+L) ----------------"
+        )
         lines.append("always_ff @(posedge clk) begin")
         lines.append("  if (!rst_n) begin")
+        for reg in sorted(input_reg_decls.keys()):
+            w = input_reg_decls[reg]
+            lines.append(f"    {reg} <= {w}'b0;")
         for reg in sorted(reg_width_by_name.keys()):
             w = reg_width_by_name[reg]
             lines.append(f"    {reg} <= {w}'b0;")
+        if precalc_setup:
+            lines.append("  end else if (next_state == ST_CALC) begin")
+            lines.append(
+                "    // PRE-CALC: load input regs for operations firing at cycle 0"
+            )
+            seen_precalc = {}
+            for lhs, rhs in precalc_setup:
+                seen_precalc[lhs] = rhs
+            for lhs in sorted(seen_precalc.keys()):
+                lines.append(f"    {lhs} <= {seen_precalc[lhs]};")
         lines.append("  end else if (state == ST_CALC) begin")
         lines.append("    case (cycle_cnt)")
-        for cycle in sorted(latch_by_cycle.keys()):
+        for cycle in sorted(seq_events.keys()):
             lines.append(f"      8'd{cycle}: begin")
-            for op in latch_by_cycle[cycle]:
-                hw_type = self.ops[op][0]
-                inst = op_unit_idx[op]
-                if hw_type == "fp_add_sub":
-                    lines.append(
-                        f"        {reg_name_by_node[op]} <= fp_add_sub_{inst}_res;"
-                    )
-                elif hw_type == "fp_add":
-                    lines.append(
-                        f"        {reg_name_by_node[op]} <= fp_add_{inst}_res;"
-                    )
-                elif hw_type == "fp_sub":
-                    lines.append(
-                        f"        {reg_name_by_node[op]} <= fp_sub_{inst}_res;"
-                    )
-                elif hw_type == "fp_mul":
-                    lines.append(
-                        f"        {reg_name_by_node[op]} <= fp_mul_{inst}_res;"
-                    )
-                elif hw_type == "fp_recip":
-                    lines.append(
-                        f"        {reg_name_by_node[op]} <= fp_recip_{inst}_out;"
-                    )
-                elif hw_type == "tri_bb_min_max":
-                    min_reg, max_reg = tri_reg_pair_by_node[op]
-                    lines.append(f"        {min_reg} <= tri_bb_min_max_{inst}_min;")
-                    lines.append(f"        {max_reg} <= tri_bb_min_max_{inst}_max;")
-                elif hw_type == "fp_min_2":
-                    lines.append(
-                        f"        {reg_name_by_node[op]} <= fp_min_2_{inst}_res;"
-                    )
-                elif hw_type == "fp_max_2":
-                    lines.append(
-                        f"        {reg_name_by_node[op]} <= fp_max_2_{inst}_res;"
-                    )
-                elif hw_type == "fp_add_half_fast":
-                    lines.append(
-                        f"        {reg_name_by_node[op]} <= fp_add_half_fast_{inst}_out;"
-                    )
-                elif hw_type == "fp32_to_int16":
-                    lines.append(
-                        f"        {reg_name_by_node[op]} <= fp32_to_int16_{inst}_out;"
-                    )
-                elif hw_type == "int16_add_sub":
-                    lines.append(
-                        f"        {reg_name_by_node[op]} <= int16_sub_{inst}_res;"
-                    )
+            for stmt in seq_events[cycle]:
+                lines.append(f"        {stmt}")
             lines.append("      end")
         lines.append("      default: ;")
         lines.append("    endcase")
         lines.append("  end")
         lines.append("end")
-        lines.append("")
-
-        lines.append("// ---------------- Combinational Launch FSM ----------------")
-        lines.append("always_comb begin")
-        for hw_type in sorted(unit_count.keys()):
-            for idx in range(1, unit_count[hw_type] + 1):
-                if hw_type == "fp_add_sub":
-                    lines.append(f"  fp_add_sub_{idx}_a = 32'b0;")
-                    lines.append(f"  fp_add_sub_{idx}_b = 32'b0;")
-                    lines.append(f"  fp_add_sub_{idx}_op = 1'b0;")
-                    lines.append(f"  fp_add_sub_{idx}_valid_in = 1'b0;")
-                elif hw_type == "fp_add":
-                    lines.append(f"  fp_add_{idx}_a = 32'b0;")
-                    lines.append(f"  fp_add_{idx}_b = 32'b0;")
-                    lines.append(f"  fp_add_{idx}_valid_in = 1'b0;")
-                elif hw_type == "fp_sub":
-                    lines.append(f"  fp_sub_{idx}_a = 32'b0;")
-                    lines.append(f"  fp_sub_{idx}_b = 32'b0;")
-                    lines.append(f"  fp_sub_{idx}_valid_in = 1'b0;")
-                elif hw_type == "fp_mul":
-                    lines.append(f"  fp_mul_{idx}_a = 32'b0;")
-                    lines.append(f"  fp_mul_{idx}_b = 32'b0;")
-                    lines.append(f"  fp_mul_{idx}_valid_in = 1'b0;")
-                elif hw_type == "fp_recip":
-                    lines.append(f"  fp_recip_{idx}_in = 32'b0;")
-                    lines.append(f"  fp_recip_{idx}_valid_in = 1'b0;")
-                elif hw_type == "tri_bb_min_max":
-                    lines.append(f"  tri_bb_min_max_{idx}_a = 32'b0;")
-                    lines.append(f"  tri_bb_min_max_{idx}_b = 32'b0;")
-                    lines.append(f"  tri_bb_min_max_{idx}_c = 32'b0;")
-                    lines.append(f"  tri_bb_min_max_{idx}_valid_in = 1'b0;")
-                elif hw_type == "fp_min_2":
-                    lines.append(f"  fp_min_2_{idx}_a = 32'b0;")
-                    lines.append(f"  fp_min_2_{idx}_b = 32'b0;")
-                    lines.append(f"  fp_min_2_{idx}_valid_in = 1'b0;")
-                elif hw_type == "fp_max_2":
-                    lines.append(f"  fp_max_2_{idx}_a = 32'b0;")
-                    lines.append(f"  fp_max_2_{idx}_b = 32'b0;")
-                    lines.append(f"  fp_max_2_{idx}_valid_in = 1'b0;")
-                elif hw_type == "fp_add_half_fast":
-                    lines.append(f"  fp_add_half_fast_{idx}_in = 32'b0;")
-                    lines.append(f"  fp_add_half_fast_{idx}_valid_in = 1'b0;")
-                elif hw_type == "fp32_to_int16":
-                    lines.append(f"  fp32_to_int16_{idx}_in = 32'b0;")
-                    lines.append(f"  fp32_to_int16_{idx}_valid_in = 1'b0;")
-                elif hw_type == "int16_add_sub":
-                    lines.append(f"  int16_sub_{idx}_a = 16'b0;")
-                    lines.append(f"  int16_sub_{idx}_b = 16'b0;")
-
-        lines.append("")
-        lines.append("  if (state == ST_CALC) begin")
-        lines.append("    case (cycle_cnt)")
-        for cycle in sorted(launch_by_cycle.keys()):
-            lines.append(f"      8'd{cycle}: begin")
-            for op in launch_by_cycle[cycle]:
-                hw_type = self.ops[op][0]
-                inst = op_unit_idx[op]
-                inputs = self.op_inputs.get(op, tuple())
-                if hw_type == "fp_add_sub":
-                    a = signal_to_rtl(inputs[0])
-                    b = signal_to_rtl(inputs[1])
-                    op_sub = self.ops[op][3] == "-"
-                    lines.append(f"        fp_add_sub_{inst}_a = {a};")
-                    lines.append(f"        fp_add_sub_{inst}_b = {b};")
-                    lines.append(
-                        f"        fp_add_sub_{inst}_op = 1'b{1 if op_sub else 0};"
-                    )
-                    lines.append(f"        fp_add_sub_{inst}_valid_in = 1'b1;")
-                elif hw_type == "fp_add":
-                    a = signal_to_rtl(inputs[0])
-                    b = signal_to_rtl(inputs[1])
-                    lines.append(f"        fp_add_{inst}_a = {a};")
-                    lines.append(f"        fp_add_{inst}_b = {b};")
-                    lines.append(f"        fp_add_{inst}_valid_in = 1'b1;")
-                elif hw_type == "fp_sub":
-                    a = signal_to_rtl(inputs[0])
-                    b = signal_to_rtl(inputs[1])
-                    lines.append(f"        fp_sub_{inst}_a = {a};")
-                    lines.append(f"        fp_sub_{inst}_b = {b};")
-                    lines.append(f"        fp_sub_{inst}_valid_in = 1'b1;")
-                elif hw_type == "fp_mul":
-                    a = signal_to_rtl(inputs[0])
-                    b = signal_to_rtl(inputs[1])
-                    lines.append(f"        fp_mul_{inst}_a = {a};")
-                    lines.append(f"        fp_mul_{inst}_b = {b};")
-                    lines.append(f"        fp_mul_{inst}_valid_in = 1'b1;")
-                elif hw_type == "fp_recip":
-                    a = signal_to_rtl(inputs[0])
-                    lines.append(f"        fp_recip_{inst}_in = {a};")
-                    lines.append(f"        fp_recip_{inst}_valid_in = 1'b1;")
-                elif hw_type == "tri_bb_min_max":
-                    a = signal_to_rtl(inputs[0])
-                    b = signal_to_rtl(inputs[1])
-                    c = signal_to_rtl(inputs[2])
-                    lines.append(f"        tri_bb_min_max_{inst}_a = {a};")
-                    lines.append(f"        tri_bb_min_max_{inst}_b = {b};")
-                    lines.append(f"        tri_bb_min_max_{inst}_c = {c};")
-                    lines.append(f"        tri_bb_min_max_{inst}_valid_in = 1'b1;")
-                elif hw_type == "fp_min_2":
-                    a = signal_to_rtl(inputs[0])
-                    b = signal_to_rtl(inputs[1])
-                    lines.append(f"        fp_min_2_{inst}_a = {a};")
-                    lines.append(f"        fp_min_2_{inst}_b = {b};")
-                    lines.append(f"        fp_min_2_{inst}_valid_in = 1'b1;")
-                elif hw_type == "fp_max_2":
-                    a = signal_to_rtl(inputs[0])
-                    b = signal_to_rtl(inputs[1])
-                    lines.append(f"        fp_max_2_{inst}_a = {a};")
-                    lines.append(f"        fp_max_2_{inst}_b = {b};")
-                    lines.append(f"        fp_max_2_{inst}_valid_in = 1'b1;")
-                elif hw_type == "fp_add_half_fast":
-                    a = signal_to_rtl(inputs[0])
-                    lines.append(f"        fp_add_half_fast_{inst}_in = {a};")
-                    lines.append(f"        fp_add_half_fast_{inst}_valid_in = 1'b1;")
-                elif hw_type == "fp32_to_int16":
-                    a = signal_to_rtl(inputs[0])
-                    lines.append(f"        fp32_to_int16_{inst}_in = {a};")
-                    lines.append(f"        fp32_to_int16_{inst}_valid_in = 1'b1;")
-                elif hw_type == "int16_add_sub":
-                    a = signal_to_rtl(inputs[0])
-                    b = signal_to_rtl(inputs[1])
-                    lines.append(f"        int16_sub_{inst}_a = {a}[15:0];")
-                    lines.append(f"        int16_sub_{inst}_b = {b}[15:0];")
-            lines.append("      end")
-        lines.append("      default: ;")
-        lines.append("    endcase")
-        lines.append("  end")
-        lines.append("end")
-
         Path(output_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
         return reg_name_by_node, tri_reg_pair_by_node
 

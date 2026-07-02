@@ -29,6 +29,7 @@ module raster_core (
     output logic    [31:0] out_e0 [4],
     output logic    [31:0] out_e1 [4],
     output logic    [31:0] out_e2 [4],
+    output logic    [PIXEL_ADDR_W-1:0] out_pixel_id [4],
     output logic    [6:0]  out_minX_local,
     output logic    [6:0]  out_minY_local,
     output logic    [7:0]  out_width,
@@ -119,6 +120,7 @@ module raster_core (
   logic [31:0] o_e0 [4];
   logic [31:0] o_e1 [4];
   logic [31:0] o_e2 [4];
+  logic [PIXEL_ADDR_W-1:0] o_pixel_id [4];
   logic [31:0] o_invArea;
   vertex_t o_v0, o_v1, o_v2;
 
@@ -149,6 +151,7 @@ module raster_core (
       .out_e0        (o_e0),
       .out_e1        (o_e1),
       .out_e2        (o_e2),
+      .out_pixel_id  (o_pixel_id),
       .out_invArea   (o_invArea),
       .out_v0        (o_v0),
       .out_v1        (o_v1),
@@ -158,6 +161,7 @@ module raster_core (
   assign out_e0 = o_e0;
   assign out_e1 = o_e1;
   assign out_e2 = o_e2;
+  assign out_pixel_id = o_pixel_id;
 
   assign out_minX_local = f_minX_local[6:0];
   assign out_minY_local = f_minY_local[6:0];

@@ -3,8 +3,7 @@
 //
 // Performs a snake-like traversal of 2x2 pixel quads across the bounding box of a triangle,
 // updating edge functions incrementally and distributing them to 4 parallel thread execution units.
-//
-// Latency: Pipelined with fp_add_sub units (latency of 8 cycles).
+
 
 `timescale 1ns / 1ns
 
@@ -49,6 +48,7 @@ module thread_orchestrator (
     output logic [31:0] out_e0[4],
     output logic [31:0] out_e1[4],
     output logic [31:0] out_e2[4],
+    output logic [PIXEL_ADDR_W-1:0] out_pixel_id[4],
 
     output logic    [31:0] out_invArea,
     output vertex_t        out_v0,
@@ -96,7 +96,7 @@ module thread_orchestrator (
   // Stall if any thread is supposed to receive valid data but is not ready
   logic stall;
   logic thread_ready;
-  assign thread_ready = ready_in[0] && ready_in[1] && ready_in[2] && ready_in[3];
+  assign thread_ready = ~ready_in[0] || ~ready_in[1] || ~ready_in[2] || ~ready_in[3];
   assign stall = (state == ST_TRAVERSE) && !thread_ready;
 
   // Ready out to frontend
@@ -114,9 +114,9 @@ module thread_orchestrator (
 
     if (state == ST_TRAVERSE && !stall) begin
       if (dir_right) begin
-        if (curr_qx < num_quads_x - 1) begin
+        if (curr_qx < num_quads_x) begin
           move_horizontal = 1'b1;
-        end else if (curr_qy < num_quads_y - 1) begin
+        end else if (curr_qy < num_quads_y) begin
           move_down = 1'b1;
         end else begin
           step_done = 1'b1;
@@ -124,7 +124,7 @@ module thread_orchestrator (
       end else begin
         if (curr_qx > 0) begin
           move_horizontal = 1'b1;
-        end else if (curr_qy < num_quads_y - 1) begin
+        end else if (curr_qy < num_quads_y) begin
           move_down = 1'b1;
         end else begin
           step_done = 1'b1;
@@ -261,7 +261,7 @@ module thread_orchestrator (
         e2_reg[i] <= '0;
       end
     end else begin
-      case (state)
+      unique case (state)
         ST_IDLE: begin
           if (valid_in) begin
             state       <= ST_TRAVERSE;
@@ -279,8 +279,8 @@ module thread_orchestrator (
             r_height    <= height;
 
             // Calculate number of quads covering the bounding box
-            num_quads_x <= width >> 1;
-            num_quads_y <= height >> 1;
+            num_quads_x <= (width >> 1) - 1;
+            num_quads_y <= (height >> 1) - 1;
 
             // Pass-through parameters
             r_invArea   <= invArea;
@@ -330,63 +330,84 @@ module thread_orchestrator (
     end
   end
 
-  logic [3:0] in_bb_mask;
+  // logic [3:0] in_bb_mask;
 
   // Bounding box pixel validity checking & masking
-  always_comb begin
-    for (int i = 0; i < 4; i++) begin
-      in_bb_mask[i] = (state == ST_TRAVERSE);
-    end
-  end
+  // always_comb begin
+  //   for (int i = 0; i < 4; i++) begin
+  //     in_bb_mask[i] = (state == ST_TRAVERSE);
+  //   end
+  // end
 
   // Delay pipelines for valid mask and pass-through metadata
   // Latency is ADD_SUB_LATENCY + 1 (for input registration)
   localparam int TOTAL_LATENCY = ADD_SUB_LATENCY + 1;
 
-  logic    [ 3:0] in_bb_mask_pipe[TOTAL_LATENCY];
-  logic    [31:0] invArea_pipe   [TOTAL_LATENCY];
-  vertex_t        v0_pipe        [TOTAL_LATENCY];
-  vertex_t        v1_pipe        [TOTAL_LATENCY];
-  vertex_t        v2_pipe        [TOTAL_LATENCY];
+  logic    [ 7:0] qx_coord_pipe[TOTAL_LATENCY];
+  logic    [ 7:0] qy_coord_pipe[TOTAL_LATENCY];
+  // logic    [ 3:0] in_bb_mask_pipe[TOTAL_LATENCY];
+  logic    [31:0] invArea_pipe [TOTAL_LATENCY];
+  vertex_t        v0_pipe      [TOTAL_LATENCY];
+  vertex_t        v1_pipe      [TOTAL_LATENCY];
+  vertex_t        v2_pipe      [TOTAL_LATENCY];
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       for (int i = 0; i < TOTAL_LATENCY; i++) begin
-        in_bb_mask_pipe[i] <= '0;
-        invArea_pipe[i]    <= '0;
-        v0_pipe[i]         <= '0;
-        v1_pipe[i]         <= '0;
-        v2_pipe[i]         <= '0;
+        // in_bb_mask_pipe[i] <= '0;
+        qx_coord_pipe[i] <= '0;
+        qy_coord_pipe[i] <= '0;
+        invArea_pipe[i]  <= '0;
+        v0_pipe[i]       <= '0;
+        v1_pipe[i]       <= '0;
+        v2_pipe[i]       <= '0;
       end
     end else if (!stall) begin
-      in_bb_mask_pipe[0] <= in_bb_mask;
-      invArea_pipe[0]    <= r_invArea;
-      v0_pipe[0]         <= r_v0;
-      v1_pipe[0]         <= r_v1;
-      v2_pipe[0]         <= r_v2;
+      // in_bb_mask_pipe[0] <= in_bb_mask;
+      qx_coord_pipe[0] <= qx_coord;
+      qy_coord_pipe[0] <= qy_coord;
+      invArea_pipe[0]  <= r_invArea;
+      v0_pipe[0]       <= r_v0;
+      v1_pipe[0]       <= r_v1;
+      v2_pipe[0]       <= r_v2;
       for (int i = 1; i < TOTAL_LATENCY; i++) begin
-        in_bb_mask_pipe[i] <= in_bb_mask_pipe[i-1];
-        invArea_pipe[i]    <= invArea_pipe[i-1];
-        v0_pipe[i]         <= v0_pipe[i-1];
-        v1_pipe[i]         <= v1_pipe[i-1];
-        v2_pipe[i]         <= v2_pipe[i-1];
+        // in_bb_mask_pipe[i] <= in_bb_mask_pipe[i-1];
+        qx_coord_pipe[i] <= qx_coord_pipe[i-1];
+        qy_coord_pipe[i] <= qy_coord_pipe[i-1];
+        invArea_pipe[i]  <= invArea_pipe[i-1];
+        v0_pipe[i]       <= v0_pipe[i-1];
+        v1_pipe[i]       <= v1_pipe[i-1];
+        v2_pipe[i]       <= v2_pipe[i-1];
       end
     end
   end
 
   always_comb begin
     for (int i = 0; i < 4; i++) begin
-      valid_out[i] = fp_valid_out_e0[0] && in_bb_mask_pipe[TOTAL_LATENCY-1][i];
+      // valid_out[i] = fp_valid_out_e0[0] && in_bb_mask_pipe[TOTAL_LATENCY-1][i];
+      valid_out[i] = fp_valid_out_e0[0];
     end
   end
 
   // Assignments to output ports
-  assign out_e0      = e0_reg;
-  assign out_e1      = e1_reg;
-  assign out_e2      = e2_reg;
+  assign out_e0 = e0_reg;
+  assign out_e1 = e1_reg;
+  assign out_e2 = e2_reg;
+  assign out_pixel_id[0] =
+      (qy_coord_pipe[TOTAL_LATENCY-1] * TILE_SIZE_X) +
+      qx_coord_pipe[TOTAL_LATENCY-1];
+  assign out_pixel_id[1] =
+      (qy_coord_pipe[TOTAL_LATENCY-1] * TILE_SIZE_X) +
+      qx_coord_pipe[TOTAL_LATENCY-1] + 1;
+  assign out_pixel_id[2] =
+      ((qy_coord_pipe[TOTAL_LATENCY-1] + 1) * TILE_SIZE_X) +
+      qx_coord_pipe[TOTAL_LATENCY-1];
+  assign out_pixel_id[3] =
+      ((qy_coord_pipe[TOTAL_LATENCY-1] + 1) * TILE_SIZE_X) +
+      qx_coord_pipe[TOTAL_LATENCY-1] + 1;
   assign out_invArea = invArea_pipe[TOTAL_LATENCY-1];
-  assign out_v0      = v0_pipe[TOTAL_LATENCY-1];
-  assign out_v1      = v1_pipe[TOTAL_LATENCY-1];
-  assign out_v2      = v2_pipe[TOTAL_LATENCY-1];
+  assign out_v0 = v0_pipe[TOTAL_LATENCY-1];
+  assign out_v1 = v1_pipe[TOTAL_LATENCY-1];
+  assign out_v2 = v2_pipe[TOTAL_LATENCY-1];
 
 endmodule

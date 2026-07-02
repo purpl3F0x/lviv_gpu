@@ -157,11 +157,41 @@ module raster_frontend (
   // --------------------------------------------------------------------------
   // Internal Signal Declarations
   // --------------------------------------------------------------------------
+  logic [     31:0] fp32_to_int16_1_in_reg;
+  logic [      0:0] fp32_to_int16_1_valid_in_reg;
+  logic [     31:0] fp_add_half_fast_1_in_reg;
+  logic [      0:0] fp_add_half_fast_1_valid_in_reg;
+  logic [     31:0] fp_add_sub_1_a_reg;
+  logic [     31:0] fp_add_sub_1_b_reg;
+  logic [      0:0] fp_add_sub_1_op_reg;
+  logic [      0:0] fp_add_sub_1_valid_in_reg;
+  logic [     31:0] fp_add_sub_2_a_reg;
+  logic [     31:0] fp_add_sub_2_b_reg;
+  logic [      0:0] fp_add_sub_2_op_reg;
+  logic [      0:0] fp_add_sub_2_valid_in_reg;
+  logic [     31:0] fp_max_2_1_a_reg;
+  logic [     31:0] fp_max_2_1_b_reg;
+  logic [      0:0] fp_max_2_1_valid_in_reg;
+  logic [     31:0] fp_min_2_1_a_reg;
+  logic [     31:0] fp_min_2_1_b_reg;
+  logic [      0:0] fp_min_2_1_valid_in_reg;
+  logic [     31:0] fp_mul_1_a_reg;
+  logic [     31:0] fp_mul_1_b_reg;
+  logic [      0:0] fp_mul_1_valid_in_reg;
+  logic [     31:0] fp_mul_2_a_reg;
+  logic [     31:0] fp_mul_2_b_reg;
+  logic [      0:0] fp_mul_2_valid_in_reg;
+  logic [     31:0] fp_recip_1_in_reg;
+  logic [      0:0] fp_recip_1_valid_in_reg;
+  logic [     15:0] int16_sub_1_a_reg;
+  logic [     15:0] int16_sub_1_b_reg;
+  logic [     31:0] tri_bb_min_max_1_a_reg;
+  logic [     31:0] tri_bb_min_max_1_b_reg;
+  logic [     31:0] tri_bb_min_max_1_c_reg;
+  logic [      0:0] tri_bb_min_max_1_valid_in_reg;
+
+  // ---- Pipeline output/intermediate registers ----
   logic [     15:0] bb_height_reg;
-  logic [     31:0] bb_max_x_reg;
-  logic [     31:0] bb_max_y_reg;
-  logic [     31:0] bb_min_x_reg;
-  logic [     31:0] bb_min_y_reg;
   logic [     15:0] bb_start_x_reg;
   logic [     15:0] bb_start_y_reg;
   logic [     15:0] bb_width_reg;
@@ -170,28 +200,30 @@ module raster_frontend (
   logic [     31:0] e0_10_reg;
   logic [     31:0] e0_11_reg;
   logic [     31:0] e0_dx_2x_reg;
-  logic [     31:0] e0_dx_reg;
   logic [     31:0] e0_dy_2x_reg;
-  logic [     31:0] e0_dy_reg;
   logic [     31:0] e1_00_reg;
   logic [     31:0] e1_01_reg;
   logic [     31:0] e1_10_reg;
   logic [     31:0] e1_11_reg;
   logic [     31:0] e1_dx_2x_reg;
-  logic [     31:0] e1_dx_reg;
   logic [     31:0] e1_dy_2x_reg;
-  logic [     31:0] e1_dy_reg;
   logic [     31:0] e2_00_reg;
   logic [     31:0] e2_01_reg;
   logic [     31:0] e2_10_reg;
   logic [     31:0] e2_11_reg;
   logic [     31:0] e2_dx_2x_reg;
-  logic [     31:0] e2_dx_reg;
   logic [     31:0] e2_dy_2x_reg;
-  logic [     31:0] e2_dy_reg;
+  logic [     31:0] fp32_to_int16_1_in_src_reg;
+  logic [     31:0] fp_add_sub_1_a_src_reg;
+  logic [     31:0] fp_add_sub_1_b_src_reg;
+  logic [     31:0] fp_add_sub_2_a_src_reg;
+  logic [     31:0] fp_add_sub_2_b_src_reg;
+  logic [     31:0] fp_mul_1_b_src_reg;
+  logic [     31:0] fp_mul_2_a_src_reg;
+  logic [     31:0] fp_mul_2_b_src_reg;
+  logic [     31:0] fp_recip_1_in_src_reg;
+  logic [     31:0] int16_add_sub_1_a_src_reg;
   logic [     31:0] invArea_reg;
-  logic [     31:0] p_min_x_reg;
-  logic [     31:0] p_min_y_reg;
   logic [     31:0] tmp0;
   logic [     31:0] tmp1;
   logic [     31:0] tmp2;
@@ -199,184 +231,181 @@ module raster_frontend (
   logic [     31:0] tmp4;
   logic [     31:0] tmp5;
   logic [     31:0] tmp6;
-  logic [     15:0] tmp7;
+  logic [     31:0] tmp7;
   logic [     31:0] tmp8;
   logic [     31:0] tmp9;
-  logic [     31:0] tri_max_x_reg;
-  logic [     31:0] tri_max_y_reg;
-  logic [     31:0] tri_min_x_reg;
-  logic [     31:0] tri_min_y_reg;
 
-  // --------------------------------------------------------------------------
-  // Modules Declerations
-  // --------------------------------------------------------------------------
-
-  logic [     31:0] fp32_to_int16_1_in;
+  // ---------------- Unit Instantiations (ports tied to input regs) ----------------
   logic [     15:0] fp32_to_int16_1_out;
-  logic             fp32_to_int16_1_valid_in;
   fp32_to_int16 #(
       .LATENCY(2)
   ) u_fp32_to_int16_1 (
       .aclk    (clk),
       .aresetn (rst_n),
       .aclken  (1'b1),
-      .valid_in(fp32_to_int16_1_valid_in),
-      .a       (fp32_to_int16_1_in),
+      .valid_in(fp32_to_int16_1_valid_in_reg),
+      .a       (fp32_to_int16_1_in_reg),
       .result  (fp32_to_int16_1_out)
   );
 
-  logic [31:0] fp_add_half_fast_1_in, fp_add_half_fast_1_out;
-  logic fp_add_half_fast_1_valid_in, fp_add_half_fast_1_valid_out;
+  logic [31:0] fp_add_half_fast_1_out;
+  logic fp_add_half_fast_1_valid_out;
   fp_add_half_fast u_fp_add_half_fast_1 (
       .clk      (clk),
       .rst_n    (rst_n),
-      .valid_in (fp_add_half_fast_1_valid_in),
-      .f_in     (fp_add_half_fast_1_in),
+      .valid_in (fp_add_half_fast_1_valid_in_reg),
+      .f_in     (fp_add_half_fast_1_in_reg),
       .valid_out(fp_add_half_fast_1_valid_out),
       .f_out    (fp_add_half_fast_1_out)
   );
 
-  logic [31:0] fp_add_sub_1_a, fp_add_sub_1_b, fp_add_sub_1_res;
-  logic fp_add_sub_1_op, fp_add_sub_1_valid_in;
+  logic [31:0] fp_add_sub_1_res;
   fp_add_sub #(
       .LATENCY(8)
   ) u_fp_add_sub_1 (
       .aclk    (clk),
       .aresetn (rst_n),
       .aclken  (1'b1),
-      .op_sub  (fp_add_sub_1_op),
-      .valid_in(fp_add_sub_1_valid_in),
-      .a       (fp_add_sub_1_a),
-      .b       (fp_add_sub_1_b),
+      .op_sub  (fp_add_sub_1_op_reg),
+      .valid_in(fp_add_sub_1_valid_in_reg),
+      .a       (fp_add_sub_1_a_reg),
+      .b       (fp_add_sub_1_b_reg),
       .result  (fp_add_sub_1_res)
   );
 
-  logic [31:0] fp_add_sub_2_a, fp_add_sub_2_b, fp_add_sub_2_res;
-  logic fp_add_sub_2_op, fp_add_sub_2_valid_in;
+  logic [31:0] fp_add_sub_2_res;
   fp_add_sub #(
       .LATENCY(8)
   ) u_fp_add_sub_2 (
       .aclk    (clk),
       .aresetn (rst_n),
       .aclken  (1'b1),
-      .op_sub  (fp_add_sub_2_op),
-      .valid_in(fp_add_sub_2_valid_in),
-      .a       (fp_add_sub_2_a),
-      .b       (fp_add_sub_2_b),
+      .op_sub  (fp_add_sub_2_op_reg),
+      .valid_in(fp_add_sub_2_valid_in_reg),
+      .a       (fp_add_sub_2_a_reg),
+      .b       (fp_add_sub_2_b_reg),
       .result  (fp_add_sub_2_res)
   );
 
-  logic [31:0] fp_add_sub_3_a, fp_add_sub_3_b, fp_add_sub_3_res;
-  logic fp_add_sub_3_op, fp_add_sub_3_valid_in;
-  fp_add_sub #(
-      .LATENCY(8)
-  ) u_fp_add_sub_3 (
-      .aclk    (clk),
-      .aresetn (rst_n),
-      .aclken  (1'b1),
-      .op_sub  (fp_add_sub_3_op),
-      .valid_in(fp_add_sub_3_valid_in),
-      .a       (fp_add_sub_3_a),
-      .b       (fp_add_sub_3_b),
-      .result  (fp_add_sub_3_res)
-  );
-
-  logic [31:0] fp_max_2_1_a, fp_max_2_1_b, fp_max_2_1_res;
-  logic fp_max_2_1_valid_in, fp_max_2_1_valid_out;
+  logic [31:0] fp_max_2_1_res;
+  logic fp_max_2_1_valid_out;
   fp_max_2 u_fp_max_2_1 (
       .clk      (clk),
       .rst_n    (rst_n),
-      .valid_in (fp_max_2_1_valid_in),
-      .f_a      (fp_max_2_1_a),
-      .f_b      (fp_max_2_1_b),
+      .valid_in (fp_max_2_1_valid_in_reg),
+      .f_a      (fp_max_2_1_a_reg),
+      .f_b      (fp_max_2_1_b_reg),
       .valid_out(fp_max_2_1_valid_out),
       .f_max    (fp_max_2_1_res)
   );
 
-  logic [31:0] fp_min_2_1_a, fp_min_2_1_b, fp_min_2_1_res;
-  logic fp_min_2_1_valid_in, fp_min_2_1_valid_out;
+  logic [31:0] fp_min_2_1_res;
+  logic fp_min_2_1_valid_out;
   fp_min_2 u_fp_min_2_1 (
       .clk      (clk),
       .rst_n    (rst_n),
-      .valid_in (fp_min_2_1_valid_in),
-      .f_a      (fp_min_2_1_a),
-      .f_b      (fp_min_2_1_b),
+      .valid_in (fp_min_2_1_valid_in_reg),
+      .f_a      (fp_min_2_1_a_reg),
+      .f_b      (fp_min_2_1_b_reg),
       .valid_out(fp_min_2_1_valid_out),
       .f_min    (fp_min_2_1_res)
   );
 
-  logic [31:0] fp_mul_1_a, fp_mul_1_b, fp_mul_1_res;
-  logic fp_mul_1_valid_in;
+  logic [31:0] fp_mul_1_res;
   fp_mul #(
       .LATENCY(5)
   ) u_fp_mul_1 (
       .aclk    (clk),
       .aresetn (rst_n),
       .aclken  (1'b1),
-      .valid_in(fp_mul_1_valid_in),
-      .a       (fp_mul_1_a),
-      .b       (fp_mul_1_b),
+      .valid_in(fp_mul_1_valid_in_reg),
+      .a       (fp_mul_1_a_reg),
+      .b       (fp_mul_1_b_reg),
       .result  (fp_mul_1_res)
   );
 
-  logic [31:0] fp_mul_2_a, fp_mul_2_b, fp_mul_2_res;
-  logic fp_mul_2_valid_in;
+  logic [31:0] fp_mul_2_res;
   fp_mul #(
       .LATENCY(5)
   ) u_fp_mul_2 (
       .aclk    (clk),
       .aresetn (rst_n),
       .aclken  (1'b1),
-      .valid_in(fp_mul_2_valid_in),
-      .a       (fp_mul_2_a),
-      .b       (fp_mul_2_b),
+      .valid_in(fp_mul_2_valid_in_reg),
+      .a       (fp_mul_2_a_reg),
+      .b       (fp_mul_2_b_reg),
       .result  (fp_mul_2_res)
   );
 
-  logic [31:0] fp_recip_1_in, fp_recip_1_out;
-  logic fp_recip_1_valid_in;
+  logic [31:0] fp_recip_1_out;
   fp_recip #(
       .LATENCY(22)
   ) u_fp_recip_1 (
       .aclk    (clk),
       .aresetn (rst_n),
       .aclken  (1'b1),
-      .valid_in(fp_recip_1_valid_in),
-      .a       (fp_recip_1_in),
+      .valid_in(fp_recip_1_valid_in_reg),
+      .a       (fp_recip_1_in_reg),
       .result  (fp_recip_1_out)
   );
 
-  logic [15:0] int16_sub_1_a, int16_sub_1_b, int16_sub_1_res;
+  logic [15:0] int16_sub_1_res;
   int16_sub u_int16_sub_1 (
       .clken(1'b1),
-      .a    (int16_sub_1_a),
-      .b    (int16_sub_1_b),
+      .a    (int16_sub_1_a_reg),
+      .b    (int16_sub_1_b_reg),
       .s    (int16_sub_1_res)
   );
 
-  logic [31:0] tri_bb_min_max_1_a, tri_bb_min_max_1_b, tri_bb_min_max_1_c;
   logic [31:0] tri_bb_min_max_1_min, tri_bb_min_max_1_max;
-  logic tri_bb_min_max_1_valid_in, tri_bb_min_max_1_valid_out;
+  logic tri_bb_min_max_1_valid_out;
   tri_bb_min_max u_tri_bb_min_max_1 (
       .clk        (clk),
       .rst_n      (rst_n),
-      .valid_in   (tri_bb_min_max_1_valid_in),
-      .f_a        (tri_bb_min_max_1_a),
-      .f_b        (tri_bb_min_max_1_b),
-      .f_c        (tri_bb_min_max_1_c),
+      .valid_in   (tri_bb_min_max_1_valid_in_reg),
+      .f_a        (tri_bb_min_max_1_a_reg),
+      .f_b        (tri_bb_min_max_1_b_reg),
+      .f_c        (tri_bb_min_max_1_c_reg),
       .valid_out  (tri_bb_min_max_1_valid_out),
       .f_min_floor(tri_bb_min_max_1_min),
       .f_max_ceil (tri_bb_min_max_1_max)
   );
-
   // ---------------- Sequential Latch FSM ----------------
   always_ff @(posedge clk) begin
     if (!rst_n) begin
+      fp32_to_int16_1_in_reg <= 32'b0;
+      fp32_to_int16_1_valid_in_reg <= 1'b0;
+      fp_add_half_fast_1_in_reg <= 32'b0;
+      fp_add_half_fast_1_valid_in_reg <= 1'b0;
+      fp_add_sub_1_a_reg <= 32'b0;
+      fp_add_sub_1_b_reg <= 32'b0;
+      fp_add_sub_1_op_reg <= 1'b0;
+      fp_add_sub_1_valid_in_reg <= 1'b0;
+      fp_add_sub_2_a_reg <= 32'b0;
+      fp_add_sub_2_b_reg <= 32'b0;
+      fp_add_sub_2_op_reg <= 1'b0;
+      fp_add_sub_2_valid_in_reg <= 1'b0;
+      fp_max_2_1_a_reg <= 32'b0;
+      fp_max_2_1_b_reg <= 32'b0;
+      fp_max_2_1_valid_in_reg <= 1'b0;
+      fp_min_2_1_a_reg <= 32'b0;
+      fp_min_2_1_b_reg <= 32'b0;
+      fp_min_2_1_valid_in_reg <= 1'b0;
+      fp_mul_1_a_reg <= 32'b0;
+      fp_mul_1_b_reg <= 32'b0;
+      fp_mul_1_valid_in_reg <= 1'b0;
+      fp_mul_2_a_reg <= 32'b0;
+      fp_mul_2_b_reg <= 32'b0;
+      fp_mul_2_valid_in_reg <= 1'b0;
+      fp_recip_1_in_reg <= 32'b0;
+      fp_recip_1_valid_in_reg <= 1'b0;
+      int16_sub_1_a_reg <= 16'b0;
+      int16_sub_1_b_reg <= 16'b0;
+      tri_bb_min_max_1_a_reg <= 32'b0;
+      tri_bb_min_max_1_b_reg <= 32'b0;
+      tri_bb_min_max_1_c_reg <= 32'b0;
+      tri_bb_min_max_1_valid_in_reg <= 1'b0;
       bb_height_reg <= 16'b0;
-      bb_max_x_reg <= 32'b0;
-      bb_max_y_reg <= 32'b0;
-      bb_min_x_reg <= 32'b0;
-      bb_min_y_reg <= 32'b0;
       bb_start_x_reg <= 16'b0;
       bb_start_y_reg <= 16'b0;
       bb_width_reg <= 16'b0;
@@ -385,28 +414,30 @@ module raster_frontend (
       e0_10_reg <= 32'b0;
       e0_11_reg <= 32'b0;
       e0_dx_2x_reg <= 32'b0;
-      e0_dx_reg <= 32'b0;
       e0_dy_2x_reg <= 32'b0;
-      e0_dy_reg <= 32'b0;
       e1_00_reg <= 32'b0;
       e1_01_reg <= 32'b0;
       e1_10_reg <= 32'b0;
       e1_11_reg <= 32'b0;
       e1_dx_2x_reg <= 32'b0;
-      e1_dx_reg <= 32'b0;
       e1_dy_2x_reg <= 32'b0;
-      e1_dy_reg <= 32'b0;
       e2_00_reg <= 32'b0;
       e2_01_reg <= 32'b0;
       e2_10_reg <= 32'b0;
       e2_11_reg <= 32'b0;
       e2_dx_2x_reg <= 32'b0;
-      e2_dx_reg <= 32'b0;
       e2_dy_2x_reg <= 32'b0;
-      e2_dy_reg <= 32'b0;
+      fp32_to_int16_1_in_src_reg <= 32'b0;
+      fp_add_sub_1_a_src_reg <= 32'b0;
+      fp_add_sub_1_b_src_reg <= 32'b0;
+      fp_add_sub_2_a_src_reg <= 32'b0;
+      fp_add_sub_2_b_src_reg <= 32'b0;
+      fp_mul_1_b_src_reg <= 32'b0;
+      fp_mul_2_a_src_reg <= 32'b0;
+      fp_mul_2_b_src_reg <= 32'b0;
+      fp_recip_1_in_src_reg <= 32'b0;
+      int16_add_sub_1_a_src_reg <= 32'b0;
       invArea_reg <= 32'b0;
-      p_min_x_reg <= 32'b0;
-      p_min_y_reg <= 32'b0;
       tmp0 <= 32'b0;
       tmp1 <= 32'b0;
       tmp2 <= 32'b0;
@@ -414,423 +445,389 @@ module raster_frontend (
       tmp4 <= 32'b0;
       tmp5 <= 32'b0;
       tmp6 <= 32'b0;
-      tmp7 <= 16'b0;
+      tmp7 <= 32'b0;
       tmp8 <= 32'b0;
       tmp9 <= 32'b0;
-      tri_max_x_reg <= 32'b0;
-      tri_max_y_reg <= 32'b0;
-      tri_min_x_reg <= 32'b0;
-      tri_min_y_reg <= 32'b0;
+    end else if (state == ST_READ_V2 && valid_in == 1'b1) begin
+      // PRE-CALC: load input regs for operations firing at cycle 0
+      fp_add_sub_1_a_reg <= v2_reg.y;
+      fp_add_sub_1_b_reg <= v1_reg.y;
+      fp_add_sub_1_op_reg <= 1'b1;
+      fp_add_sub_1_valid_in_reg <= 1'b1;
+      tri_bb_min_max_1_a_reg <= v0_reg.x;
+      tri_bb_min_max_1_b_reg <= v1_reg.x;
+      tri_bb_min_max_1_c_reg <= v2_reg.x;
+      tri_bb_min_max_1_valid_in_reg <= 1'b1;
     end else if (state == ST_CALC) begin
       case (cycle_cnt)
+        8'd0: begin
+          fp_add_sub_2_a_reg <= v2_reg.x;
+          fp_add_sub_2_b_reg <= v0_reg.x;
+          fp_add_sub_2_op_reg <= 1'b1;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
+          fp_add_sub_1_a_reg <= v1_reg.y;
+          fp_add_sub_1_b_reg <= v0_reg.y;
+          fp_add_sub_1_op_reg <= 1'b1;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+          tri_bb_min_max_1_a_reg <= v0_reg.y;
+          tri_bb_min_max_1_b_reg <= v1_reg.y;
+          tri_bb_min_max_1_c_reg <= v2_reg.y;
+          tri_bb_min_max_1_valid_in_reg <= 1'b1;
+        end
+        8'd1: begin
+          fp_add_sub_1_a_reg <= v2_reg.y;
+          fp_add_sub_1_b_reg <= v0_reg.y;
+          fp_add_sub_1_op_reg <= 1'b1;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+          fp_add_sub_2_a_reg <= v1_reg.x;
+          fp_add_sub_2_b_reg <= v0_reg.x;
+          fp_add_sub_2_op_reg <= 1'b1;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
+          tri_bb_min_max_1_valid_in_reg <= 1'b0;
+        end
+        8'd2: begin
+          fp_add_sub_1_a_reg <= v1_reg.x;
+          fp_add_sub_1_b_reg <= v2_reg.x;
+          fp_add_sub_1_op_reg <= 1'b1;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+          fp_add_sub_2_a_reg <= v0_reg.y;
+          fp_add_sub_2_b_reg <= v2_reg.y;
+          fp_add_sub_2_op_reg <= 1'b1;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
+        end
+        8'd3: begin
+          fp_add_sub_1_a_reg <= v0_reg.x;
+          fp_add_sub_1_b_reg <= v1_reg.x;
+          fp_add_sub_1_op_reg <= 1'b1;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+          fp_add_sub_2_valid_in_reg <= 1'b0;
+        end
+        8'd4: begin
+          fp_add_sub_1_valid_in_reg <= 1'b0;
+        end
         8'd5: begin
-          tri_min_x_reg <= tri_bb_min_max_1_min;
-          tri_max_x_reg <= tri_bb_min_max_1_max;
+          fp_max_2_1_a_reg <= tmp0;
+          fp_max_2_1_b_reg <= binMinX;
+          fp_max_2_1_valid_in_reg <= 1'b1;
+          fp_min_2_1_a_reg <= tmp1;
+          fp_min_2_1_b_reg <= binMaxX;
+          fp_min_2_1_valid_in_reg <= 1'b1;
+          tmp0 <= tri_bb_min_max_1_min;
+          tmp1 <= tri_bb_min_max_1_max;
         end
         8'd6: begin
-          tri_min_y_reg <= tri_bb_min_max_1_min;
-          tri_max_y_reg <= tri_bb_min_max_1_max;
+          fp_max_2_1_a_reg <= tmp3;
+          fp_max_2_1_b_reg <= binMinY;
+          fp_max_2_1_valid_in_reg <= 1'b1;
+          fp_min_2_1_a_reg <= tmp4;
+          fp_min_2_1_b_reg <= binMaxY;
+          fp_min_2_1_valid_in_reg <= 1'b1;
+          tmp3 <= tri_bb_min_max_1_min;
+          tmp4 <= tri_bb_min_max_1_max;
         end
         8'd7: begin
-          bb_min_x_reg <= fp_max_2_1_res;
-          bb_max_x_reg <= fp_min_2_1_res;
+          fp_add_half_fast_1_in_reg <= tmp0;
+          fp_add_half_fast_1_valid_in_reg <= 1'b1;
+          fp32_to_int16_1_in_reg <= fp32_to_int16_1_in_src_reg;
+          fp32_to_int16_1_valid_in_reg <= 1'b1;
+          fp_max_2_1_valid_in_reg <= 1'b0;
+          fp_min_2_1_valid_in_reg <= 1'b0;
+          tmp0 <= fp_max_2_1_res;
+          fp32_to_int16_1_in_src_reg <= fp_min_2_1_res;
         end
         8'd8: begin
-          e0_dx_reg <= fp_add_sub_1_res;
-          e2_dx_reg <= fp_add_sub_2_res;
-          e2_dy_reg <= fp_add_sub_3_res;
-          bb_min_y_reg <= fp_max_2_1_res;
-          bb_max_y_reg <= fp_min_2_1_res;
+          fp_add_half_fast_1_in_reg <= tmp1;
+          fp_add_half_fast_1_valid_in_reg <= 1'b1;
+          fp32_to_int16_1_in_reg <= tmp0;
+          fp32_to_int16_1_valid_in_reg <= 1'b1;
+          tmp2 <= fp_add_sub_1_res;
+          tmp1 <= fp_max_2_1_res;
+          fp32_to_int16_1_in_src_reg <= fp_min_2_1_res;
         end
         8'd9: begin
-          e0_dy_reg <= fp_add_sub_1_res;
-          e1_dy_reg <= fp_add_sub_2_res;
+          fp_add_sub_2_a_reg <= tmp5;
+          fp_add_sub_2_b_reg <= tmp5;
+          fp_add_sub_2_op_reg <= 1'b0;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
+          fp32_to_int16_1_in_reg <= tmp1;
+          fp32_to_int16_1_valid_in_reg <= 1'b1;
+          fp_add_half_fast_1_valid_in_reg <= 1'b0;
+          tmp6 <= fp_add_sub_2_res;
+          tmp5 <= fp_add_sub_1_res;
         end
         8'd10: begin
-          e1_dx_reg <= fp_add_sub_3_res;
-          tmp0 <= fp_add_sub_1_res;
-          p_min_x_reg <= fp_add_half_fast_1_out;
+          fp_mul_1_a_reg <= tmp6;
+          fp_mul_1_b_reg <= tmp5;
+          fp_mul_1_valid_in_reg <= 1'b1;
+          fp_mul_2_a_reg <= fp_mul_2_a_src_reg;
+          fp_mul_2_b_reg <= fp_mul_2_b_src_reg;
+          fp_mul_2_valid_in_reg <= 1'b1;
+          fp_add_sub_1_a_reg <= tmp3;
+          fp_add_sub_1_b_reg <= v1_reg.x;
+          fp_add_sub_1_op_reg <= 1'b1;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+          fp_add_sub_2_a_reg <= tmp3;
+          fp_add_sub_2_b_reg <= v2_reg.x;
+          fp_add_sub_2_op_reg <= 1'b1;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
+          fp32_to_int16_1_in_reg <= fp32_to_int16_1_in_src_reg;
+          fp32_to_int16_1_valid_in_reg <= 1'b1;
+          fp_mul_2_a_src_reg <= fp_add_sub_1_res;
+          fp_mul_2_b_src_reg <= fp_add_sub_2_res;
+          tmp3 <= fp_add_half_fast_1_out;
+          int16_add_sub_1_a_src_reg <= fp32_to_int16_1_out;
         end
         8'd11: begin
-          tmp1 <= fp_add_sub_2_res;
-          p_min_y_reg <= fp_add_half_fast_1_out;
+          fp_add_sub_1_a_reg <= tmp3;
+          fp_add_sub_1_b_reg <= v0_reg.x;
+          fp_add_sub_1_op_reg <= 1'b1;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+          fp_add_sub_2_a_reg <= tmp0;
+          fp_add_sub_2_b_reg <= v0_reg.y;
+          fp_add_sub_2_op_reg <= 1'b1;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
+          fp_mul_1_valid_in_reg <= 1'b0;
+          fp_mul_2_valid_in_reg <= 1'b0;
+          fp32_to_int16_1_valid_in_reg <= 1'b0;
+          tmp8 <= fp_add_sub_1_res;
+          tmp7 <= fp_add_sub_2_res;
+          tmp0 <= fp_add_half_fast_1_out;
+          bb_start_x_reg <= fp32_to_int16_1_out;
         end
         8'd12: begin
+          fp_add_sub_1_a_reg <= tmp0;
+          fp_add_sub_1_b_reg <= v1_reg.y;
+          fp_add_sub_1_op_reg <= 1'b1;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+          fp_add_sub_2_a_reg <= tmp0;
+          fp_add_sub_2_b_reg <= v2_reg.y;
+          fp_add_sub_2_op_reg <= 1'b1;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
+          int16_sub_1_a_reg <= int16_add_sub_1_a_src_reg[15:0];
+          int16_sub_1_b_reg <= bb_start_x_reg[15:0];
+          tmp9 <= fp_add_sub_1_res;
           bb_start_y_reg <= fp32_to_int16_1_out;
         end
         8'd13: begin
-          tmp2 <= fp32_to_int16_1_out;
+          int16_sub_1_a_reg <= int16_add_sub_1_a_src_reg[15:0];
+          int16_sub_1_b_reg <= bb_start_y_reg[15:0];
+          fp_add_sub_1_valid_in_reg <= 1'b0;
+          fp_add_sub_2_valid_in_reg <= 1'b0;
+          int16_add_sub_1_a_src_reg <= fp32_to_int16_1_out;
+          bb_width_reg <= int16_sub_1_res;
         end
         8'd14: begin
-          tmp7 <= fp32_to_int16_1_out;
           bb_height_reg <= int16_sub_1_res;
         end
+        8'd15: begin
+          fp_add_sub_1_a_reg <= tmp7;
+          fp_add_sub_1_b_reg <= tmp7;
+          fp_add_sub_1_op_reg <= 1'b0;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+        end
         8'd16: begin
-          tmp5 <= fp_mul_1_res;
-          bb_start_x_reg <= fp32_to_int16_1_out;
+          fp_add_sub_2_a_reg <= fp_add_sub_2_a_src_reg;
+          fp_add_sub_2_b_reg <= fp_add_sub_2_b_src_reg;
+          fp_add_sub_2_op_reg <= 1'b1;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
+          fp_add_sub_1_valid_in_reg <= 1'b0;
+          fp_add_sub_2_a_src_reg <= fp_mul_1_res;
+          fp_add_sub_2_b_src_reg <= fp_mul_2_res;
         end
         8'd17: begin
-          e2_dy_2x_reg <= fp_add_sub_1_res;
-          tmp6 <= fp_mul_2_res;
+          fp_add_sub_2_valid_in_reg <= 1'b0;
         end
         8'd18: begin
-          e0_dy_2x_reg <= fp_add_sub_3_res;
-          e1_dy_2x_reg <= fp_add_sub_2_res;
+          e2_dx_2x_reg <= fp_add_sub_2_res;
         end
         8'd19: begin
-          tmp3 <= fp_add_sub_1_res;
-          tmp4 <= fp_add_sub_2_res;
-          e1_dx_2x_reg <= fp_add_sub_3_res;
+          fp_mul_1_a_reg <= tmp2;
+          fp_mul_1_b_reg <= fp_mul_1_b_src_reg;
+          fp_mul_1_valid_in_reg <= 1'b1;
+          fp_mul_2_a_reg <= tmp7;
+          fp_mul_2_b_reg <= fp_mul_2_b_src_reg;
+          fp_mul_2_valid_in_reg <= 1'b1;
+          fp_mul_1_b_src_reg <= fp_add_sub_1_res;
+          fp_mul_2_b_src_reg <= fp_add_sub_2_res;
         end
         8'd20: begin
-          tmp0 <= fp_add_sub_1_res;
-          tmp1 <= fp_add_sub_2_res;
+          fp_mul_1_a_reg <= tmp5;
+          fp_mul_1_b_reg <= fp_mul_1_b_src_reg;
+          fp_mul_1_valid_in_reg <= 1'b1;
+          fp_mul_2_a_reg <= tmp9;
+          fp_mul_2_b_reg <= fp_mul_2_b_src_reg;
+          fp_mul_2_valid_in_reg <= 1'b1;
+          fp_mul_1_b_src_reg <= fp_add_sub_1_res;
+          fp_mul_2_b_src_reg <= fp_add_sub_2_res;
         end
         8'd21: begin
-          tmp8 <= fp_add_sub_3_res;
-          tmp9 <= fp_add_sub_1_res;
+          fp_mul_1_a_reg <= tmp8;
+          fp_mul_1_b_reg <= fp_mul_1_b_src_reg;
+          fp_mul_1_valid_in_reg <= 1'b1;
+          fp_mul_2_a_reg <= tmp6;
+          fp_mul_2_b_reg <= fp_mul_2_b_src_reg;
+          fp_mul_2_valid_in_reg <= 1'b1;
+          fp_mul_1_b_src_reg <= fp_add_sub_1_res;
+          fp_mul_2_b_src_reg <= fp_add_sub_2_res;
         end
         8'd22: begin
-          e0_dx_2x_reg <= fp_add_sub_2_res;
-          e2_dx_2x_reg <= fp_add_sub_1_res;
+          fp_mul_1_valid_in_reg <= 1'b0;
+          fp_mul_2_valid_in_reg <= 1'b0;
+        end
+        8'd23: begin
+          fp_add_sub_1_a_reg <= tmp8;
+          fp_add_sub_1_b_reg <= tmp8;
+          fp_add_sub_1_op_reg <= 1'b0;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+        end
+        8'd24: begin
+          fp_add_sub_2_a_reg <= tmp2;
+          fp_add_sub_2_b_reg <= tmp2;
+          fp_add_sub_2_op_reg <= 1'b0;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
+          fp_add_sub_1_valid_in_reg <= 1'b0;
+          e1_dx_2x_reg <= fp_add_sub_1_res;
         end
         8'd25: begin
-          tmp3 <= fp_mul_1_res;
-          tmp2 <= fp_mul_2_res;
+          fp_add_sub_2_valid_in_reg <= 1'b0;
+          fp_recip_1_in_src_reg <= fp_add_sub_2_res;
+          fp_add_sub_2_a_src_reg <= fp_mul_1_res;
+          fp_add_sub_1_a_src_reg <= fp_mul_2_res;
         end
         8'd26: begin
-          tmp1 <= fp_mul_1_res;
-          tmp0 <= fp_mul_2_res;
+          fp_add_sub_1_a_reg <= fp_add_sub_1_a_src_reg;
+          fp_add_sub_1_b_reg <= fp_add_sub_1_b_src_reg;
+          fp_add_sub_1_op_reg <= 1'b0;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+          fp_add_sub_1_a_src_reg <= fp_mul_1_res;
+          fp_add_sub_1_b_src_reg <= fp_mul_2_res;
         end
         8'd27: begin
-          tmp4 <= fp_mul_1_res;
-          tmp5 <= fp_mul_2_res;
+          fp_add_sub_2_a_reg <= fp_add_sub_2_a_src_reg;
+          fp_add_sub_2_b_reg <= fp_add_sub_2_b_src_reg;
+          fp_add_sub_2_op_reg <= 1'b0;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
+          fp_add_sub_1_a_reg <= fp_add_sub_1_a_src_reg;
+          fp_add_sub_1_b_reg <= fp_add_sub_1_b_src_reg;
+          fp_add_sub_1_op_reg <= 1'b0;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+          fp_add_sub_2_b_src_reg <= fp_mul_1_res;
+          fp_add_sub_1_b_src_reg <= fp_mul_2_res;
+        end
+        8'd28: begin
+          fp_add_sub_2_valid_in_reg <= 1'b0;
+          fp_add_sub_1_valid_in_reg <= 1'b0;
         end
         8'd30: begin
-          tmp6 <= fp_add_sub_3_res;
+          fp_recip_1_in_reg <= fp_recip_1_in_src_reg;
+          fp_recip_1_valid_in_reg <= 1'b1;
+          fp_add_sub_1_a_reg <= tmp6;
+          fp_add_sub_1_b_reg <= tmp6;
+          fp_add_sub_1_op_reg <= 1'b0;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+        end
+        8'd31: begin
+          fp_recip_1_valid_in_reg   <= 1'b0;
+          fp_add_sub_1_valid_in_reg <= 1'b0;
+        end
+        8'd32: begin
+          fp_add_sub_2_a_reg <= tmp9;
+          fp_add_sub_2_b_reg <= tmp9;
+          fp_add_sub_2_op_reg <= 1'b0;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
+          e0_dy_2x_reg <= fp_add_sub_1_res;
+        end
+        8'd33: begin
+          fp_add_sub_2_valid_in_reg <= 1'b0;
+          e0_dx_2x_reg <= fp_add_sub_2_res;
         end
         8'd35: begin
+          fp_add_sub_1_a_reg <= e2_00_reg;
+          fp_add_sub_1_b_reg <= tmp5;
+          fp_add_sub_1_op_reg <= 1'b0;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
           e2_00_reg <= fp_add_sub_1_res;
         end
         8'd36: begin
+          fp_add_sub_2_a_reg <= e0_00_reg;
+          fp_add_sub_2_b_reg <= tmp2;
+          fp_add_sub_2_op_reg <= 1'b0;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
+          fp_add_sub_1_a_reg <= e1_00_reg;
+          fp_add_sub_1_b_reg <= tmp7;
+          fp_add_sub_1_op_reg <= 1'b0;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
           e0_00_reg <= fp_add_sub_2_res;
-          e1_00_reg <= fp_add_sub_3_res;
+          e1_00_reg <= fp_add_sub_1_res;
+        end
+        8'd37: begin
+          fp_add_sub_2_valid_in_reg <= 1'b0;
+          fp_add_sub_1_valid_in_reg <= 1'b0;
+        end
+        8'd38: begin
+          fp_add_sub_1_a_reg <= e1_00_reg;
+          fp_add_sub_1_b_reg <= tmp6;
+          fp_add_sub_1_op_reg <= 1'b0;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+        end
+        8'd39: begin
+          fp_add_sub_2_a_reg <= e0_00_reg;
+          fp_add_sub_2_b_reg <= tmp8;
+          fp_add_sub_2_op_reg <= 1'b0;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
+          fp_add_sub_1_valid_in_reg <= 1'b0;
+          e1_dy_2x_reg <= fp_add_sub_1_res;
+        end
+        8'd40: begin
+          fp_add_sub_1_a_reg <= e2_00_reg;
+          fp_add_sub_1_b_reg <= tmp9;
+          fp_add_sub_1_op_reg <= 1'b0;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+          fp_add_sub_2_valid_in_reg <= 1'b0;
+        end
+        8'd41: begin
+          fp_add_sub_1_valid_in_reg <= 1'b0;
+          e2_dy_2x_reg <= fp_add_sub_2_res;
         end
         8'd44: begin
+          fp_add_sub_2_a_reg <= e2_10_reg;
+          fp_add_sub_2_b_reg <= tmp9;
+          fp_add_sub_2_op_reg <= 1'b0;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
           e2_10_reg <= fp_add_sub_1_res;
         end
         8'd45: begin
+          fp_add_sub_1_a_reg <= e0_10_reg;
+          fp_add_sub_1_b_reg <= tmp8;
+          fp_add_sub_1_op_reg <= 1'b0;
+          fp_add_sub_1_valid_in_reg <= 1'b1;
+          fp_add_sub_2_a_reg <= e1_10_reg;
+          fp_add_sub_2_b_reg <= tmp6;
+          fp_add_sub_2_op_reg <= 1'b0;
+          fp_add_sub_2_valid_in_reg <= 1'b1;
           e0_10_reg <= fp_add_sub_2_res;
-          e1_10_reg <= fp_add_sub_3_res;
+          e1_10_reg <= fp_add_sub_1_res;
+        end
+        8'd46: begin
+          fp_add_sub_1_valid_in_reg <= 1'b0;
+          fp_add_sub_2_valid_in_reg <= 1'b0;
         end
         8'd47: begin
-          e0_01_reg <= fp_add_sub_1_res;
-          e1_01_reg <= fp_add_sub_2_res;
+          e1_01_reg <= fp_add_sub_1_res;
         end
-        8'd50: begin
-          e2_01_reg <= fp_add_sub_3_res;
+        8'd48: begin
+          e0_01_reg <= fp_add_sub_2_res;
+        end
+        8'd49: begin
+          e2_01_reg <= fp_add_sub_1_res;
         end
         8'd53: begin
           invArea_reg <= fp_recip_1_out;
-          e2_11_reg   <= fp_add_sub_1_res;
+          e2_11_reg   <= fp_add_sub_2_res;
         end
         8'd54: begin
-          e0_11_reg <= fp_add_sub_2_res;
-          e1_11_reg <= fp_add_sub_3_res;
-          bb_width_reg <= int16_sub_1_res;
-        end
-        default: ;
-      endcase
-    end
-  end
-
-  // ---------------- Combinational Launch FSM ----------------
-
-  always_comb begin
-    fp32_to_int16_1_in = 32'b0;
-    fp32_to_int16_1_valid_in = 1'b0;
-    fp_add_half_fast_1_in = 32'b0;
-    fp_add_half_fast_1_valid_in = 1'b0;
-    fp_add_sub_1_a = 32'b0;
-    fp_add_sub_1_b = 32'b0;
-    fp_add_sub_1_op = 1'b0;
-    fp_add_sub_1_valid_in = 1'b0;
-    fp_add_sub_2_a = 32'b0;
-    fp_add_sub_2_b = 32'b0;
-    fp_add_sub_2_op = 1'b0;
-    fp_add_sub_2_valid_in = 1'b0;
-    fp_add_sub_3_a = 32'b0;
-    fp_add_sub_3_b = 32'b0;
-    fp_add_sub_3_op = 1'b0;
-    fp_add_sub_3_valid_in = 1'b0;
-    fp_max_2_1_a = 32'b0;
-    fp_max_2_1_b = 32'b0;
-    fp_max_2_1_valid_in = 1'b0;
-    fp_min_2_1_a = 32'b0;
-    fp_min_2_1_b = 32'b0;
-    fp_min_2_1_valid_in = 1'b0;
-    fp_mul_1_a = 32'b0;
-    fp_mul_1_b = 32'b0;
-    fp_mul_1_valid_in = 1'b0;
-    fp_mul_2_a = 32'b0;
-    fp_mul_2_b = 32'b0;
-    fp_mul_2_valid_in = 1'b0;
-    fp_recip_1_in = 32'b0;
-    fp_recip_1_valid_in = 1'b0;
-    int16_sub_1_a = 16'b0;
-    int16_sub_1_b = 16'b0;
-    tri_bb_min_max_1_a = 32'b0;
-    tri_bb_min_max_1_b = 32'b0;
-    tri_bb_min_max_1_c = 32'b0;
-    tri_bb_min_max_1_valid_in = 1'b0;
-
-    if (state == ST_CALC) begin
-      case (cycle_cnt)
-        8'd0: begin
-          fp_add_sub_1_a = v2_reg.y;
-          fp_add_sub_1_b = v1_reg.y;
-          fp_add_sub_1_op = 1'b1;
-          fp_add_sub_1_valid_in = 1'b1;
-          fp_add_sub_2_a = v1_reg.y;
-          fp_add_sub_2_b = v0_reg.y;
-          fp_add_sub_2_op = 1'b1;
-          fp_add_sub_2_valid_in = 1'b1;
-          fp_add_sub_3_a = v0_reg.x;
-          fp_add_sub_3_b = v1_reg.x;
-          fp_add_sub_3_op = 1'b1;
-          fp_add_sub_3_valid_in = 1'b1;
-          tri_bb_min_max_1_a = v0_reg.x;
-          tri_bb_min_max_1_b = v1_reg.x;
-          tri_bb_min_max_1_c = v2_reg.x;
-          tri_bb_min_max_1_valid_in = 1'b1;
-        end
-        8'd1: begin
-          fp_add_sub_1_a = v1_reg.x;
-          fp_add_sub_1_b = v2_reg.x;
-          fp_add_sub_1_op = 1'b1;
-          fp_add_sub_1_valid_in = 1'b1;
-          fp_add_sub_2_a = v2_reg.x;
-          fp_add_sub_2_b = v0_reg.x;
-          fp_add_sub_2_op = 1'b1;
-          fp_add_sub_2_valid_in = 1'b1;
-          tri_bb_min_max_1_a = v0_reg.y;
-          tri_bb_min_max_1_b = v1_reg.y;
-          tri_bb_min_max_1_c = v2_reg.y;
-          tri_bb_min_max_1_valid_in = 1'b1;
-        end
-        8'd2: begin
-          fp_add_sub_3_a = v0_reg.y;
-          fp_add_sub_3_b = v2_reg.y;
-          fp_add_sub_3_op = 1'b1;
-          fp_add_sub_3_valid_in = 1'b1;
-          fp_add_sub_1_a = v1_reg.x;
-          fp_add_sub_1_b = v0_reg.x;
-          fp_add_sub_1_op = 1'b1;
-          fp_add_sub_1_valid_in = 1'b1;
-        end
-        8'd3: begin
-          fp_add_sub_2_a = v2_reg.y;
-          fp_add_sub_2_b = v0_reg.y;
-          fp_add_sub_2_op = 1'b1;
-          fp_add_sub_2_valid_in = 1'b1;
-        end
-        8'd6: begin
-          fp_max_2_1_a = tri_min_x_reg;
-          fp_max_2_1_b = binMinX;
-          fp_max_2_1_valid_in = 1'b1;
-          fp_min_2_1_a = tri_max_x_reg;
-          fp_min_2_1_b = binMaxX;
-          fp_min_2_1_valid_in = 1'b1;
-        end
-        8'd7: begin
-          fp_max_2_1_a = tri_min_y_reg;
-          fp_max_2_1_b = binMinY;
-          fp_max_2_1_valid_in = 1'b1;
-          fp_min_2_1_a = tri_max_y_reg;
-          fp_min_2_1_b = binMaxY;
-          fp_min_2_1_valid_in = 1'b1;
-        end
-        8'd8: begin
-          fp_add_half_fast_1_in = bb_min_x_reg;
-          fp_add_half_fast_1_valid_in = 1'b1;
-        end
-        8'd9: begin
-          fp_add_half_fast_1_in = bb_min_y_reg;
-          fp_add_half_fast_1_valid_in = 1'b1;
-          fp_add_sub_1_a = e2_dy_reg;
-          fp_add_sub_1_b = e2_dy_reg;
-          fp_add_sub_1_op = 1'b0;
-          fp_add_sub_1_valid_in = 1'b1;
-        end
-        8'd10: begin
-          fp_add_sub_3_a = e0_dy_reg;
-          fp_add_sub_3_b = e0_dy_reg;
-          fp_add_sub_3_op = 1'b0;
-          fp_add_sub_3_valid_in = 1'b1;
-          fp_add_sub_2_a = e1_dy_reg;
-          fp_add_sub_2_b = e1_dy_reg;
-          fp_add_sub_2_op = 1'b0;
-          fp_add_sub_2_valid_in = 1'b1;
-          fp32_to_int16_1_in = bb_min_y_reg;
-          fp32_to_int16_1_valid_in = 1'b1;
-        end
-        8'd11: begin
-          fp_mul_1_a = e1_dy_reg;
-          fp_mul_1_b = e2_dx_reg;
-          fp_mul_1_valid_in = 1'b1;
-          fp_add_sub_1_a = p_min_x_reg;
-          fp_add_sub_1_b = v2_reg.x;
-          fp_add_sub_1_op = 1'b1;
-          fp_add_sub_1_valid_in = 1'b1;
-          fp_add_sub_2_a = p_min_x_reg;
-          fp_add_sub_2_b = v0_reg.x;
-          fp_add_sub_2_op = 1'b1;
-          fp_add_sub_2_valid_in = 1'b1;
-          fp_add_sub_3_a = e1_dx_reg;
-          fp_add_sub_3_b = e1_dx_reg;
-          fp_add_sub_3_op = 1'b0;
-          fp_add_sub_3_valid_in = 1'b1;
-          fp32_to_int16_1_in = bb_max_y_reg;
-          fp32_to_int16_1_valid_in = 1'b1;
-        end
-        8'd12: begin
-          fp_mul_2_a = tmp1;
-          fp_mul_2_b = tmp0;
-          fp_mul_2_valid_in = 1'b1;
-          fp_add_sub_1_a = p_min_x_reg;
-          fp_add_sub_1_b = v1_reg.x;
-          fp_add_sub_1_op = 1'b1;
-          fp_add_sub_1_valid_in = 1'b1;
-          fp_add_sub_2_a = p_min_y_reg;
-          fp_add_sub_2_b = v0_reg.y;
-          fp_add_sub_2_op = 1'b1;
-          fp_add_sub_2_valid_in = 1'b1;
-          fp32_to_int16_1_in = bb_max_x_reg;
-          fp32_to_int16_1_valid_in = 1'b1;
-        end
-        8'd13: begin
-          fp_add_sub_3_a = p_min_y_reg;
-          fp_add_sub_3_b = v1_reg.y;
-          fp_add_sub_3_op = 1'b1;
-          fp_add_sub_3_valid_in = 1'b1;
-          fp_add_sub_1_a = p_min_y_reg;
-          fp_add_sub_1_b = v2_reg.y;
-          fp_add_sub_1_op = 1'b1;
-          fp_add_sub_1_valid_in = 1'b1;
-        end
-        8'd14: begin
-          fp_add_sub_2_a = e0_dx_reg;
-          fp_add_sub_2_b = e0_dx_reg;
-          fp_add_sub_2_op = 1'b0;
-          fp_add_sub_2_valid_in = 1'b1;
-          fp_add_sub_1_a = e2_dx_reg;
-          fp_add_sub_1_b = e2_dx_reg;
-          fp_add_sub_1_op = 1'b0;
-          fp_add_sub_1_valid_in = 1'b1;
-          fp32_to_int16_1_in = bb_min_x_reg;
-          fp32_to_int16_1_valid_in = 1'b1;
-          int16_sub_1_a = tmp2[15:0];
-          int16_sub_1_b = bb_start_y_reg[15:0];
-        end
-        8'd20: begin
-          fp_mul_1_a = e1_dx_reg;
-          fp_mul_1_b = tmp3;
-          fp_mul_1_valid_in = 1'b1;
-          fp_mul_2_a = e2_dx_reg;
-          fp_mul_2_b = tmp4;
-          fp_mul_2_valid_in = 1'b1;
-        end
-        8'd21: begin
-          fp_mul_1_a = e0_dx_reg;
-          fp_mul_1_b = tmp0;
-          fp_mul_1_valid_in = 1'b1;
-          fp_mul_2_a = e2_dy_reg;
-          fp_mul_2_b = tmp1;
-          fp_mul_2_valid_in = 1'b1;
-        end
-        8'd22: begin
-          fp_add_sub_3_a = tmp5;
-          fp_add_sub_3_b = tmp6;
-          fp_add_sub_3_op = 1'b1;
-          fp_add_sub_3_valid_in = 1'b1;
-          fp_mul_1_a = e0_dy_reg;
-          fp_mul_1_b = tmp8;
-          fp_mul_1_valid_in = 1'b1;
-          fp_mul_2_a = e1_dy_reg;
-          fp_mul_2_b = tmp9;
-          fp_mul_2_valid_in = 1'b1;
-        end
-        8'd27: begin
-          fp_add_sub_1_a = tmp2;
-          fp_add_sub_1_b = tmp0;
-          fp_add_sub_1_op = 1'b0;
-          fp_add_sub_1_valid_in = 1'b1;
-        end
-        8'd28: begin
-          fp_add_sub_2_a = tmp1;
-          fp_add_sub_2_b = tmp4;
-          fp_add_sub_2_op = 1'b0;
-          fp_add_sub_2_valid_in = 1'b1;
-          fp_add_sub_3_a = tmp3;
-          fp_add_sub_3_b = tmp5;
-          fp_add_sub_3_op = 1'b0;
-          fp_add_sub_3_valid_in = 1'b1;
-        end
-        8'd31: begin
-          fp_recip_1_in = tmp6;
-          fp_recip_1_valid_in = 1'b1;
-        end
-        8'd36: begin
-          fp_add_sub_1_a = e2_00_reg;
-          fp_add_sub_1_b = e2_dx_reg;
-          fp_add_sub_1_op = 1'b0;
-          fp_add_sub_1_valid_in = 1'b1;
-        end
-        8'd37: begin
-          fp_add_sub_2_a = e0_00_reg;
-          fp_add_sub_2_b = e0_dx_reg;
-          fp_add_sub_2_op = 1'b0;
-          fp_add_sub_2_valid_in = 1'b1;
-          fp_add_sub_3_a = e1_00_reg;
-          fp_add_sub_3_b = e1_dx_reg;
-          fp_add_sub_3_op = 1'b0;
-          fp_add_sub_3_valid_in = 1'b1;
-        end
-        8'd39: begin
-          fp_add_sub_1_a = e0_00_reg;
-          fp_add_sub_1_b = e0_dy_reg;
-          fp_add_sub_1_op = 1'b0;
-          fp_add_sub_1_valid_in = 1'b1;
-          fp_add_sub_2_a = e1_00_reg;
-          fp_add_sub_2_b = e1_dy_reg;
-          fp_add_sub_2_op = 1'b0;
-          fp_add_sub_2_valid_in = 1'b1;
-        end
-        8'd42: begin
-          fp_add_sub_3_a = e2_00_reg;
-          fp_add_sub_3_b = e2_dy_reg;
-          fp_add_sub_3_op = 1'b0;
-          fp_add_sub_3_valid_in = 1'b1;
-        end
-        8'd45: begin
-          fp_add_sub_1_a = e2_10_reg;
-          fp_add_sub_1_b = e2_dy_reg;
-          fp_add_sub_1_op = 1'b0;
-          fp_add_sub_1_valid_in = 1'b1;
-        end
-        8'd46: begin
-          fp_add_sub_2_a = e0_10_reg;
-          fp_add_sub_2_b = e0_dy_reg;
-          fp_add_sub_2_op = 1'b0;
-          fp_add_sub_2_valid_in = 1'b1;
-          fp_add_sub_3_a = e1_10_reg;
-          fp_add_sub_3_b = e1_dy_reg;
-          fp_add_sub_3_op = 1'b0;
-          fp_add_sub_3_valid_in = 1'b1;
-        end
-        8'd54: begin
-          int16_sub_1_a = tmp7[15:0];
-          int16_sub_1_b = bb_start_x_reg[15:0];
+          e0_11_reg <= fp_add_sub_1_res;
+          e1_11_reg <= fp_add_sub_2_res;
         end
         default: ;
       endcase

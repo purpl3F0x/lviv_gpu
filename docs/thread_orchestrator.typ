@@ -1,4 +1,5 @@
 #import "@preview/cetz:0.4.1": canvas, draw
+#import "@preview/circuiteria:0.2.0"
 
 #set page(
   paper: "a4",
@@ -31,7 +32,7 @@
 ]
 
 == 1. Module Overview
-The `thread_orchestrator` module (codename *Bachi*, named after the sweeping plectrum used for traditional string instruments) is responsible for traversing the 2D bounding box of a triangle inside a specific tile. It performs a snake-like (boustrophedon) traversal, evaluating $2 times 2$ pixel quads in each step, and dynamically updates the edge functions for all 4 pixels of the quad in parallel. 
+The `thread_orchestrator` module (codename *Bachi*, named after the sweeping plectrum used for traditional string instruments) is responsible for traversing the 2D bounding box of a triangle inside a specific tile. It performs a snake-like (boustrophedon) traversal, evaluating $2 times 2$ pixel quads in each step, and dynamically updates the edge functions for all 4 pixels of the quad in parallel.
 
 Rather than re-evaluating the full edge function at each step, Bachi performs incremental floating-point additions/subtractions based on pre-calculated derivatives ($e_(i, "dx")$ and $e_(i, "dy")$), significantly reducing hardware overhead. The updated edge functions and metadata are then distributed to four parallel downstream thread execution units.
 
@@ -145,7 +146,11 @@ The table below specifies the functionality and description of each port on Bach
     [ready_out], [Output], [logic], [Handshake ready to Frontend (High in ST_IDLE)],
     [ready_in [4]], [Input], [logic], [Handshake ready from 4 thread units],
     [valid_out [4]], [Output], [logic], [Handshake valid to 4 thread units],
-    [init_e0 [4], init_e1 [4], init_e2 [4]], [Input], [logic [31:0]], [Initial edge functions evaluated at top-left pixel quad coordinates],
+    [init_e0 [4], init_e1 [4], init_e2 [4]],
+    [Input],
+    [logic [31:0]],
+    [Initial edge functions evaluated at top-left pixel quad coordinates],
+
     [e0_dx_2x, e0_dy_2x], [Input], [logic [31:0]], [Edge function 0 derivatives scaled by 2 (float)],
     [e1_dx_2x, e1_dy_2x], [Input], [logic [31:0]], [Edge function 1 derivatives scaled by 2 (float)],
     [e2_dx_2x, e2_dy_2x], [Input], [logic [31:0]], [Edge function 2 derivatives scaled by 2 (float)],
@@ -178,7 +183,7 @@ Bachi performs a boustrophedon (snake-like) traversal of $2 times 2$ pixel quads
           (x, y),
           (x + 1.2, y - 1.2),
           fill: fill-color,
-          stroke: 0.5pt + rgb("#dee2e6")
+          stroke: 0.5pt + rgb("#dee2e6"),
         )
       }
     }
@@ -205,7 +210,7 @@ Bachi performs a boustrophedon (snake-like) traversal of $2 times 2$ pixel quads
       (3.6, -6.0),
       (6.0, -6.0),
       stroke: 3.5pt + rgb("#ef233c"),
-      mark: (end: ">", fill: rgb("#ef233c"), size: 0.15)
+      mark: (end: ">", fill: rgb("#ef233c"), size: 0.15),
     )
 
     // Draw Quad labels (Q0 to Q8)
@@ -214,7 +219,7 @@ Bachi performs a boustrophedon (snake-like) traversal of $2 times 2$ pixel quads
         (x, y),
         box(fill: white, inset: 3.5pt, radius: 2pt, stroke: 0.5pt + rgb("#dee2e6"))[
           #text(size: 8pt, weight: "bold", fill: rgb("#2b2d42"))[#text-label]
-        ]
+        ],
       )
     }
 

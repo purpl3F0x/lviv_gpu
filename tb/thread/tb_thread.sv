@@ -5,21 +5,17 @@ import gpu_types_pkg::*;
 module tb_thread;
   logic                       clk;
   logic                       rst_n;
-  logic                       pipe_en;
 
   logic                       valid_in;
   logic                       ready_out;
-  logic    [            31:0] in_e0;
-  logic    [            31:0] in_e1;
-  logic    [            31:0] in_e2;
-  logic    [            31:0] in_inv_area;
-  logic    [PIXEL_ADDR_W-1:0] in_addr;
-  vertex_t                    in_v0;
-  vertex_t                    in_v1;
-  vertex_t                    in_v2;
+  thread_data_in_t            in_data;
 
-  logic    [            31:0] m_axis_texcoord_u_tdata;
-  logic    [            31:0] m_axis_texcoord_v_tdata;
+  logic    [            24:0] m_axis_texcoord_u_tdata;
+  logic    [            24:0] m_axis_texcoord_v_tdata;
+  logic    [             7:0] m_axis_color_r_tdata;
+  logic    [             7:0] m_axis_color_g_tdata;
+  logic    [             7:0] m_axis_color_b_tdata;
+  logic    [             7:0] m_axis_color_a_tdata;
   logic    [             0:0] m_axis_comp_z_tdata;
   logic                       m_axis_tvalid;
   logic                       m_axis_tready;
@@ -48,6 +44,10 @@ module tb_thread;
 
   shortreal                    expected_u_q        [$];
   shortreal                    expected_v_q        [$];
+  shortreal                    expected_r_q        [$];
+  shortreal                    expected_g_q        [$];
+  shortreal                    expected_b_q        [$];
+  shortreal                    expected_a_q        [$];
   bit                          expected_pass_q     [$];
   logic     [PIXEL_ADDR_W-1:0] expected_wr_addr_q  [$];
   logic     [            31:0] expected_wr_data_q  [$];
@@ -65,6 +65,35 @@ module tb_thread;
 
   function automatic shortreal fr(input logic [31:0] b);
     return $bitstoshortreal(b);
+  endfunction
+
+  function automatic logic [24:0] to_uq2_23(input shortreal v);
+    shortreal c;
+    int unsigned q;
+    if (v < 0.0) begin
+      c = 0.0;
+    end else if (v > 3.99999988) begin
+      c = 3.99999988;
+    end else begin
+      c = v;
+    end
+    q = int'((c * 8388608.0) + 0.5);
+    if (q > 25'h1ff_ffff) begin
+      q = 25'h1ff_ffff;
+    end
+    return q[24:0];
+  endfunction
+
+  function automatic shortreal uq2_23_to_real(input logic [24:0] b);
+    int unsigned q;
+    q = b;
+    return q / 8388608.0;
+  endfunction
+
+  function automatic shortreal u8_to_real(input logic [7:0] b);
+    int unsigned q;
+    q = b;
+    return q;
   endfunction
 
   // Match fp_cmp_le behavior used in thread.
@@ -87,10 +116,16 @@ module tb_thread;
                                input shortreal v0w, input shortreal v1w, input shortreal v2w,
                                input shortreal v0u, input shortreal v1u, input shortreal v2u,
                                input shortreal v0v, input shortreal v1v, input shortreal v2v,
+                               input shortreal v0r, input shortreal v1r, input shortreal v2r,
+                               input shortreal v0g, input shortreal v1g, input shortreal v2g,
+                               input shortreal v0b, input shortreal v1b, input shortreal v2b,
+                               input shortreal v0a, input shortreal v1a, input shortreal v2a,
                                input shortreal e0, input shortreal e1, input shortreal e2,
                                input shortreal inv_area, input logic [PIXEL_ADDR_W-1:0] mem_addr);
     shortreal iw0, iw1, iw2;
-    shortreal z, invW, w, tou, tov, eu, ev;
+    shortreal z, invW, w;
+    shortreal pw0, pw1, pw2;
+    shortreal eu, ev, er, eg, eb, ea;
     logic [31:0] z_bits;
     bit pass;
 
@@ -105,15 +140,23 @@ module tb_thread;
     invW = (v2w * iw2) + (v1w * iw1) + (v0w * iw0);
 
     w = 1.0 / invW;
+    pw0 = w * (v0w * iw0);
+    pw1 = w * (v1w * iw1);
+    pw2 = w * (v2w * iw2);
 
-    tou = (v2u * iw2) + (v1u * iw1) + (v0u * iw0);
-    tov = (v2v * iw2) + (v1v * iw1) + (v0v * iw0);
-
-    eu = tou * w;
-    ev = tov * w;
+    eu = (v2u * pw2) + (v1u * pw1) + (v0u * pw0);
+    ev = (v2v * pw2) + (v1v * pw1) + (v0v * pw0);
+    er = (v2r * pw2) + (v1r * pw1) + (v0r * pw0);
+    eg = (v2g * pw2) + (v1g * pw1) + (v0g * pw0);
+    eb = (v2b * pw2) + (v1b * pw1) + (v0b * pw0);
+    ea = (v2a * pw2) + (v1a * pw1) + (v0a * pw0);
 
     expected_u_q.push_back(eu);
     expected_v_q.push_back(ev);
+    expected_r_q.push_back(er);
+    expected_g_q.push_back(eg);
+    expected_b_q.push_back(eb);
+    expected_a_q.push_back(ea);
     expected_pass_q.push_back(pass);
     if (pass) begin
       expected_pass_total++;
@@ -129,6 +172,12 @@ module tb_thread;
     shortreal v0w, v1w, v2w;
     shortreal v0u, v1u, v2u;
     shortreal v0v, v1v, v2v;
+    shortreal iw0, iw1, iw2;
+    shortreal r0, r1;
+    int unsigned c0r, c1r, c2r;
+    int unsigned c0g, c1g, c2g;
+    int unsigned c0b, c1b, c2b;
+    int unsigned c0a, c1a, c2a;
     shortreal e0, e1, e2, inv_area;
     int unsigned mem_addr;
 
@@ -149,41 +198,79 @@ module tb_thread;
     v1v = ($urandom(seed) % 2000) / 1000.0;
     v2v = ($urandom(seed) % 2000) / 1000.0;
 
-    e0 = ($urandom(seed) % 2000) / 1000.0;
-    e1 = ($urandom(seed) % 2000) / 1000.0;
-    e2 = ($urandom(seed) % 2000) / 1000.0;
+    c0r = $urandom(seed) % 256;
+    c1r = $urandom(seed) % 256;
+    c2r = $urandom(seed) % 256;
+    c0g = $urandom(seed) % 256;
+    c1g = $urandom(seed) % 256;
+    c2g = $urandom(seed) % 256;
+    c0b = $urandom(seed) % 256;
+    c1b = $urandom(seed) % 256;
+    c2b = $urandom(seed) % 256;
+    c0a = $urandom(seed) % 256;
+    c1a = $urandom(seed) % 256;
+    c2a = $urandom(seed) % 256;
 
+    // Generate two barycentric coefficients and derive the third so
+    // coefficients are in [0,1] and sum to exactly 1.
+    r0 = ($urandom(seed) % 1001) / 1000.0;
+    r1 = ($urandom(seed) % 1001) / 1000.0;
+    if ((r0 + r1) > 1.0) begin
+      r0 = 1.0 - r0;
+      r1 = 1.0 - r1;
+    end
+    iw0 = r0;
+    iw1 = r1;
+    iw2 = 1.0 - iw0 - iw1;
+
+    // Keep inv_area in a sane positive range and derive edge terms so that
+    // (e*inv_area) equals the barycentric coefficients above.
     inv_area = (($urandom(seed) % 1900) + 100) / 1000.0;
+    e0 = iw0 / inv_area;
+    e1 = iw1 / inv_area;
+    e2 = iw2 / inv_area;
+
     mem_addr = $urandom(seed) % (TILE_SIZE_X * TILE_SIZE_Y);
 
-    in_v0 = '0;
-    in_v1 = '0;
-    in_v2 = '0;
+    in_data = '0;
+    in_data.v0_z = fbits(v0z);
+    in_data.v1_z = fbits(v1z);
+    in_data.v2_z = fbits(v2z);
 
-    in_v0.z = fbits(v0z);
-    in_v1.z = fbits(v1z);
-    in_v2.z = fbits(v2z);
+    in_data.v0_w = fbits(v0w);
+    in_data.v1_w = fbits(v1w);
+    in_data.v2_w = fbits(v2w);
 
-    in_v0.w = fbits(v0w);
-    in_v1.w = fbits(v1w);
-    in_v2.w = fbits(v2w);
+    in_data.v0_u = to_uq2_23(v0u);
+    in_data.v1_u = to_uq2_23(v1u);
+    in_data.v2_u = to_uq2_23(v2u);
 
-    in_v0.u = fbits(v0u);
-    in_v1.u = fbits(v1u);
-    in_v2.u = fbits(v2u);
+    in_data.v0_v = to_uq2_23(v0v);
+    in_data.v1_v = to_uq2_23(v1v);
+    in_data.v2_v = to_uq2_23(v2v);
 
-    in_v0.v = fbits(v0v);
-    in_v1.v = fbits(v1v);
-    in_v2.v = fbits(v2v);
+    in_data.v0_color_r = c0r[7:0];
+    in_data.v1_color_r = c1r[7:0];
+    in_data.v2_color_r = c2r[7:0];
+    in_data.v0_color_g = c0g[7:0];
+    in_data.v1_color_g = c1g[7:0];
+    in_data.v2_color_g = c2g[7:0];
+    in_data.v0_color_b = c0b[7:0];
+    in_data.v1_color_b = c1b[7:0];
+    in_data.v2_color_b = c2b[7:0];
+    in_data.v0_color_a = c0a[7:0];
+    in_data.v1_color_a = c1a[7:0];
+    in_data.v2_color_a = c2a[7:0];
 
-    in_e0 = fbits(e0);
-    in_e1 = fbits(e1);
-    in_e2 = fbits(e2);
-    in_inv_area = fbits(inv_area);
-    in_addr = mem_addr[PIXEL_ADDR_W-1:0];
+    in_data.e0 = fbits(e0);
+    in_data.e1 = fbits(e1);
+    in_data.e2 = fbits(e2);
+    in_data.inv_area = fbits(inv_area);
+    in_data.addr = mem_addr[PIXEL_ADDR_W-1:0];
 
-    push_expected(v0z, v1z, v2z, v0w, v1w, v2w, v0u, v1u, v2u, v0v, v1v, v2v, e0, e1, e2, inv_area,
-                  in_addr);
+    push_expected(v0z, v1z, v2z, v0w, v1w, v2w, v0u, v1u, v2u, v0v, v1v, v2v,
+            c0r, c1r, c2r, c0g, c1g, c2g, c0b, c1b, c2b, c0a, c1a, c2a,
+            e0, e1, e2, inv_area, in_data.addr);
 
     // Present the token on the falling edge so the DUT sees stable inputs
     // at the next rising edge.
@@ -236,39 +323,65 @@ module tb_thread;
 
   // Scoreboard monitor.
   always @(posedge clk) begin
-    shortreal got_u, got_v;
-    shortreal exp_u, exp_v;
+    shortreal got_u, got_v, got_r, got_g, got_b, got_a;
+    shortreal exp_u, exp_v, exp_r, exp_g, exp_b, exp_a;
     bit exp_pass;
     bit got_pass;
-    shortreal tol;
+    shortreal tol_uv;
+    shortreal tol_c;
 
     if (!rst_n) begin
       // no-op
-    end else if (m_axis_tvalid && m_axis_tready) begin
+    end else if (dut.output_bundle_tvalid && dut.output_bundle_s_axis_tready) begin
       if (expected_pass_q.size() == 0) begin
         $display("[TB][ERROR] Output observed but expected queue is empty");
         err_count++;
       end else begin
         exp_u = expected_u_q.pop_front();
         exp_v = expected_v_q.pop_front();
+        exp_r = expected_r_q.pop_front();
+        exp_g = expected_g_q.pop_front();
+        exp_b = expected_b_q.pop_front();
+        exp_a = expected_a_q.pop_front();
         exp_pass = expected_pass_q.pop_front();
-        got_pass = m_axis_comp_z_tdata[0];
+        got_pass = dut.comp_z_bundle_tdata;
 
         if (got_pass != exp_pass) begin
           $display("[TB][ERROR] comp_z mismatch: exp=%0d got=%0d", exp_pass, got_pass);
           err_count++;
         end
 
-        got_u = fr(m_axis_texcoord_u_tdata);
-        got_v = fr(m_axis_texcoord_v_tdata);
-        tol   = 1e-3;
+        got_u = uq2_23_to_real(dut.texcoord_u_tdata);
+        got_v = uq2_23_to_real(dut.texcoord_v_tdata);
+        got_r = u8_to_real(dut.color_r_tdata);
+        got_g = u8_to_real(dut.color_g_tdata);
+        got_b = u8_to_real(dut.color_b_tdata);
+        got_a = u8_to_real(dut.color_a_tdata);
+        tol_uv = 3e-3;
+        tol_c = 1.4;
 
-        if (((got_u - exp_u) > tol) || ((exp_u - got_u) > tol)) begin
+        if (((got_u - exp_u) > tol_uv) || ((exp_u - got_u) > tol_uv)) begin
           $display("[TB][ERROR] tex_u mismatch: exp=%f got=%f", exp_u, got_u);
           err_count++;
         end
-        if (((got_v - exp_v) > tol) || ((exp_v - got_v) > tol)) begin
+        if (((got_v - exp_v) > tol_uv) || ((exp_v - got_v) > tol_uv)) begin
           $display("[TB][ERROR] tex_v mismatch: exp=%f got=%f", exp_v, got_v);
+          err_count++;
+        end
+        if (((got_r - exp_r) > tol_c) || ((exp_r - got_r) > tol_c)) begin
+          $display("[TB][ERROR] col_r mismatch: exp=%f got=%f", exp_r, got_r);
+          err_count++;
+        end
+        if (((got_g - exp_g) > tol_c) || ((exp_g - got_g) > tol_c)) begin
+          $display("[TB][ERROR] col_g mismatch: exp=%f got=%f", exp_g, got_g);
+          err_count++;
+        end
+        if (((got_b - exp_b) > tol_c) || ((exp_b - got_b) > tol_c)) begin
+          $display("[TB][ERROR] col_b mismatch: exp=%f got=%f", exp_b, got_b);
+          err_count++;
+        end
+        if (((got_a - exp_a) > tol_c) || ((exp_a - got_a) > tol_c)) begin
+          $display("[TB][ERROR] col_a mismatch: exp=%f got=%f", exp_a, got_a);
           err_count++;
         end
       end
@@ -310,18 +423,15 @@ module tb_thread;
       .rst_n(rst_n),
       .valid_in(valid_in),
       .ready_out(ready_out),
-      .in_e0(in_e0),
-      .in_e1(in_e1),
-      .in_e2(in_e2),
-      .in_inv_area(in_inv_area),
-      .in_addr(in_addr),
-      .in_v0(in_v0),
-      .in_v1(in_v1),
-      .in_v2(in_v2),
+      .in_data(in_data),
       .m_axis_tvalid(m_axis_tvalid),
       .m_axis_tready(m_axis_tready),
       .m_axis_texcoord_u_tdata(m_axis_texcoord_u_tdata),
       .m_axis_texcoord_v_tdata(m_axis_texcoord_v_tdata),
+      .m_axis_color_r_tdata(m_axis_color_r_tdata),
+      .m_axis_color_g_tdata(m_axis_color_g_tdata),
+      .m_axis_color_b_tdata(m_axis_color_b_tdata),
+      .m_axis_color_a_tdata(m_axis_color_a_tdata),
       .m_axis_comp_z_tdata(m_axis_comp_z_tdata),
       .z_rd_en(z_rd_en),
       .z_rd_addr(z_rd_addr),
@@ -357,14 +467,7 @@ module tb_thread;
 
     rst_n = 1'b0;
     valid_in = 1'b0;
-    in_e0 = '0;
-    in_e1 = '0;
-    in_e2 = '0;
-    in_inv_area = '0;
-    in_addr = '0;
-    in_v0 = '0;
-    in_v1 = '0;
-    in_v2 = '0;
+    in_data = '0;
     m_axis_tready = 1'b1;
     sent_count = 0;
     recv_count = 0;
@@ -403,7 +506,8 @@ module tb_thread;
     end
 
     if (expected_pass_q.size() != 0) begin
-      $display("[TB][ERROR] Expected queue not fully drained: pending=%0d", expected_pass_q.size());
+      $display("[TB][ERROR] Expected queue not fully drained: pending=%0d",
+               expected_pass_q.size());
       err_count++;
     end
 

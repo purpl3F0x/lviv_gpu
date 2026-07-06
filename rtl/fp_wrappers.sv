@@ -432,3 +432,127 @@ module fp32_to_int16 #(
 `endif
 
 endmodule
+
+// ============================================================================
+// Floating-Point to Fixed-Point Q2.23 (2-cycle latency)
+// Wrapper name is fp_to_fx2_23, synthesis backend is xil_fp_to_fx2_23
+// ============================================================================
+module fp_to_fx2_23 #(
+    parameter int LATENCY = 2
+) (
+    input  logic        aclk,
+    input  logic        aresetn,
+    input  logic        aclken,
+    input  logic        s_axis_a_tvalid,
+    input  logic [31:0] s_axis_a_tdata,
+    output logic        m_axis_result_tvalid,
+    output logic [24:0] m_axis_result_tdata
+);
+
+`ifdef SIM_MODE
+  shortreal a_real;
+  logic [24:0] res_bits;
+  logic [24:0] pipeline [LATENCY];
+  logic        valid_pipe [LATENCY];
+  integer scaled;
+
+  always_comb begin
+    a_real = `BITSTOSHORTREAL(s_axis_a_tdata);
+    scaled = $rtoi(a_real * 8388608.0);  // 2^23
+    res_bits = scaled[24:0];
+  end
+
+  always_ff @(posedge aclk) begin
+    if (!aresetn) begin
+      for (int i = 0; i < LATENCY; i++) begin
+        pipeline[i] <= '0;
+        valid_pipe[i] <= 1'b0;
+      end
+    end else if (aclken) begin
+      pipeline[0] <= res_bits;
+      valid_pipe[0] <= s_axis_a_tvalid;
+      for (int i = 1; i < LATENCY; i++) begin
+        pipeline[i] <= pipeline[i-1];
+        valid_pipe[i] <= valid_pipe[i-1];
+      end
+    end
+  end
+
+  assign m_axis_result_tdata = pipeline[LATENCY-1];
+  assign m_axis_result_tvalid = valid_pipe[LATENCY-1];
+
+`else
+  xil_fp_to_fx2_23 xil_fp_to_fx2_23_inst (
+      .aclk                (aclk),
+      .aresetn             (aresetn),
+      .aclken              (aclken),
+      .s_axis_a_tvalid     (s_axis_a_tvalid),
+      .s_axis_a_tdata      (s_axis_a_tdata),
+      .m_axis_result_tvalid(m_axis_result_tvalid),
+      .m_axis_result_tdata (m_axis_result_tdata)
+  );
+`endif
+
+endmodule
+
+// ============================================================================
+// Floating-Point to Fixed-Point Q2.8 (2-cycle latency)
+// Wrapper name is fp_to_fx2_8, synthesis backend is xil_fp_to_fx2_8
+// ============================================================================
+module fp_to_fx2_8 #(
+    parameter int LATENCY = 2
+) (
+    input  logic        aclk,
+    input  logic        aresetn,
+    input  logic        aclken,
+    input  logic        s_axis_a_tvalid,
+    input  logic [31:0] s_axis_a_tdata,
+    output logic        m_axis_result_tvalid,
+    output logic [15:0] m_axis_result_tdata
+);
+
+`ifdef SIM_MODE
+  shortreal a_real;
+  logic [15:0] res_bits;
+  logic [15:0] pipeline [LATENCY];
+  logic        valid_pipe [LATENCY];
+  integer scaled;
+
+  always_comb begin
+    a_real = `BITSTOSHORTREAL(s_axis_a_tdata);
+    scaled = $rtoi(a_real * 256.0);  // 2^8
+    res_bits = scaled[15:0];
+  end
+
+  always_ff @(posedge aclk) begin
+    if (!aresetn) begin
+      for (int i = 0; i < LATENCY; i++) begin
+        pipeline[i] <= '0;
+        valid_pipe[i] <= 1'b0;
+      end
+    end else if (aclken) begin
+      pipeline[0] <= res_bits;
+      valid_pipe[0] <= s_axis_a_tvalid;
+      for (int i = 1; i < LATENCY; i++) begin
+        pipeline[i] <= pipeline[i-1];
+        valid_pipe[i] <= valid_pipe[i-1];
+      end
+    end
+  end
+
+  assign m_axis_result_tdata = pipeline[LATENCY-1];
+  assign m_axis_result_tvalid = valid_pipe[LATENCY-1];
+
+`else
+  xil_fp_to_fx2_8 xil_fp_to_fx2_8_inst (
+      .aclk                (aclk),
+      .aresetn             (aresetn),
+      .aclken              (aclken),
+      .s_axis_a_tvalid     (s_axis_a_tvalid),
+      .s_axis_a_tdata      (s_axis_a_tdata),
+      .m_axis_result_tvalid(m_axis_result_tvalid),
+      .m_axis_result_tdata (m_axis_result_tdata)
+  );
+`endif
+
+endmodule

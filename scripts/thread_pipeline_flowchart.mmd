@@ -2,24 +2,49 @@ flowchart LR
     fp_mul_1(("x\nfp_mul_1"))
     fp_mul_2(("x\nfp_mul_2"))
     fp_mul_3(("x\nfp_mul_3"))
-    fp_mul_4(("x\nfp_mul_4"))
-    fp_mul_5(("x\nfp_mul_5"))
+    fp_mul_10(("x\nfp_mul_4"))
+    fp_mul_4(("x\nfp_mul_5"))
     fp_mul_6(("x\nfp_mul_6"))
-    fp_mul_7(("x\nfp_mul_7"))
+    fp_mul_8(("x\nfp_mul_7"))
     fp_fma_1[["FMA\na*b+c\nfp_fma_1"]]
     fp_fma_3[["FMA\na*b+c\nfp_fma_2"]]
-    fp_fma_5[["FMA\na*b+c\nfp_fma_3"]]
-    fp_fma_7[["FMA\na*b+c\nfp_fma_4"]]
-    fp_fma_2[["FMA\na*b+c\nfp_fma_5"]]
-    fp_fma_4[["FMA\na*b+c\nfp_fma_6"]]
-    fp_fma_6[["FMA\na*b+c\nfp_fma_7"]]
-    fp_fma_8[["FMA\na*b+c\nfp_fma_8"]]
+    fp_fma_2[["FMA\na*b+c\nfp_fma_3"]]
+    fp_fma_4[["FMA\na*b+c\nfp_fma_4"]]
     fp_recip_1(("1/x\nfp_recip_1"))
     mem_read_1[["MEM_RD\nmem_read_1"]]
     fp_cmp_1{"CMP\nle\nfp_cmp_1"}
     mem_write_1{"MEM_WR\nmem_write_1"}
-    fp_mul_8(("x\nfp_mul_8"))
-    fp_mul_9(("x\nfp_mul_9"))
+    fp_mul_5(("x\nfp_mul_8"))
+    fp_mul_7(("x\nfp_mul_9"))
+    fp_mul_9(("x\nfp_mul_10"))
+    fp_to_fx2_23_1["fp_to_fx2_23\nfp_to_fx2_23_1"]
+    fp_to_fx2_23_2["fp_to_fx2_23\nfp_to_fx2_23_2"]
+    fp_to_fx2_23_3["fp_to_fx2_23\nfp_to_fx2_23_3"]
+    fx_2_23_mul_1["fx_2_23_mul\nfx_2_23_mul_1"]
+    fx_2_23_mul_2["fx_2_23_mul\nfx_2_23_mul_2"]
+    fx_2_23_to_fx_2_8_1["fx_2_23_to_fx_2_8\nfx_2_23_to_fx_2_8_1"]
+    fx_2_23_to_fx_2_8_2["fx_2_23_to_fx_2_8\nfx_2_23_to_fx_2_8_2"]
+    fx_2_23_to_fx_2_8_3["fx_2_23_to_fx_2_8\nfx_2_23_to_fx_2_8_3"]
+    fx_9_8_mul_1["fx_9_8_mul\nfx_9_8_mul_1"]
+    fx_9_8_mul_2["fx_9_8_mul\nfx_9_8_mul_2"]
+    fx_9_8_mul_3["fx_9_8_mul\nfx_9_8_mul_3"]
+    fx_9_8_mul_4["fx_9_8_mul\nfx_9_8_mul_4"]
+    fx_2_23_fma_1["fx_2_23_fma\nfx_2_23_fma_1"]
+    fx_2_23_fma_3["fx_2_23_fma\nfx_2_23_fma_2"]
+    fx_9_8_fma_1["fx_9_8_fma\nfx_9_8_fma_1"]
+    fx_9_8_fma_3["fx_9_8_fma\nfx_9_8_fma_2"]
+    fx_9_8_fma_5["fx_9_8_fma\nfx_9_8_fma_3"]
+    fx_9_8_fma_7["fx_9_8_fma\nfx_9_8_fma_4"]
+    fx_2_23_fma_2["fx_2_23_fma\nfx_2_23_fma_3"]
+    fx_2_23_fma_4["fx_2_23_fma\nfx_2_23_fma_4"]
+    fx_9_8_fma_2["fx_9_8_fma\nfx_9_8_fma_5"]
+    fx_9_8_fma_4["fx_9_8_fma\nfx_9_8_fma_6"]
+    fx_9_8_fma_6["fx_9_8_fma\nfx_9_8_fma_7"]
+    fx_9_8_fma_8["fx_9_8_fma\nfx_9_8_fma_8"]
+    fx_9_8_to_u8_1["fx_9_8_to_u8\nfx_9_8_to_u8_1"]
+    fx_9_8_to_u8_2["fx_9_8_to_u8\nfx_9_8_to_u8_2"]
+    fx_9_8_to_u8_3["fx_9_8_to_u8\nfx_9_8_to_u8_3"]
+    fx_9_8_to_u8_4["fx_9_8_to_u8\nfx_9_8_to_u8_4"]
     L_e0(["e0"])
     L_e0 --> fp_mul_1
     L_inv_area(["inv_area"])
@@ -31,58 +56,118 @@ flowchart LR
     L_e2 --> fp_mul_3
     L_inv_area --> fp_mul_3
     L_v0_z(["v0_z"])
-    L_v0_z --> fp_mul_4
-    fp_mul_1 --> fp_mul_4
+    L_v0_z --> fp_mul_10
+    fp_mul_1 --> fp_mul_10
     L_v0_w(["v0_w"])
-    L_v0_w --> fp_mul_5
-    fp_mul_1 --> fp_mul_5
-    L_v0_texture_u_over_w(["v0_texture_u_over_w"])
-    L_v0_texture_u_over_w --> fp_mul_6
-    fp_mul_1 --> fp_mul_6
-    L_v0_texture_v_over_w(["v0_texture_v_over_w"])
-    L_v0_texture_v_over_w --> fp_mul_7
-    fp_mul_1 --> fp_mul_7
-    L_v1_z(["v1_z"])
-    L_v1_z --> fp_fma_1
+    L_v0_w --> fp_mul_4
+    fp_mul_1 --> fp_mul_4
+    L_v1_w(["v1_w"])
+    L_v1_w --> fp_mul_6
+    fp_mul_2 --> fp_mul_6
+    L_v2_w(["v2_w"])
+    L_v2_w --> fp_mul_8
+    fp_mul_3 --> fp_mul_8
+    L_v1_w --> fp_fma_1
     fp_mul_2 --> fp_fma_1
     fp_mul_4 --> fp_fma_1
-    L_v1_w(["v1_w"])
-    L_v1_w --> fp_fma_3
+    L_v1_z(["v1_z"])
+    L_v1_z --> fp_fma_3
     fp_mul_2 --> fp_fma_3
-    fp_mul_5 --> fp_fma_3
-    L_v1_texture_u_over_w(["v1_texture_u_over_w"])
-    L_v1_texture_u_over_w --> fp_fma_5
-    fp_mul_2 --> fp_fma_5
-    fp_mul_6 --> fp_fma_5
-    L_v1_texture_v_over_w(["v1_texture_v_over_w"])
-    L_v1_texture_v_over_w --> fp_fma_7
-    fp_mul_2 --> fp_fma_7
-    fp_mul_7 --> fp_fma_7
-    L_v2_z(["v2_z"])
-    L_v2_z --> fp_fma_2
+    fp_mul_10 --> fp_fma_3
+    L_v2_w --> fp_fma_2
     fp_mul_3 --> fp_fma_2
     fp_fma_1 --> fp_fma_2
-    L_v2_w(["v2_w"])
-    L_v2_w --> fp_fma_4
+    L_v2_z(["v2_z"])
+    L_v2_z --> fp_fma_4
     fp_mul_3 --> fp_fma_4
     fp_fma_3 --> fp_fma_4
-    L_v2_texture_u_over_w(["v2_texture_u_over_w"])
-    L_v2_texture_u_over_w --> fp_fma_6
-    fp_mul_3 --> fp_fma_6
-    fp_fma_5 --> fp_fma_6
-    L_v2_texture_v_over_w(["v2_texture_v_over_w"])
-    L_v2_texture_v_over_w --> fp_fma_8
-    fp_mul_3 --> fp_fma_8
-    fp_fma_7 --> fp_fma_8
-    fp_fma_4 --> fp_recip_1
+    fp_fma_2 --> fp_recip_1
     L_addr(["addr"])
     L_addr --> mem_read_1
-    fp_fma_2 --> mem_read_1
-    fp_fma_2 --> fp_cmp_1
+    fp_fma_4 --> mem_read_1
+    fp_fma_4 --> fp_cmp_1
     mem_read_1 --> fp_cmp_1
     L_addr --> mem_write_1
-    fp_fma_2 --> mem_write_1
-    fp_fma_6 --> fp_mul_8
-    fp_recip_1 --> fp_mul_8
-    fp_fma_8 --> fp_mul_9
+    fp_fma_4 --> mem_write_1
+    fp_recip_1 --> fp_mul_5
+    fp_mul_4 --> fp_mul_5
+    fp_recip_1 --> fp_mul_7
+    fp_mul_6 --> fp_mul_7
     fp_recip_1 --> fp_mul_9
+    fp_mul_8 --> fp_mul_9
+    fp_mul_5 --> fp_to_fx2_23_1
+    fp_mul_7 --> fp_to_fx2_23_2
+    fp_mul_9 --> fp_to_fx2_23_3
+    L_v0_texture_u(["v0_texture_u"])
+    L_v0_texture_u --> fx_2_23_mul_1
+    fp_to_fx2_23_1 --> fx_2_23_mul_1
+    L_v0_texture_v(["v0_texture_v"])
+    L_v0_texture_v --> fx_2_23_mul_2
+    fp_to_fx2_23_1 --> fx_2_23_mul_2
+    fp_to_fx2_23_1 --> fx_2_23_to_fx_2_8_1
+    fp_to_fx2_23_2 --> fx_2_23_to_fx_2_8_2
+    fp_to_fx2_23_3 --> fx_2_23_to_fx_2_8_3
+    L_v0_color_r(["v0_color_r"])
+    L_v0_color_r --> fx_9_8_mul_1
+    fx_2_23_to_fx_2_8_1 --> fx_9_8_mul_1
+    L_v0_color_g(["v0_color_g"])
+    L_v0_color_g --> fx_9_8_mul_2
+    fx_2_23_to_fx_2_8_1 --> fx_9_8_mul_2
+    L_v0_color_b(["v0_color_b"])
+    L_v0_color_b --> fx_9_8_mul_3
+    fx_2_23_to_fx_2_8_1 --> fx_9_8_mul_3
+    L_v0_color_a(["v0_color_a"])
+    L_v0_color_a --> fx_9_8_mul_4
+    fx_2_23_to_fx_2_8_1 --> fx_9_8_mul_4
+    L_v1_texture_u(["v1_texture_u"])
+    L_v1_texture_u --> fx_2_23_fma_1
+    fp_to_fx2_23_2 --> fx_2_23_fma_1
+    fx_2_23_mul_1 --> fx_2_23_fma_1
+    L_v1_texture_v(["v1_texture_v"])
+    L_v1_texture_v --> fx_2_23_fma_3
+    fp_to_fx2_23_2 --> fx_2_23_fma_3
+    fx_2_23_mul_2 --> fx_2_23_fma_3
+    L_v1_color_r(["v1_color_r"])
+    L_v1_color_r --> fx_9_8_fma_1
+    fx_2_23_to_fx_2_8_2 --> fx_9_8_fma_1
+    fx_9_8_mul_1 --> fx_9_8_fma_1
+    L_v1_color_g(["v1_color_g"])
+    L_v1_color_g --> fx_9_8_fma_3
+    fx_2_23_to_fx_2_8_2 --> fx_9_8_fma_3
+    fx_9_8_mul_2 --> fx_9_8_fma_3
+    L_v1_color_b(["v1_color_b"])
+    L_v1_color_b --> fx_9_8_fma_5
+    fx_2_23_to_fx_2_8_2 --> fx_9_8_fma_5
+    fx_9_8_mul_3 --> fx_9_8_fma_5
+    L_v1_color_a(["v1_color_a"])
+    L_v1_color_a --> fx_9_8_fma_7
+    fx_2_23_to_fx_2_8_2 --> fx_9_8_fma_7
+    fx_9_8_mul_4 --> fx_9_8_fma_7
+    L_v2_texture_u(["v2_texture_u"])
+    L_v2_texture_u --> fx_2_23_fma_2
+    fp_to_fx2_23_3 --> fx_2_23_fma_2
+    fx_2_23_fma_1 --> fx_2_23_fma_2
+    L_v2_texture_v(["v2_texture_v"])
+    L_v2_texture_v --> fx_2_23_fma_4
+    fp_to_fx2_23_3 --> fx_2_23_fma_4
+    fx_2_23_fma_3 --> fx_2_23_fma_4
+    L_v2_color_r(["v2_color_r"])
+    L_v2_color_r --> fx_9_8_fma_2
+    fx_2_23_to_fx_2_8_3 --> fx_9_8_fma_2
+    fx_9_8_fma_1 --> fx_9_8_fma_2
+    L_v2_color_g(["v2_color_g"])
+    L_v2_color_g --> fx_9_8_fma_4
+    fx_2_23_to_fx_2_8_3 --> fx_9_8_fma_4
+    fx_9_8_fma_3 --> fx_9_8_fma_4
+    L_v2_color_b(["v2_color_b"])
+    L_v2_color_b --> fx_9_8_fma_6
+    fx_2_23_to_fx_2_8_3 --> fx_9_8_fma_6
+    fx_9_8_fma_5 --> fx_9_8_fma_6
+    L_v2_color_a(["v2_color_a"])
+    L_v2_color_a --> fx_9_8_fma_8
+    fx_2_23_to_fx_2_8_3 --> fx_9_8_fma_8
+    fx_9_8_fma_7 --> fx_9_8_fma_8
+    fx_9_8_fma_2 --> fx_9_8_to_u8_1
+    fx_9_8_fma_4 --> fx_9_8_to_u8_2
+    fx_9_8_fma_6 --> fx_9_8_to_u8_3
+    fx_9_8_fma_8 --> fx_9_8_to_u8_4

@@ -14,6 +14,17 @@ SUPPORTED_OPS = {
     "mux",
     "mem_read",
     "mem_write",
+    # Fixed-point arithmetic (all Q8.8 / 16-bit)
+    "fx_8_8_mul",
+    "fx_8_8_fma",
+    "fx_9_8_mul",
+    "fx_9_8_fma",
+    "fx_2_23_mul",
+    "fx_2_23_fma",
+    "fp_to_fx2_23",
+    "fp_to_fx2_8",
+    "fx_2_23_to_fx_2_8",
+    "fx_9_8_to_u8",
 }
 
 
@@ -27,6 +38,41 @@ DEFAULT_LATENCIES = {
     "mux": 1,
     "mem_read": 1,
     "mem_write": 1,
+    # Fixed-point op latencies follow the RTL pipeline depths.
+    "fx_9_8_mul": 2,
+    "fx_9_8_fma": 2,
+    "fx_2_23_mul": 2,
+    "fx_2_23_fma": 3,
+    "fx_2_23_to_fx_2_8": 1,
+    "fx_9_8_to_u8": 1,
+    # Xilinx conversion wrappers are 2-cycle latency.
+    "fp_to_fx2_23": 2,
+    "fp_to_fx2_8": 2,
+}
+
+# Output bit-width for each op type (default 32 for fp ops).
+# All fx ops use Q8.8 = 16 bits.
+_FX_OP_WIDTHS = {
+    "fx_8_8_mul": 16,
+    "fx_8_8_fma": 16,
+    "fx_9_8_mul": 17,
+    "fx_9_8_fma": 17,
+    "fx_2_23_mul": 25,
+    "fx_2_23_fma": 25,
+    "fp_to_fx2_23": 25,
+    "fp_to_fx2_8": 16,
+    "fx_2_23_to_fx_2_8": 16,
+    "fx_9_8_to_u8": 8,
+}
+
+# Leaf-signal type → bit width.
+_LEAF_TYPE_WIDTHS = {
+    "addr_t": 14,
+    "uint8_t": 8,
+    "fx_2_8": 16,  # stored as Q8.8 word; upper bits zero for valid bary coords
+    "fx_8_8": 16,
+    "fx_9_8": 17,
+    "fx_2_23": 25,
 }
 
 
@@ -191,7 +237,9 @@ class HardwareDAG:
                 self.dependencies.append((sig.hw_id, node_id))
 
     def add_binary_operation(self, op_type, left, right, expr, op_symbol=""):
-        if op_type not in ("fp_add", "fp_sub", "fp_mul"):
+        _FP_BINARY = {"fp_add", "fp_sub", "fp_mul"}
+        _FX_BINARY = {"fx_8_8_mul", "fx_9_8_mul", "fx_2_23_mul"}
+        if op_type not in _FP_BINARY | _FX_BINARY:
             raise ValueError(f"Unsupported binary op type: {op_type}")
 
         valid_expr = self._merge_valid_expr(
@@ -209,22 +257,28 @@ class HardwareDAG:
         self.expression_cache[cache_key] = node_id
         return node_id
 
-    def add_fma_operation(self, a, b, c, expr):
+    def add_fma_operation(self, a, b, c, expr, op_type="fp_fma"):
         valid_expr = self._merge_valid_expr(
             self.global_valid_expr,
             self._input_valid_expr(a),
         )
-        cache_key = ("fp_fma", expr, valid_expr)
+        cache_key = (op_type, expr, valid_expr)
         if cache_key in self.expression_cache:
             return self.expression_cache[cache_key]
 
-        node_id = self._new_node("fp_fma", expr, valid_expr=valid_expr)
+        node_id = self._new_node(op_type, expr, valid_expr=valid_expr)
         self._add_edges(node_id, (a, b, c), tuple(self.control_dependencies))
         self.expression_cache[cache_key] = node_id
         return node_id
 
     def add_unary_operation(self, op_type, src, expr):
-        if op_type != "fp_recip":
+        if op_type not in (
+            "fp_recip",
+            "fp_to_fx2_23",
+            "fp_to_fx2_8",
+            "fx_2_23_to_fx_2_8",
+            "fx_9_8_to_u8",
+        ):
             raise ValueError(f"Unsupported unary op type: {op_type}")
 
         valid_expr = self._merge_valid_expr(
@@ -380,6 +434,8 @@ class HardwareDAG:
         }
 
     def _signal_ref(self, sig, wire_name_by_node):
+        if isinstance(sig, (Signal, PredicateSignal)) and getattr(sig, "sv_ref", None):
+            return sig.sv_ref
         if isinstance(sig, (Signal, PredicateSignal)) and sig.hw_id:
             return wire_name_by_node[sig.hw_id]
         if isinstance(sig, (Signal, PredicateSignal)):
@@ -410,10 +466,32 @@ class HardwareDAG:
                     return sig
             return inputs[0] if inputs else None
 
-        if op_type == "fp_fma" and produced_inputs:
+        if (
+            op_type
+            in (
+                "fp_fma",
+                "fx_8_8_fma",
+                "fx_9_8_fma",
+                "fx_2_23_fma",
+            )
+            and produced_inputs
+        ):
             return produced_inputs[-1]
 
-        if op_type in ("fp_add", "fp_sub", "fp_mul", "fp_recip", "mux"):
+        if op_type in (
+            "fp_add",
+            "fp_sub",
+            "fp_mul",
+            "fp_recip",
+            "mux",
+            "fx_8_8_mul",
+            "fx_9_8_mul",
+            "fx_2_23_mul",
+            "fp_to_fx2_23",
+            "fp_to_fx2_8",
+            "fx_2_23_to_fx_2_8",
+            "fx_9_8_to_u8",
+        ):
             if produced_inputs:
                 return produced_inputs[-1]
 
@@ -424,12 +502,30 @@ class HardwareDAG:
 
         return inputs[0] if inputs else None
 
+    def _op_out_width(self, op_type):
+        """Return the output bit-width for a given op type."""
+        if op_type in ("fp_cmp", "mem_write"):
+            return 1
+        return _FX_OP_WIDTHS.get(op_type, 32)
+
     def _leaf_axis_base(self, sig):
         raw = getattr(sig, "expr", str(sig))
         return self._sanitize_sv_name(raw)
 
+    def _leaf_struct_field(self, sig):
+        raw = getattr(sig, "expr", str(sig))
+        # Keep generator leaf names stable while mapping to compact struct fields.
+        m_tex = re.fullmatch(r"v([0-2])_texture_([uv])", raw)
+        if m_tex:
+            return f"v{m_tex.group(1)}_{m_tex.group(2)}"
+        return self._sanitize_sv_name(raw)
+
     def _leaf_data_ref(self, sig):
-        return f"s_axis_{self._leaf_axis_base(sig)}_tdata"
+        # sv_ref carries a pre-formed SV expression (e.g. for zero-latency
+        # type conversions like uint8→Q8.8) and is used verbatim as the wire.
+        if getattr(sig, "sv_ref", None):
+            return sig.sv_ref
+        return f"thread_data_buf.{self._leaf_struct_field(sig)}"
 
     def _leaf_valid_ref(self, sig):
         return f"s_axis_{self._leaf_axis_base(sig)}_tvalid"
@@ -460,41 +556,60 @@ class HardwareDAG:
         for node in sorted_ops:
             info = self.ops[node]
             wire = wire_name_by_node[node]
-            width = 1 if info.op_type in ("fp_cmp", "mem_write") else 32
+            width = self._op_out_width(info.op_type)
             lines.append(f"logic [{width-1}:0] {wire};")
             if info.op_type == "fp_cmp":
                 lines.append(f"logic {wire}_valid;")
+            if info.op_type == "mem_write":
+                lines.append(f"logic {node}_fire;")
         lines.append("")
 
-        for node in sorted_ops:
-            if self.ops[node].op_type == "fp_cmp":
-                valid_name_by_node[node] = f"{wire_name_by_node[node]}_valid"
-
         lines.append("// ---- Selected outputs ----")
-        selected_output_names = ("texcoord_u", "texcoord_v", "comp_z")
-        selected_nodes = {
-            node: name
-            for node, name in self.node_names.items()
-            if name in selected_output_names
+        output_aliases = {
+            "u": "texcoord_u",
+            "v": "texcoord_v",
+            "r": "color_r",
+            "g": "color_g",
+            "b": "color_b",
+            "a": "color_a",
+            "texcoord_u": "texcoord_u",
+            "texcoord_v": "texcoord_v",
+            "color_r": "color_r",
+            "color_g": "color_g",
+            "color_b": "color_b",
+            "color_a": "color_a",
+            "comp_z": "comp_z",
         }
-        if selected_nodes:
-            for node in sorted(selected_nodes, key=lambda n: (start_times[n], n)):
-                out_name = selected_nodes[node]
+        selected_output_order = (
+            "texcoord_u",
+            "texcoord_v",
+            "color_r",
+            "color_g",
+            "color_b",
+            "color_a",
+            "comp_z",
+        )
+        selected_node_by_name = {}
+        for node, raw_name in self.node_names.items():
+            out_name = output_aliases.get(raw_name)
+            if out_name is not None and out_name not in selected_node_by_name:
+                selected_node_by_name[out_name] = node
+
+        selected_outputs = [
+            (selected_node_by_name[name], name)
+            for name in selected_output_order
+            if name in selected_node_by_name
+        ]
+
+        if selected_outputs:
+            for node, out_name in selected_outputs:
                 src_wire = wire_name_by_node[node]
-                width = 1 if self.ops[node].op_type in ("fp_cmp", "mem_write") else 32
-                if self.ops[node].op_type == "fp_cmp":
-                    src_valid = valid_name_by_node[node]
-                else:
-                    src_valid = (
-                        f"valid_pipe[{start_times[node] + self.ops[node].latency + 1}]"
-                    )
+                width = self._op_out_width(self.ops[node].op_type)
                 if width == 1:
                     lines.append(f"logic {out_name}_tdata;")
                 else:
                     lines.append(f"logic [{width-1}:0] {out_name}_tdata;")
-                lines.append(f"logic {out_name}_tvalid;")
                 lines.append(f"assign {out_name}_tdata = {src_wire};")
-                lines.append(f"assign {out_name}_tvalid = {src_valid};")
         else:
             lines.append("// None")
         lines.append("")
@@ -518,16 +633,49 @@ class HardwareDAG:
         def _signal_width(sig):
             if isinstance(sig, PredicateSignal):
                 return 1
+            if isinstance(sig, Signal) and getattr(sig, "sv_ref", None) is not None:
+                t = getattr(sig, "type", "")
+                if t in _LEAF_TYPE_WIDTHS:
+                    return _LEAF_TYPE_WIDTHS[t]
             if isinstance(sig, Signal) and sig.hw_id:
-                prod_info = self.ops[sig.hw_id]
-                return 1 if prod_info.op_type in ("fp_cmp", "mem_write") else 32
-            if isinstance(sig, Signal) and getattr(sig, "type", "") == "addr_t":
-                return 14
+                return self._op_out_width(self.ops[sig.hw_id].op_type)
+            if isinstance(sig, Signal):
+                t = getattr(sig, "type", "")
+                if t in _LEAF_TYPE_WIDTHS:
+                    return _LEAF_TYPE_WIDTHS[t]
             return 32
 
         def _leaf_name(sig):
             raw = getattr(sig, "expr", str(sig))
             return self._sanitize_sv_name(raw)
+
+        def _color_leaf_info(sig):
+            if not isinstance(sig, Signal):
+                return None
+            expr = getattr(sig, "expr", "")
+            m = re.fullmatch(r"v([0-2])_color_([argb])", expr)
+            if not m:
+                return None
+            return (f"v{m.group(1)}", m.group(2))
+
+        def _color_pack_ref(vertex_name):
+            return (
+                "{"
+                f"thread_data_buf.{vertex_name}_color_a, "
+                f"thread_data_buf.{vertex_name}_color_r, "
+                f"thread_data_buf.{vertex_name}_color_g, "
+                f"thread_data_buf.{vertex_name}_color_b"
+                "}"
+            )
+
+        def _color_chan_slice(ref, chan):
+            if chan == "a":
+                return f"{ref}[31:24]"
+            if chan == "r":
+                return f"{ref}[23:16]"
+            if chan == "g":
+                return f"{ref}[15:8]"
+            return f"{ref}[7:0]"
 
         # Align any late-consumed input with delay pipes.
         # Internal AXIS skid buffers are not used in this architecture.
@@ -544,7 +692,7 @@ class HardwareDAG:
         consumer_fire_nodes = {
             node
             for node in sorted_ops
-            if self.ops[node].op_type in ("fp_cmp", "mem_read", "mem_write", "mux")
+            if self.ops[node].op_type in ("fp_cmp", "mem_read", "mux")
             and len(self.op_inputs[node]) > 0
         }
 
@@ -564,20 +712,68 @@ class HardwareDAG:
                 f"delay_pipe #(.WIDTH({width}), .STAGES({stages})) u_{dst_ref}_data_delay (.clk(clk), .rst_n(rst_n), .clken(pipe_en_internal), .data_in({src_ref}), .data_out({dst_ref}));"
             )
 
-        # Calculate max pipeline depth for master valid pipeline
-        max_depth = 0
-        for node in sorted_ops:
-            stage = start_times[node] + self.ops[node].latency + 1
-            max_depth = max(max_depth, stage)
-
         # Track alignment delays to find max alignment depth
         alignment_delays = {}
+        # For leaf sources, allow emitting incremental delay chains from an
+        # already-aligned tap to reduce delay_pipe storage.
+        leaf_align_by_src = {}
+        # Reuse one packed color delay pipe per vertex/stage depth.
+        color_pack_align_by_key = {}
+        color_pack_taps_by_vertex = {}
 
         for dst in sorted_ops:
             dst_start = start_times[dst]
             inputs = self.op_inputs[dst]
 
             for idx, sig in enumerate(inputs):
+                color_info = _color_leaf_info(sig)
+                if color_info and getattr(sig, "type", "") == "fx_9_8":
+                    vertex_name, chan = color_info
+                    extra_delay = dst_start
+                    packed_src_ref = _color_pack_ref(vertex_name)
+                    leaf_ready_keys.add(f"{vertex_name}_color_{chan}")
+
+                    if extra_delay > 0:
+                        key = (vertex_name, extra_delay)
+                        if key not in color_pack_align_by_key:
+                            delay_src_ref = packed_src_ref
+                            delay_stages = extra_delay
+
+                            prior = color_pack_taps_by_vertex.get(vertex_name, [])
+                            best = None
+                            for dly, aligned_ref in prior:
+                                if dly < extra_delay and (
+                                    best is None or dly > best[0]
+                                ):
+                                    best = (dly, aligned_ref)
+                            if best is not None:
+                                delay_src_ref = best[1]
+                                delay_stages = extra_delay - best[0]
+
+                            packed_buf = (
+                                f"align_{vertex_name}_color_argb_d{extra_delay}"
+                            )
+                            _emit_delay_align(
+                                delay_src_ref, packed_buf, 32, delay_stages
+                            )
+                            alignment_delays[packed_buf] = extra_delay
+                            color_pack_align_by_key[key] = packed_buf
+                            color_pack_taps_by_vertex.setdefault(
+                                vertex_name, []
+                            ).append((extra_delay, packed_buf))
+
+                        packed_ref = color_pack_align_by_key[key]
+                        input_valid_ref_by_edge[(dst, idx)] = f"{packed_ref}_valid"
+                    else:
+                        packed_ref = packed_src_ref
+                        input_valid_ref_by_edge[(dst, idx)] = (
+                            f"valid_pipe[{dst_start + 1}]"
+                        )
+
+                    chan_ref = _color_chan_slice(packed_ref, chan)
+                    input_ref_by_edge[(dst, idx)] = f"{{1'b0, {chan_ref}, 8'h00}}"
+                    continue
+
                 width = _signal_width(sig)
 
                 if isinstance(sig, (Signal, PredicateSignal)) and sig.hw_id:
@@ -598,12 +794,34 @@ class HardwareDAG:
                     leaf_ready_keys.add(self._leaf_axis_base(sig))
 
                 if extra_delay > 0:
+                    delay_src_ref = src_ref
+                    delay_stages = extra_delay
+
+                    # If this is a leaf input and we already created a shorter
+                    # alignment for the same source, chain from it.
+                    if not (isinstance(sig, (Signal, PredicateSignal)) and sig.hw_id):
+                        leaf_key = (src_ref, width, src_tag)
+                        prior = leaf_align_by_src.get(leaf_key, [])
+                        best = None
+                        for dly, aligned_ref in prior:
+                            if dly < extra_delay and (best is None or dly > best[0]):
+                                best = (dly, aligned_ref)
+                        if best is not None:
+                            delay_src_ref = best[1]
+                            delay_stages = extra_delay - best[0]
+
                     buf_name = f"align_{src_tag}_to_{dst}_i{idx}_d{extra_delay}"
                     input_ref_by_edge[(dst, idx)] = buf_name
                     input_valid_ref_by_edge[(dst, idx)] = f"{buf_name}_valid"
                     _declare_buffer_signal(buf_name, width)
-                    _emit_delay_align(src_ref, buf_name, width, extra_delay)
+                    _emit_delay_align(delay_src_ref, buf_name, width, delay_stages)
                     alignment_delays[buf_name] = extra_delay
+
+                    if not (isinstance(sig, (Signal, PredicateSignal)) and sig.hw_id):
+                        leaf_key = (src_ref, width, src_tag)
+                        leaf_align_by_src.setdefault(leaf_key, []).append(
+                            (extra_delay, buf_name)
+                        )
                 else:
                     input_ref_by_edge[(dst, idx)] = src_ref
                     input_valid_ref_by_edge[(dst, idx)] = src_valid_ref
@@ -619,18 +837,8 @@ class HardwareDAG:
             valid_ref_by_node[dst] = f"valid_pipe[{start_times[dst] + 1}]"
             control_gate_ref_by_node[dst] = "1'b1"
 
-        # Note: consumer fire wiring will be generated later after valid_pipe updates
-
-        lines.append("// ---- Master valid pipeline ----")
-        lines.append(f"logic [{max_depth}:0] valid_pipe;")
-        lines.append("assign valid_pipe[0] = input_bundle_buf_tvalid;")
-        lines.append("always_ff @(posedge clk) begin")
-        lines.append("  if (~rst_n)")
-        lines.append(f"    valid_pipe[{max_depth}:1] <= '0;")
-        lines.append("  else if (pipe_en_internal)")
-        lines.append(f"    valid_pipe[{max_depth}:1] <= valid_pipe[{max_depth-1}:0];")
-        lines.append("end")
-        lines.append("")
+        # Note: consumer fire wiring will be generated later after valid_pipe updates.
+        # valid_pipe is declared in rtl/thread.sv outside this autogenerated block.
 
         # Update alignment valid references to tap valid_pipe
         for align_name, delay in alignment_delays.items():
@@ -643,8 +851,14 @@ class HardwareDAG:
                 input_valid_ref_by_edge[key] = f"valid_pipe[{delay + 1}]"
 
         # Recompute valid_ref_by_node as pure stage taps for fixed-latency units.
+        # mem_read/mem_write fire on their start stage; others use start+1.
         valid_ref_by_node = {
-            node: f"valid_pipe[{start_times[node] + 1}]" for node in sorted_ops
+            node: (
+                f"valid_pipe[{start_times[node]}]"
+                if self.ops[node].op_type in ("mem_read", "mem_write")
+                else f"valid_pipe[{start_times[node] + 1}]"
+            )
+            for node in sorted_ops
         }
 
         lines.append("// ---- Non-AXIS consumer fire wiring ----")
@@ -691,7 +905,8 @@ class HardwareDAG:
                 lines.append(
                     "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
                 )
-                lines.append(f"    .valid_in({valid_in}),")
+                lines.append(f"    // .valid_in({valid_in}),")
+                lines.append("    .valid_in(),")
                 lines.append(f"    .a({a}), .b({b}),")
                 lines.append(f"    .result({out_wire})")
                 lines.append(");")
@@ -702,7 +917,8 @@ class HardwareDAG:
                 lines.append(
                     "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
                 )
-                lines.append(f"    .valid_in({valid_in}),")
+                lines.append(f"    // .valid_in({valid_in}),")
+                lines.append("    .valid_in(),")
                 lines.append(f"    .a({a}), .b({b}),")
                 lines.append(f"    .result({out_wire})")
                 lines.append(");")
@@ -713,7 +929,8 @@ class HardwareDAG:
                 lines.append(
                     "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
                 )
-                lines.append(f"    .valid_in({valid_in}),")
+                lines.append(f"    // .valid_in({valid_in}),")
+                lines.append("    .valid_in(),")
                 lines.append(f"    .a({a}), .b({b}),")
                 lines.append(f"    .result({out_wire})")
                 lines.append(");")
@@ -725,7 +942,8 @@ class HardwareDAG:
                 lines.append(
                     "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
                 )
-                lines.append(f"    .valid_in({valid_in}),")
+                lines.append(f"    // .valid_in({valid_in}),")
+                lines.append("    .valid_in(),")
                 lines.append(f"    .a({a}), .b({b}), .c({c}),")
                 lines.append(f"    .result({out_wire})")
                 lines.append(");")
@@ -735,7 +953,8 @@ class HardwareDAG:
                 lines.append(
                     "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
                 )
-                lines.append(f"    .valid_in({valid_in}),")
+                lines.append(f"    // .valid_in({valid_in}),")
+                lines.append("    .valid_in(),")
                 lines.append(f"    .a({a}),")
                 lines.append(f"    .result({out_wire})")
                 lines.append(");")
@@ -761,9 +980,16 @@ class HardwareDAG:
                         ):
                             control_wire = wire_name_by_node[control_sig.hw_id]
                             control_terms.append(f"({control_wire}[0])")
+                    lines.append(
+                        f"assign {node}_fire = valid_pipe[{start_times[node]}];"
+                    )
                     if control_terms:
-                        wr_en_expr = f"{node}_fire && " + " && ".join(control_terms)
+                        lines.append(
+                            f"assign {out_wire}[0] = {' && '.join(control_terms)};"
+                        )
+                        wr_en_expr = f"{node}_fire && {out_wire}[0]"
                     else:
+                        lines.append(f"assign {out_wire}[0] = 1'b1;")
                         wr_en_expr = f"{node}_fire"
                     lines.append(f"assign z_wr_en = {wr_en_expr};")
                     lines.append(f"assign z_wr_addr = {addr};")
@@ -776,11 +1002,11 @@ class HardwareDAG:
                     lines.append("    .aclk(clk),")
                     lines.append("    .aclken(pipe_en_internal),")
                     lines.append(f"    .s_axis_a({a}),")
-                    lines.append("    .s_axis_a_valid(),")
+                    lines.append("    //   .s_axis_a_valid(),")
                     lines.append(f"    .s_axis_b({b}),")
-                    lines.append("    .s_axis_b_valid(),")
-                    lines.append(f"    .m_axis_res({out_wire}[0]),")
-                    lines.append("    .m_axis_tvalid()")
+                    lines.append("    //   .s_axis_b_valid(),")
+                    lines.append(f"    .m_axis_res({out_wire}[0])")
+                    lines.append("    //   .m_axis_tvalid()")
                     lines.append(");")
                 else:
                     cmp_map = {
@@ -801,25 +1027,111 @@ class HardwareDAG:
                     lines.append(f"    .a({a}), .b({b}),")
                     lines.append(f"    .result({out_wire}[0])")
                     lines.append(");")
+            elif info.op_type == "fx_8_8_mul":
+                a = input_ref_by_edge[(node, 0)]
+                b = input_ref_by_edge[(node, 1)]
+                lines.append(f"fx_8_8_mul u_{unit} (")
+                lines.append("    .clk(clk), .clken(pipe_en_internal),")
+                lines.append(f"    .a({a}), .b({b}),")
+                lines.append(f"    .q({out_wire})")
+                lines.append(");")
+            elif info.op_type == "fx_8_8_fma":
+                a = input_ref_by_edge[(node, 0)]
+                b = input_ref_by_edge[(node, 1)]
+                c = input_ref_by_edge[(node, 2)]
+                lines.append(f"fx_8_8_fma u_{unit} (")
+                lines.append("    .clk(clk), .clken(pipe_en_internal),")
+                lines.append(f"    .a({a}), .b({b}), .c({c}),")
+                lines.append(f"    .q({out_wire})")
+                lines.append(");")
+            elif info.op_type == "fx_9_8_mul":
+                a = input_ref_by_edge[(node, 0)]
+                b = input_ref_by_edge[(node, 1)]
+                lines.append(f"fx_9_8_mul u_{unit} (")
+                lines.append("    .clk(clk), .clken(pipe_en_internal),")
+                lines.append(f"    .a({a}), .b({b}),")
+                lines.append(f"    .q({out_wire})")
+                lines.append(");")
+            elif info.op_type == "fx_9_8_fma":
+                a = input_ref_by_edge[(node, 0)]
+                b = input_ref_by_edge[(node, 1)]
+                c = input_ref_by_edge[(node, 2)]
+                lines.append(f"fx_9_8_fma u_{unit} (")
+                lines.append("    .clk(clk), .clken(pipe_en_internal),")
+                lines.append(f"    .a({a}), .b({b}), .c({c}),")
+                lines.append(f"    .q({out_wire})")
+                lines.append(");")
+            elif info.op_type == "fx_2_23_mul":
+                a = input_ref_by_edge[(node, 0)]
+                b = input_ref_by_edge[(node, 1)]
+                lines.append(f"fx_2_23_mul u_{unit} (")
+                lines.append("    .clk(clk), .clken(pipe_en_internal),")
+                lines.append(f"    .a({a}), .b({b}),")
+                lines.append(f"    .q({out_wire})")
+                lines.append(");")
+            elif info.op_type == "fx_2_23_fma":
+                a = input_ref_by_edge[(node, 0)]
+                b = input_ref_by_edge[(node, 1)]
+                c = input_ref_by_edge[(node, 2)]
+                lines.append(f"fx_2_23_fma u_{unit} (")
+                lines.append("    .clk(clk), .clken(pipe_en_internal),")
+                lines.append(f"    .a({a}), .b({b}), .c({c}),")
+                lines.append(f"    .q({out_wire})")
+                lines.append(");")
+            elif info.op_type == "fp_to_fx2_23":
+                a = input_ref_by_edge[(node, 0)]
+                lines.append(f"fp_to_fx2_23 u_{unit} (")
+                lines.append(
+                    "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
+                )
+                lines.append(f"    .s_axis_a_tvalid({valid_in}),")
+                lines.append(f"    .s_axis_a_tdata({a}),")
+                lines.append("    .m_axis_result_tvalid(),")
+                lines.append(f"    .m_axis_result_tdata({out_wire})")
+                lines.append(");")
+            elif info.op_type == "fp_to_fx2_8":
+                a = input_ref_by_edge[(node, 0)]
+                lines.append(f"fp_to_fx2_8 u_{unit} (")
+                lines.append(
+                    "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
+                )
+                lines.append(f"    .s_axis_a_tvalid({valid_in}),")
+                lines.append(f"    .s_axis_a_tdata({a}),")
+                lines.append("    .m_axis_result_tvalid(),")
+                lines.append(f"    .m_axis_result_tdata({out_wire})")
+                lines.append(");")
+            elif info.op_type == "fx_2_23_to_fx_2_8":
+                a = input_ref_by_edge[(node, 0)]
+                lines.append(f"fx_2_23_to_fx_2_8 u_{unit} (")
+                lines.append("    .clk(clk), .clken(pipe_en_internal),")
+                lines.append(f"    .in_fx2_23({a}),")
+                lines.append(f"    .out_fx2_8({out_wire})")
+                lines.append(");")
+            elif info.op_type == "fx_9_8_to_u8":
+                a = input_ref_by_edge[(node, 0)]
+                lines.append(f"fx_9_8_to_u8 u_{unit} (")
+                lines.append("    .clk(clk), .clken(pipe_en_internal),")
+                lines.append(f"    .in_fx9_8({a}),")
+                lines.append(f"    .out_u8({out_wire})")
+                lines.append(");")
         lines.append("")
 
         # ---- Output skid buffer ----
         lines.append("// ---- Output skid buffer ----")
         # Collect selected output names and widths in order
         out_fields = []
-        for node in sorted(selected_nodes, key=lambda n: (start_times[n], n)):
-            out_name = selected_nodes[node]
-            width = 1 if self.ops[node].op_type in ("fp_cmp", "mem_write") else 32
+        for node, out_name in selected_outputs:
+            width = self._op_out_width(self.ops[node].op_type)
             if self.ops[node].op_type == "fp_cmp":
                 stage = start_times[node] + self.ops[node].latency
             else:
-                stage = start_times[node] + self.ops[node].latency + 1
+                stage = start_times[node] + self.ops[node].latency
             out_fields.append((out_name, width, stage))
 
         if out_fields:
             final_out_stage = max(stage for _, _, stage in out_fields)
-            total_out_width = sum(w for _, w, _ in out_fields)
-            lines.append(f"localparam int OUTBUNDLEWIDTH = {total_out_width};")
+            bits_terms = " + ".join(f"$bits({name}_tdata)" for name, _, _ in out_fields)
+            lines.append(f"localparam int OUTBUNDLEWIDTH = {bits_terms};")
             lines.append("logic [OUTBUNDLEWIDTH-1:0] output_bundle_tdata;")
             lines.append("logic output_bundle_tvalid;")
             lines.append("logic output_bundle_s_axis_tready;")
@@ -853,8 +1165,7 @@ class HardwareDAG:
             )
             lines.append("")
             lines.append("axis_skid_buffer #(")
-            lines.append("    .WIDTH (OUTBUNDLEWIDTH),")
-            lines.append("    .STAGES(1)")
+            lines.append("    .WIDTH(OUTBUNDLEWIDTH)")
             lines.append(") u_output_bundle_skid (")
             lines.append("    .aclk(clk), .aresetn(rst_n),")
             lines.append("    .s_axis_tdata(output_bundle_tdata),")
@@ -870,14 +1181,8 @@ class HardwareDAG:
                 f"m_axis_{name}_tdata" for name, _, _ in out_fields
             )
             lines.append(f"assign {{{unpack_fields}}} = output_bundle_buf_tdata;")
-            for out_name, _, _ in out_fields:
-                lines.append(
-                    f"assign m_axis_{out_name}_tvalid = output_bundle_buf_tvalid;"
-                )
-            tready_terms = " && ".join(
-                f"m_axis_{name}_tready" for name, _, _ in out_fields
-            )
-            lines.append(f"assign output_bundle_buf_tready = {tready_terms};")
+            lines.append("assign m_axis_tvalid = output_bundle_buf_tvalid;")
+            lines.append("assign output_bundle_buf_tready = m_axis_tready;")
             lines.append("")
             lines.append("// Pipeline control: clken = output skid can accept")
             lines.append("assign pipe_en_internal = output_bundle_s_axis_tready;")
@@ -887,19 +1192,25 @@ class HardwareDAG:
 
         Path(output_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    def dump_flowchart(self, schedule_result, output_path):
+    def dump_graphviz_layout(self, schedule_result, output_path):
         sorted_ops = schedule_result["sorted_ops"]
         unit_by_node = schedule_result["unit_by_node"]
+        start_times = schedule_result["start_times"]
+        named_node_by_signal = {
+            name: node_id
+            for node_id, name in self.node_names.items()
+            if node_id in set(sorted_ops)
+        }
 
         def op_symbol(info):
             if info.op_type == "fp_add":
                 return "+"
             if info.op_type == "fp_sub":
                 return "-"
-            if info.op_type == "fp_mul":
-                return "x"
-            if info.op_type == "fp_fma":
-                return "FMA\\na*b+c"
+            if info.op_type in ("fp_mul", "fx_8_8_mul", "fx_9_8_mul", "fx_2_23_mul"):
+                return "*"
+            if info.op_type in ("fp_fma", "fx_8_8_fma", "fx_9_8_fma", "fx_2_23_fma"):
+                return "FMA"
             if info.op_type == "fp_recip":
                 return "1/x"
             if info.op_type == "fp_cmp":
@@ -910,42 +1221,123 @@ class HardwareDAG:
                 return "MEM_RD"
             if info.op_type == "mem_write":
                 return "MEM_WR"
+            if info.op_type == "fp_to_fx2_23":
+                return "to\\nQ2.23"
+            if info.op_type == "fp_to_fx2_8":
+                return "to\\nQ2.8"
+            if info.op_type == "fx_2_23_to_fx_2_8":
+                return "Q2.23\\n->Q2.8"
+            if info.op_type == "fx_9_8_to_u8":
+                return "to\\nu8"
             return info.op_type
 
-        def op_node_decl(node, info, unit):
-            label = f"{op_symbol(info)}\\n{unit}".replace('"', "'")
-            if info.op_type in ("fp_add", "fp_sub", "fp_mul", "fp_recip"):
-                return f'    {node}(("{label}"))'
-            if info.op_type == "fp_fma":
-                return f'    {node}[["{label}"]]'
-            if info.op_type == "fp_cmp":
-                return f'    {node}{{"{label}"}}'
-            if info.op_type == "mux":
-                return f'    {node}[/"{label}"/]'
-            if info.op_type == "mem_read":
-                return f'    {node}[["{label}"]]'
-            if info.op_type == "mem_write":
-                return f'    {node}{{"{label}"}}'
-            return f'    {node}["{label}"]'
+        def op_node_decl(node, info, start_cycle):
+            label = f"{op_symbol(info)}".replace('"', '\\"')
+            shape = "circle"
+            return (
+                f'    {node} [label="{label}", shape={shape}, '
+                f'group="c{start_cycle}", tooltip="{node} / {unit_by_node[node]}"];'
+            )
 
-        lines = ["flowchart LR"]
+        lines = [
+            "digraph thread_pipeline {",
+            "    rankdir=LR;",
+            "    splines=true;",
+            "    ranksep=1.0;",
+            "    nodesep=0.35;",
+            '    node [fontname="Helvetica", fontsize=10];',
+            '    edge [fontname="Helvetica", fontsize=9];',
+        ]
+
+        cycle_nodes = {}
         for node in sorted_ops:
             info = self.ops[node]
-            unit = unit_by_node[node]
-            lines.append(op_node_decl(node, info, unit))
+            start_cycle = start_times[node]
+            cycle_nodes.setdefault(start_cycle, []).append(node)
+            lines.append(op_node_decl(node, info, start_cycle))
 
         seen_leaf = set()
+        leaf_ids = []
         for node in sorted_ops:
             for sig in self.op_inputs[node]:
                 if isinstance(sig, (Signal, PredicateSignal)) and sig.hw_id:
-                    lines.append(f"    {sig.hw_id} --> {node}")
+                    lines.append(f"    {sig.hw_id} -> {node};")
                 else:
                     leaf = getattr(sig, "expr", str(sig))
                     leaf_id = "L_" + re.sub(r"[^0-9A-Za-z_]", "_", leaf)
                     if leaf_id not in seen_leaf:
-                        lines.append(f'    {leaf_id}(["{leaf}"])')
+                        leaf_label = str(leaf).replace('"', '\\"')
+                        lines.append(
+                            f'    {leaf_id} [label="{leaf_label}", shape=note, style=filled, fillcolor="lightgray"];'
+                        )
                         seen_leaf.add(leaf_id)
-                    lines.append(f"    {leaf_id} --> {node}")
+                        leaf_ids.append(leaf_id)
+                    lines.append(f"    {leaf_id} -> {node};")
+
+        if leaf_ids:
+            lines.append("")
+            lines.append("    // Keep external inputs on the left side")
+            lines.append("    { rank=source;")
+            for leaf_id in leaf_ids:
+                lines.append(f"        {leaf_id};")
+            lines.append("    }")
+
+        for cycle in sorted(cycle_nodes.keys()):
+            nodes = cycle_nodes[cycle]
+            if not nodes:
+                continue
+            lines.append("")
+            lines.append(f"    // Operation nodes that start at cycle {cycle}")
+            lines.append("    { rank=same;")
+            for node in nodes:
+                lines.append(f"        {node};")
+            lines.append("    }")
+
+        # Mark final pipeline outputs on the right side.
+        out_edges = []
+        u_node = named_node_by_signal.get("u")
+        v_node = named_node_by_signal.get("v")
+        r_node = named_node_by_signal.get("r")
+        g_node = named_node_by_signal.get("g")
+        b_node = named_node_by_signal.get("b")
+        a_node = named_node_by_signal.get("a")
+
+        lines.append("")
+        lines.append("    // Final outputs")
+        lines.append(
+            '    OUT_u [label="u", shape=box, style=filled, fillcolor="lightyellow"];'
+        )
+        lines.append(
+            '    OUT_v [label="v", shape=box, style=filled, fillcolor="lightyellow"];'
+        )
+        lines.append(
+            '    OUT_argb [label="argb", shape=box, style=filled, fillcolor="lightyellow"];'
+        )
+
+        if u_node:
+            out_edges.append((u_node, "OUT_u"))
+        if v_node:
+            out_edges.append((v_node, "OUT_v"))
+        if a_node:
+            out_edges.append((a_node, "OUT_argb"))
+        if r_node:
+            out_edges.append((r_node, "OUT_argb"))
+        if g_node:
+            out_edges.append((g_node, "OUT_argb"))
+        if b_node:
+            out_edges.append((b_node, "OUT_argb"))
+
+        for src, dst in out_edges:
+            lines.append(f"    {src} -> {dst};")
+
+        lines.append("")
+        lines.append("    { rank=sink;")
+        lines.append("        OUT_u;")
+        lines.append("        OUT_v;")
+        lines.append("        OUT_argb;")
+        lines.append("    }")
+
+        lines.append("}")
 
         Path(output_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -1013,11 +1405,13 @@ class Signal:
         expr=None,
         type="float_t",
         valid_expr="pipe_en",
+        sv_ref=None,
     ):
         self.dag = dag
         self.hw_id = hw_id
         self.type = type
         self.valid_expr = valid_expr
+        self.sv_ref = sv_ref  # optional pre-formed SV wire expression
         self._name = None
         if name is not None:
             self.expr = name
@@ -1073,14 +1467,138 @@ class Signal:
         )
 
     def __mul__(self, other):
-        self._check_binary(other)
+        if not isinstance(other, Signal):
+            raise TypeError("Binary operations require Signal operands")
+        if self.dag is not other.dag:
+            raise ValueError("Signals must belong to the same DAG")
+        a_type = getattr(self, "type", "float_t")
+        b_type = getattr(other, "type", "float_t")
+        if (a_type == "uint8_t" and b_type in ("fx_2_8", "fx_8_8")) or (
+            b_type == "uint8_t" and a_type in ("fx_2_8", "fx_8_8")
+        ):
+            a = self._as_fx9_8_operand()
+            b = other._as_fx9_8_operand()
+            expr = f"({a.expr} * {b.expr})"
+            node_id = self.dag.add_binary_operation("fx_9_8_mul", a, b, expr, "*")
+            return Signal(
+                self.dag,
+                hw_id=node_id,
+                expr=expr,
+                type="fx_9_8",
+                valid_expr=self.dag.ops[node_id].valid_expr,
+            )
+        # Fixed-point multiply dispatch by type family.
+        if a_type in ("fx_2_8", "fx_8_8") and b_type in ("fx_2_8", "fx_8_8"):
+            op, res_type = "fx_8_8_mul", "fx_8_8"
+        elif a_type == "fx_9_8" and b_type == "fx_9_8":
+            op, res_type = "fx_9_8_mul", "fx_9_8"
+        elif a_type == "fx_2_23" and b_type == "fx_2_23":
+            op, res_type = "fx_2_23_mul", "fx_2_23"
+        else:
+            if a_type != b_type:
+                raise TypeError(
+                    f"Unsupported mul type combination: {a_type} * {b_type}"
+                )
+            op, res_type = "fp_mul", a_type
         expr = f"({self.expr} * {other.expr})"
-        node_id = self.dag.add_binary_operation("fp_mul", self, other, expr, "*")
+        node_id = self.dag.add_binary_operation(op, self, other, expr, "*")
         return Signal(
             self.dag,
             hw_id=node_id,
             expr=expr,
-            type=self.type,
+            type=res_type,
+            valid_expr=self.dag.ops[node_id].valid_expr,
+        )
+
+    def _as_fx9_8_operand(self):
+        """Return a zero-padded Q9.8 view of this signal without adding latency."""
+        if self.type == "fx_9_8":
+            return self
+        if self.type == "uint8_t":
+            base = f"thread_data_buf.{self.dag._leaf_struct_field(self)}"
+            return Signal(
+                self.dag,
+                hw_id=self.hw_id,
+                expr=self.expr,
+                type="fx_9_8",
+                valid_expr=self.valid_expr,
+                sv_ref=f"{{1'b0, {base}, 8'h00}}",
+            )
+        if self.type in ("fx_2_8", "fx_8_8"):
+            return Signal(
+                self.dag,
+                hw_id=self.hw_id,
+                expr=self.expr,
+                type="fx_9_8",
+                valid_expr=self.valid_expr,
+                sv_ref=f"{{1'b0, {self.expr}}}",
+            )
+        raise TypeError(f"Cannot zero-pad signal of type {self.type} to fx_9_8")
+
+    def as_fx8_8(self):
+        """Zero-latency conversion: extend uint8 to Q8.8 by appending 8 zero
+        LSBs.  No pipeline stage is inserted; the SV expression
+        {thread_data_buf.xxx, 8'h00} is used directly at the connection
+        site."""
+        if self.type != "uint8_t":
+            raise TypeError("as_fx8_8 is only supported for uint8_t signals")
+        base = f"thread_data_buf.{self.dag._leaf_struct_field(self)}"
+        return Signal(
+            self.dag,
+            hw_id=None,
+            expr=self.expr,  # keep original name for buffer/delay naming
+            type="fx_8_8",
+            valid_expr=self.valid_expr,
+            sv_ref=f"{{{base}, 8'h00}}",  # verbatim SV wire reference
+        )
+
+    def as_fx2_23(self):
+        """Convert fp32 bits to Q2.23 fixed point using Xilinx wrapper."""
+        if self.type != "float_t":
+            raise TypeError("as_fx2_23 is only supported for float_t signals")
+        expr = f"fp_to_fx2_23({self.expr})"
+        node_id = self.dag.add_unary_operation("fp_to_fx2_23", self, expr)
+        return Signal(
+            self.dag,
+            hw_id=node_id,
+            expr=expr,
+            type="fx_2_23",
+            valid_expr=self.dag.ops[node_id].valid_expr,
+        )
+
+    def as_fx2_8(self):
+        """Convert to Q2.8.
+
+        - float_t  -> Q2.8 via fp_to_fx2_8 wrapper (2 cycles)
+        - fx_2_23  -> Q2.8 via fx_2_23_to_fx_2_8 (round-to-nearest, 1 cycle)
+        """
+        if self.type == "float_t":
+            expr = f"fp_to_fx2_8({self.expr})"
+            node_id = self.dag.add_unary_operation("fp_to_fx2_8", self, expr)
+        elif self.type == "fx_2_23":
+            expr = f"fx_2_23_to_fx_2_8({self.expr})"
+            node_id = self.dag.add_unary_operation("fx_2_23_to_fx_2_8", self, expr)
+        else:
+            raise TypeError("as_fx2_8 is supported only for float_t or fx_2_23 signals")
+        return Signal(
+            self.dag,
+            hw_id=node_id,
+            expr=expr,
+            type="fx_2_8",
+            valid_expr=self.dag.ops[node_id].valid_expr,
+        )
+
+    def as_u8(self):
+        """Convert UQ9.8 fixed-point to uint8 with rounding/clamp."""
+        if self.type != "fx_9_8":
+            raise TypeError("as_u8 is only supported for fx_9_8 signals")
+        expr = f"fx_9_8_to_u8({self.expr})"
+        node_id = self.dag.add_unary_operation("fx_9_8_to_u8", self, expr)
+        return Signal(
+            self.dag,
+            hw_id=node_id,
+            expr=expr,
+            type="uint8_t",
             valid_expr=self.dag.ops[node_id].valid_expr,
         )
 
@@ -1100,6 +1618,70 @@ class Signal:
         )
 
     @staticmethod
+    def fx_fma(a, b, c):
+        """Fixed-point FMA: a * b + c, all operands Q8.8 (fx_2_8/fx_8_8).
+        Uses fx_8_8_fma; result is fx_8_8 (16-bit Q8.8).
+        fx_2_8 coefficients are stored in Q8.8 words with upper bits zero.
+        """
+        for sig in (a, b, c):
+            if not isinstance(sig, Signal):
+                raise TypeError("fx_fma requires Signal operands")
+        if a.dag is not b.dag or a.dag is not c.dag:
+            raise ValueError("fx_fma signals must belong to the same DAG")
+        a_type = getattr(a, "type", "")
+        b_type = getattr(b, "type", "")
+        c_type = getattr(c, "type", "")
+        if "uint8_t" in (a_type, b_type, c_type) and {
+            a_type,
+            b_type,
+            c_type,
+        } <= {"uint8_t", "fx_2_8", "fx_8_8", "fx_9_8"}:
+            a9 = a._as_fx9_8_operand()
+            b9 = b._as_fx9_8_operand()
+            c9 = c._as_fx9_8_operand()
+            expr = f"fx_fma({a9.expr}, {b9.expr}, {c9.expr})"
+            node_id = a.dag.add_fma_operation(a9, b9, c9, expr, op_type="fx_9_8_fma")
+            return Signal(
+                a.dag,
+                hw_id=node_id,
+                expr=expr,
+                type="fx_9_8",
+                valid_expr=a.dag.ops[node_id].valid_expr,
+            )
+        if a_type in ("fx_2_8", "fx_8_8") and b_type in ("fx_2_8", "fx_8_8"):
+            if c_type not in ("fx_2_8", "fx_8_8"):
+                raise TypeError(
+                    f"fx_fma Q8.8 path requires c in fx_2_8/fx_8_8, got: {c_type}"
+                )
+            op_type = "fx_8_8_fma"
+            out_type = "fx_8_8"
+        elif a_type == "fx_9_8" and b_type == "fx_9_8":
+            if c_type != "fx_9_8":
+                raise TypeError(f"fx_fma Q9.8 path requires c in fx_9_8, got: {c_type}")
+            op_type = "fx_9_8_fma"
+            out_type = "fx_9_8"
+        elif a_type == "fx_2_23" and b_type == "fx_2_23":
+            if c_type != "fx_2_23":
+                raise TypeError(
+                    f"fx_fma Q2.23 path requires c in fx_2_23, got: {c_type}"
+                )
+            op_type = "fx_2_23_fma"
+            out_type = "fx_2_23"
+        else:
+            raise TypeError(
+                f"Unsupported fx_fma type combination: {a_type} * {b_type} + {c_type}"
+            )
+        expr = f"fx_fma({a.expr}, {b.expr}, {c.expr})"
+        node_id = a.dag.add_fma_operation(a, b, c, expr, op_type=op_type)
+        return Signal(
+            a.dag,
+            hw_id=node_id,
+            expr=expr,
+            type=out_type,
+            valid_expr=a.dag.ops[node_id].valid_expr,
+        )
+
+    @staticmethod
     def fma(a, b, c):
         if (
             not isinstance(a, Signal)
@@ -1107,13 +1689,43 @@ class Signal:
             or not isinstance(c, Signal)
         ):
             raise TypeError("fma requires Signal operands")
-        if a.type != b.type or a.type != c.type:
-            raise TypeError("fma requires matching signal types")
         if a.dag is not b.dag or a.dag is not c.dag:
             raise ValueError("fma signals must belong to the same DAG")
 
+        a_type = getattr(a, "type", "")
+        b_type = getattr(b, "type", "")
+        c_type = getattr(c, "type", "")
+        if "uint8_t" in (a_type, b_type, c_type) and {
+            a_type,
+            b_type,
+            c_type,
+        } <= {"uint8_t", "fx_2_8", "fx_8_8", "fx_9_8"}:
+            a9 = a._as_fx9_8_operand()
+            b9 = b._as_fx9_8_operand()
+            c9 = c._as_fx9_8_operand()
+            expr = f"fma({a9.expr}, {b9.expr}, {c9.expr})"
+            node_id = a.dag.add_fma_operation(a9, b9, c9, expr, op_type="fx_9_8_fma")
+            return Signal(
+                a.dag,
+                hw_id=node_id,
+                expr=expr,
+                type="fx_9_8",
+                valid_expr=a.dag.ops[node_id].valid_expr,
+            )
+        if a.type != b.type or a.type != c.type:
+            raise TypeError("fma requires matching signal types")
+
+        if a.type in ("fx_2_8", "fx_8_8"):
+            op_type = "fx_8_8_fma"
+        elif a.type == "fx_9_8":
+            op_type = "fx_9_8_fma"
+        elif a.type == "fx_2_23":
+            op_type = "fx_2_23_fma"
+        else:
+            op_type = "fp_fma"
+
         expr = f"fma({a.expr}, {b.expr}, {c.expr})"
-        node_id = a.dag.add_fma_operation(a, b, c, expr)
+        node_id = a.dag.add_fma_operation(a, b, c, expr, op_type=op_type)
         return Signal(
             a.dag,
             hw_id=node_id,
@@ -1212,7 +1824,7 @@ def auto_name_signals(namespace):
 
 
 if __name__ == "__main__":
-    GENERATE_FLOWCHART = True
+    GENERATE_GRAPHVIZ_LAYOUT = True
     GENERATE_WRAPPER_MODULES = False
 
     latencies = {
@@ -1224,6 +1836,8 @@ if __name__ == "__main__":
         "fp_cmp": 1,
         "mem_read": 1,
         "mem_write": 1,
+        "fx_8_8_mul": 1,
+        "fx_8_8_fma": 1,
     }
 
     dag = HardwareDAG(latencies=latencies)
@@ -1248,12 +1862,25 @@ if __name__ == "__main__":
     # v0_normal_over_w_z = Signal(dag, name="v0_normal_over_w_z")
     # v1_normal_over_w_z = Signal(dag, name="v1_normal_over_w_z")
     # v2_normal_over_w_z = Signal(dag, name="v2_normal_over_w_z")
-    v0_texture_u_over_w = Signal(dag, name="v0_texture_u_over_w")
-    v1_texture_u_over_w = Signal(dag, name="v1_texture_u_over_w")
-    v2_texture_u_over_w = Signal(dag, name="v2_texture_u_over_w")
-    v0_texture_v_over_w = Signal(dag, name="v0_texture_v_over_w")
-    v1_texture_v_over_w = Signal(dag, name="v1_texture_v_over_w")
-    v2_texture_v_over_w = Signal(dag, name="v2_texture_v_over_w")
+    # Texture channels are already converted to Q2.23 upstream.
+    v0_texture_u = Signal(dag, name="v0_texture_u", type="fx_2_23")
+    v1_texture_u = Signal(dag, name="v1_texture_u", type="fx_2_23")
+    v2_texture_u = Signal(dag, name="v2_texture_u", type="fx_2_23")
+    v0_texture_v = Signal(dag, name="v0_texture_v", type="fx_2_23")
+    v1_texture_v = Signal(dag, name="v1_texture_v", type="fx_2_23")
+    v2_texture_v = Signal(dag, name="v2_texture_v", type="fx_2_23")
+    v0_color_r = Signal(dag, name="v0_color_r", type="uint8_t")
+    v1_color_r = Signal(dag, name="v1_color_r", type="uint8_t")
+    v2_color_r = Signal(dag, name="v2_color_r", type="uint8_t")
+    v0_color_g = Signal(dag, name="v0_color_g", type="uint8_t")
+    v1_color_g = Signal(dag, name="v1_color_g", type="uint8_t")
+    v2_color_g = Signal(dag, name="v2_color_g", type="uint8_t")
+    v0_color_b = Signal(dag, name="v0_color_b", type="uint8_t")
+    v1_color_b = Signal(dag, name="v1_color_b", type="uint8_t")
+    v2_color_b = Signal(dag, name="v2_color_b", type="uint8_t")
+    v0_color_a = Signal(dag, name="v0_color_a", type="uint8_t")
+    v1_color_a = Signal(dag, name="v1_color_a", type="uint8_t")
+    v2_color_a = Signal(dag, name="v2_color_a", type="uint8_t")
 
     inv_area = Signal(dag, name="inv_area")
 
@@ -1267,6 +1894,36 @@ if __name__ == "__main__":
         op2 = Signal.fma(b, y, op1)
         result = Signal.fma(c, z, op2)
         return result
+
+    invW = interpolate(v0_w, v1_w, v2_w, iw0, iw1, iw2)
+    w = 1 / invW
+
+    t0_fp = w * (v0_w * iw0)
+    t1_fp = w * (v1_w * iw1)
+    t2_fp = w * (v2_w * iw2)
+
+    t0 = t0_fp.as_fx2_23()
+    t1 = t1_fp.as_fx2_23()
+    t2 = t2_fp.as_fx2_23()
+
+    t0_small = t0.as_fx2_8()
+    t1_small = t1.as_fx2_8()
+    t2_small = t2.as_fx2_8()
+
+    # Interpolate u, v
+    u = interpolate(v0_texture_u, v1_texture_u, v2_texture_u, t0, t1, t2)
+    v = interpolate(v0_texture_v, v1_texture_v, v2_texture_v, t0, t1, t2)
+
+    # Interpolate color channels
+    r_fx = interpolate(v0_color_r, v1_color_r, v2_color_r, t0_small, t1_small, t2_small)
+    g_fx = interpolate(v0_color_g, v1_color_g, v2_color_g, t0_small, t1_small, t2_small)
+    b_fx = interpolate(v0_color_b, v1_color_b, v2_color_b, t0_small, t1_small, t2_small)
+    a_fx = interpolate(v0_color_a, v1_color_a, v2_color_a, t0_small, t1_small, t2_small)
+
+    r = r_fx.as_u8()
+    g = g_fx.as_u8()
+    b = b_fx.as_u8()
+    a = a_fx.as_u8()
 
     z = interpolate(v0_z, v1_z, v2_z, iw0, iw1, iw2)
     current_z = Signal.mem_read(addr, after=z)
@@ -1282,8 +1939,6 @@ if __name__ == "__main__":
     dag.control_dependencies = [comp_z]
     write_done = Signal.mem_write(addr, z)
     dag.control_dependencies = []
-    invW = interpolate(v0_w, v1_w, v2_w, iw0, iw1, iw2)
-    w = 1 / invW
 
     # We don't Do normals (for now at leeast) on the raster step
     # normal_over_w_x = interpolate(
@@ -1296,15 +1951,15 @@ if __name__ == "__main__":
     #     v0_normal_over_w_z, v1_normal_over_w_z, v2_normal_over_w_z, iw0, iw1, iw2
     # )
 
-    texcoord_over_w_u = interpolate(
-        v0_texture_u_over_w, v1_texture_u_over_w, v2_texture_u_over_w, iw0, iw1, iw2
-    )
-    texcoord_over_w_v = interpolate(
-        v0_texture_v_over_w, v1_texture_v_over_w, v2_texture_v_over_w, iw0, iw1, iw2
-    )
+    # texcoord_over_w_u = interpolate(
+    #     v0_texture_u_over_w, v1_texture_u_over_w, v2_texture_u_over_w, iw0, iw1, iw2
+    # )
+    # texcoord_over_w_v = interpolate(
+    #     v0_texture_v_over_w, v1_texture_v_over_w, v2_texture_v_over_w, iw0, iw1, iw2
+    # )
 
-    texcoord_u = texcoord_over_w_u * w
-    texcoord_v = texcoord_over_w_v * w
+    # texcoord_u = texcoord_over_w_u * w
+    # texcoord_v = texcoord_over_w_v * w
 
     # Optional naming for generated register labels
     auto_name_signals(locals())
@@ -1314,12 +1969,12 @@ if __name__ == "__main__":
     dag.print_schedule(result)
 
     out_svh = Path(__file__).with_name("thread_pipeline_autogen.svh")
-    out_flow = Path(__file__).with_name("thread_pipeline_flowchart.mmd")
+    out_graphviz = Path(__file__).with_name("thread_pipeline_graph.dot")
     dag.dump_thread_pipeline(result, out_svh)
-    if GENERATE_FLOWCHART:
-        dag.dump_flowchart(result, out_flow)
+    if GENERATE_GRAPHVIZ_LAYOUT:
+        dag.dump_graphviz_layout(result, out_graphviz)
 
     print(f"\nGenerated: {out_svh}")
-    if GENERATE_FLOWCHART:
-        print(f"Generated: {out_flow}")
+    if GENERATE_GRAPHVIZ_LAYOUT:
+        print(f"Generated: {out_graphviz}")
     print(f"Final signal expr: {z.expr}")

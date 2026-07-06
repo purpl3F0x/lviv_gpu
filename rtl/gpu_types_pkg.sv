@@ -52,4 +52,38 @@ package gpu_types_pkg;
     logic [31:0] v;
   } vertex_t;
 
+  // Thread ingress token after frontend preprocessing.
+  // Texture u/v arrive as UQ2.23 in this token.
+  typedef struct packed {
+    logic [PIXEL_ADDR_W-1:0] addr;
+    logic [31:0] inv_area;
+    logic [31:0] e2;
+    logic [31:0] e1;
+    logic [31:0] e0;
+    logic [24:0] v2_v;
+    logic [24:0] v2_u;
+    logic [31:0] v2_w;
+    logic [31:0] v2_z;
+    logic [24:0] v1_v;
+    logic [24:0] v1_u;
+    logic [31:0] v1_w;
+    logic [31:0] v1_z;
+    logic [24:0] v0_v;
+    logic [24:0] v0_u;
+    logic [31:0] v0_w;
+    logic [31:0] v0_z;
+    logic [7:0] v0_color_a;
+    logic [7:0] v0_color_r;
+    logic [7:0] v0_color_g;
+    logic [7:0] v0_color_b;
+    logic [7:0] v1_color_a;
+    logic [7:0] v1_color_r;
+    logic [7:0] v1_color_g;
+    logic [7:0] v1_color_b;
+    logic [7:0] v2_color_a;
+    logic [7:0] v2_color_r;
+    logic [7:0] v2_color_g;
+    logic [7:0] v2_color_b;
+  } thread_data_in_t;
+
 endpackage

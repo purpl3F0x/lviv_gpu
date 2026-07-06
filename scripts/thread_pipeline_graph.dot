@@ -1,0 +1,336 @@
+digraph thread_pipeline {
+    rankdir=LR;
+    splines=true;
+    ranksep=1.0;
+    nodesep=0.35;
+    node [fontname="Helvetica", fontsize=10];
+    edge [fontname="Helvetica", fontsize=9];
+    fp_mul_1 [label="*", shape=circle, group="c0", tooltip="fp_mul_1 / fp_mul_1"];
+    fp_mul_2 [label="*", shape=circle, group="c0", tooltip="fp_mul_2 / fp_mul_2"];
+    fp_mul_3 [label="*", shape=circle, group="c0", tooltip="fp_mul_3 / fp_mul_3"];
+    fp_mul_10 [label="*", shape=circle, group="c5", tooltip="fp_mul_10 / fp_mul_4"];
+    fp_mul_4 [label="*", shape=circle, group="c5", tooltip="fp_mul_4 / fp_mul_5"];
+    fp_mul_6 [label="*", shape=circle, group="c5", tooltip="fp_mul_6 / fp_mul_6"];
+    fp_mul_8 [label="*", shape=circle, group="c5", tooltip="fp_mul_8 / fp_mul_7"];
+    fp_fma_1 [label="FMA", shape=circle, group="c10", tooltip="fp_fma_1 / fp_fma_1"];
+    fp_fma_3 [label="FMA", shape=circle, group="c10", tooltip="fp_fma_3 / fp_fma_2"];
+    fp_fma_2 [label="FMA", shape=circle, group="c23", tooltip="fp_fma_2 / fp_fma_3"];
+    fp_fma_4 [label="FMA", shape=circle, group="c23", tooltip="fp_fma_4 / fp_fma_4"];
+    fp_recip_1 [label="1/x", shape=circle, group="c36", tooltip="fp_recip_1 / fp_recip_1"];
+    mem_read_1 [label="MEM_RD", shape=circle, group="c36", tooltip="mem_read_1 / mem_read_1"];
+    fp_cmp_1 [label="CMP\nle", shape=circle, group="c37", tooltip="fp_cmp_1 / fp_cmp_1"];
+    mem_write_1 [label="MEM_WR", shape=circle, group="c38", tooltip="mem_write_1 / mem_write_1"];
+    fp_mul_5 [label="*", shape=circle, group="c58", tooltip="fp_mul_5 / fp_mul_8"];
+    fp_mul_7 [label="*", shape=circle, group="c58", tooltip="fp_mul_7 / fp_mul_9"];
+    fp_mul_9 [label="*", shape=circle, group="c58", tooltip="fp_mul_9 / fp_mul_10"];
+    fp_to_fx2_23_1 [label="to\nQ2.23", shape=circle, group="c63", tooltip="fp_to_fx2_23_1 / fp_to_fx2_23_1"];
+    fp_to_fx2_23_2 [label="to\nQ2.23", shape=circle, group="c63", tooltip="fp_to_fx2_23_2 / fp_to_fx2_23_2"];
+    fp_to_fx2_23_3 [label="to\nQ2.23", shape=circle, group="c63", tooltip="fp_to_fx2_23_3 / fp_to_fx2_23_3"];
+    fx_2_23_mul_1 [label="*", shape=circle, group="c65", tooltip="fx_2_23_mul_1 / fx_2_23_mul_1"];
+    fx_2_23_mul_2 [label="*", shape=circle, group="c65", tooltip="fx_2_23_mul_2 / fx_2_23_mul_2"];
+    fx_2_23_to_fx_2_8_1 [label="Q2.23\n->Q2.8", shape=circle, group="c65", tooltip="fx_2_23_to_fx_2_8_1 / fx_2_23_to_fx_2_8_1"];
+    fx_2_23_to_fx_2_8_2 [label="Q2.23\n->Q2.8", shape=circle, group="c65", tooltip="fx_2_23_to_fx_2_8_2 / fx_2_23_to_fx_2_8_2"];
+    fx_2_23_to_fx_2_8_3 [label="Q2.23\n->Q2.8", shape=circle, group="c65", tooltip="fx_2_23_to_fx_2_8_3 / fx_2_23_to_fx_2_8_3"];
+    fx_9_8_mul_1 [label="*", shape=circle, group="c66", tooltip="fx_9_8_mul_1 / fx_9_8_mul_1"];
+    fx_9_8_mul_2 [label="*", shape=circle, group="c66", tooltip="fx_9_8_mul_2 / fx_9_8_mul_2"];
+    fx_9_8_mul_3 [label="*", shape=circle, group="c66", tooltip="fx_9_8_mul_3 / fx_9_8_mul_3"];
+    fx_9_8_mul_4 [label="*", shape=circle, group="c66", tooltip="fx_9_8_mul_4 / fx_9_8_mul_4"];
+    fx_2_23_fma_1 [label="FMA", shape=circle, group="c67", tooltip="fx_2_23_fma_1 / fx_2_23_fma_1"];
+    fx_2_23_fma_3 [label="FMA", shape=circle, group="c67", tooltip="fx_2_23_fma_3 / fx_2_23_fma_2"];
+    fx_9_8_fma_1 [label="FMA", shape=circle, group="c68", tooltip="fx_9_8_fma_1 / fx_9_8_fma_1"];
+    fx_9_8_fma_3 [label="FMA", shape=circle, group="c68", tooltip="fx_9_8_fma_3 / fx_9_8_fma_2"];
+    fx_9_8_fma_5 [label="FMA", shape=circle, group="c68", tooltip="fx_9_8_fma_5 / fx_9_8_fma_3"];
+    fx_9_8_fma_7 [label="FMA", shape=circle, group="c68", tooltip="fx_9_8_fma_7 / fx_9_8_fma_4"];
+    fx_2_23_fma_2 [label="FMA", shape=circle, group="c70", tooltip="fx_2_23_fma_2 / fx_2_23_fma_3"];
+    fx_2_23_fma_4 [label="FMA", shape=circle, group="c70", tooltip="fx_2_23_fma_4 / fx_2_23_fma_4"];
+    fx_9_8_fma_2 [label="FMA", shape=circle, group="c70", tooltip="fx_9_8_fma_2 / fx_9_8_fma_5"];
+    fx_9_8_fma_4 [label="FMA", shape=circle, group="c70", tooltip="fx_9_8_fma_4 / fx_9_8_fma_6"];
+    fx_9_8_fma_6 [label="FMA", shape=circle, group="c70", tooltip="fx_9_8_fma_6 / fx_9_8_fma_7"];
+    fx_9_8_fma_8 [label="FMA", shape=circle, group="c70", tooltip="fx_9_8_fma_8 / fx_9_8_fma_8"];
+    fx_9_8_to_u8_1 [label="to\nu8", shape=circle, group="c72", tooltip="fx_9_8_to_u8_1 / fx_9_8_to_u8_1"];
+    fx_9_8_to_u8_2 [label="to\nu8", shape=circle, group="c72", tooltip="fx_9_8_to_u8_2 / fx_9_8_to_u8_2"];
+    fx_9_8_to_u8_3 [label="to\nu8", shape=circle, group="c72", tooltip="fx_9_8_to_u8_3 / fx_9_8_to_u8_3"];
+    fx_9_8_to_u8_4 [label="to\nu8", shape=circle, group="c72", tooltip="fx_9_8_to_u8_4 / fx_9_8_to_u8_4"];
+    L_e0 [label="e0", shape=note, style=filled, fillcolor="lightgray"];
+    L_e0 -> fp_mul_1;
+    L_inv_area [label="inv_area", shape=note, style=filled, fillcolor="lightgray"];
+    L_inv_area -> fp_mul_1;
+    L_e1 [label="e1", shape=note, style=filled, fillcolor="lightgray"];
+    L_e1 -> fp_mul_2;
+    L_inv_area -> fp_mul_2;
+    L_e2 [label="e2", shape=note, style=filled, fillcolor="lightgray"];
+    L_e2 -> fp_mul_3;
+    L_inv_area -> fp_mul_3;
+    L_v0_z [label="v0_z", shape=note, style=filled, fillcolor="lightgray"];
+    L_v0_z -> fp_mul_10;
+    fp_mul_1 -> fp_mul_10;
+    L_v0_w [label="v0_w", shape=note, style=filled, fillcolor="lightgray"];
+    L_v0_w -> fp_mul_4;
+    fp_mul_1 -> fp_mul_4;
+    L_v1_w [label="v1_w", shape=note, style=filled, fillcolor="lightgray"];
+    L_v1_w -> fp_mul_6;
+    fp_mul_2 -> fp_mul_6;
+    L_v2_w [label="v2_w", shape=note, style=filled, fillcolor="lightgray"];
+    L_v2_w -> fp_mul_8;
+    fp_mul_3 -> fp_mul_8;
+    L_v1_w -> fp_fma_1;
+    fp_mul_2 -> fp_fma_1;
+    fp_mul_4 -> fp_fma_1;
+    L_v1_z [label="v1_z", shape=note, style=filled, fillcolor="lightgray"];
+    L_v1_z -> fp_fma_3;
+    fp_mul_2 -> fp_fma_3;
+    fp_mul_10 -> fp_fma_3;
+    L_v2_w -> fp_fma_2;
+    fp_mul_3 -> fp_fma_2;
+    fp_fma_1 -> fp_fma_2;
+    L_v2_z [label="v2_z", shape=note, style=filled, fillcolor="lightgray"];
+    L_v2_z -> fp_fma_4;
+    fp_mul_3 -> fp_fma_4;
+    fp_fma_3 -> fp_fma_4;
+    fp_fma_2 -> fp_recip_1;
+    L_addr [label="addr", shape=note, style=filled, fillcolor="lightgray"];
+    L_addr -> mem_read_1;
+    fp_fma_4 -> mem_read_1;
+    fp_fma_4 -> fp_cmp_1;
+    mem_read_1 -> fp_cmp_1;
+    L_addr -> mem_write_1;
+    fp_fma_4 -> mem_write_1;
+    fp_recip_1 -> fp_mul_5;
+    fp_mul_4 -> fp_mul_5;
+    fp_recip_1 -> fp_mul_7;
+    fp_mul_6 -> fp_mul_7;
+    fp_recip_1 -> fp_mul_9;
+    fp_mul_8 -> fp_mul_9;
+    fp_mul_5 -> fp_to_fx2_23_1;
+    fp_mul_7 -> fp_to_fx2_23_2;
+    fp_mul_9 -> fp_to_fx2_23_3;
+    L_v0_texture_u [label="v0_texture_u", shape=note, style=filled, fillcolor="lightgray"];
+    L_v0_texture_u -> fx_2_23_mul_1;
+    fp_to_fx2_23_1 -> fx_2_23_mul_1;
+    L_v0_texture_v [label="v0_texture_v", shape=note, style=filled, fillcolor="lightgray"];
+    L_v0_texture_v -> fx_2_23_mul_2;
+    fp_to_fx2_23_1 -> fx_2_23_mul_2;
+    fp_to_fx2_23_1 -> fx_2_23_to_fx_2_8_1;
+    fp_to_fx2_23_2 -> fx_2_23_to_fx_2_8_2;
+    fp_to_fx2_23_3 -> fx_2_23_to_fx_2_8_3;
+    L_v0_color_r [label="v0_color_r", shape=note, style=filled, fillcolor="lightgray"];
+    L_v0_color_r -> fx_9_8_mul_1;
+    fx_2_23_to_fx_2_8_1 -> fx_9_8_mul_1;
+    L_v0_color_g [label="v0_color_g", shape=note, style=filled, fillcolor="lightgray"];
+    L_v0_color_g -> fx_9_8_mul_2;
+    fx_2_23_to_fx_2_8_1 -> fx_9_8_mul_2;
+    L_v0_color_b [label="v0_color_b", shape=note, style=filled, fillcolor="lightgray"];
+    L_v0_color_b -> fx_9_8_mul_3;
+    fx_2_23_to_fx_2_8_1 -> fx_9_8_mul_3;
+    L_v0_color_a [label="v0_color_a", shape=note, style=filled, fillcolor="lightgray"];
+    L_v0_color_a -> fx_9_8_mul_4;
+    fx_2_23_to_fx_2_8_1 -> fx_9_8_mul_4;
+    L_v1_texture_u [label="v1_texture_u", shape=note, style=filled, fillcolor="lightgray"];
+    L_v1_texture_u -> fx_2_23_fma_1;
+    fp_to_fx2_23_2 -> fx_2_23_fma_1;
+    fx_2_23_mul_1 -> fx_2_23_fma_1;
+    L_v1_texture_v [label="v1_texture_v", shape=note, style=filled, fillcolor="lightgray"];
+    L_v1_texture_v -> fx_2_23_fma_3;
+    fp_to_fx2_23_2 -> fx_2_23_fma_3;
+    fx_2_23_mul_2 -> fx_2_23_fma_3;
+    L_v1_color_r [label="v1_color_r", shape=note, style=filled, fillcolor="lightgray"];
+    L_v1_color_r -> fx_9_8_fma_1;
+    fx_2_23_to_fx_2_8_2 -> fx_9_8_fma_1;
+    fx_9_8_mul_1 -> fx_9_8_fma_1;
+    L_v1_color_g [label="v1_color_g", shape=note, style=filled, fillcolor="lightgray"];
+    L_v1_color_g -> fx_9_8_fma_3;
+    fx_2_23_to_fx_2_8_2 -> fx_9_8_fma_3;
+    fx_9_8_mul_2 -> fx_9_8_fma_3;
+    L_v1_color_b [label="v1_color_b", shape=note, style=filled, fillcolor="lightgray"];
+    L_v1_color_b -> fx_9_8_fma_5;
+    fx_2_23_to_fx_2_8_2 -> fx_9_8_fma_5;
+    fx_9_8_mul_3 -> fx_9_8_fma_5;
+    L_v1_color_a [label="v1_color_a", shape=note, style=filled, fillcolor="lightgray"];
+    L_v1_color_a -> fx_9_8_fma_7;
+    fx_2_23_to_fx_2_8_2 -> fx_9_8_fma_7;
+    fx_9_8_mul_4 -> fx_9_8_fma_7;
+    L_v2_texture_u [label="v2_texture_u", shape=note, style=filled, fillcolor="lightgray"];
+    L_v2_texture_u -> fx_2_23_fma_2;
+    fp_to_fx2_23_3 -> fx_2_23_fma_2;
+    fx_2_23_fma_1 -> fx_2_23_fma_2;
+    L_v2_texture_v [label="v2_texture_v", shape=note, style=filled, fillcolor="lightgray"];
+    L_v2_texture_v -> fx_2_23_fma_4;
+    fp_to_fx2_23_3 -> fx_2_23_fma_4;
+    fx_2_23_fma_3 -> fx_2_23_fma_4;
+    L_v2_color_r [label="v2_color_r", shape=note, style=filled, fillcolor="lightgray"];
+    L_v2_color_r -> fx_9_8_fma_2;
+    fx_2_23_to_fx_2_8_3 -> fx_9_8_fma_2;
+    fx_9_8_fma_1 -> fx_9_8_fma_2;
+    L_v2_color_g [label="v2_color_g", shape=note, style=filled, fillcolor="lightgray"];
+    L_v2_color_g -> fx_9_8_fma_4;
+    fx_2_23_to_fx_2_8_3 -> fx_9_8_fma_4;
+    fx_9_8_fma_3 -> fx_9_8_fma_4;
+    L_v2_color_b [label="v2_color_b", shape=note, style=filled, fillcolor="lightgray"];
+    L_v2_color_b -> fx_9_8_fma_6;
+    fx_2_23_to_fx_2_8_3 -> fx_9_8_fma_6;
+    fx_9_8_fma_5 -> fx_9_8_fma_6;
+    L_v2_color_a [label="v2_color_a", shape=note, style=filled, fillcolor="lightgray"];
+    L_v2_color_a -> fx_9_8_fma_8;
+    fx_2_23_to_fx_2_8_3 -> fx_9_8_fma_8;
+    fx_9_8_fma_7 -> fx_9_8_fma_8;
+    fx_9_8_fma_2 -> fx_9_8_to_u8_1;
+    fx_9_8_fma_4 -> fx_9_8_to_u8_2;
+    fx_9_8_fma_6 -> fx_9_8_to_u8_3;
+    fx_9_8_fma_8 -> fx_9_8_to_u8_4;
+
+    // Keep external inputs on the left side
+    { rank=source;
+        L_e0;
+        L_inv_area;
+        L_e1;
+        L_e2;
+        L_v0_z;
+        L_v0_w;
+        L_v1_w;
+        L_v2_w;
+        L_v1_z;
+        L_v2_z;
+        L_addr;
+        L_v0_texture_u;
+        L_v0_texture_v;
+        L_v0_color_r;
+        L_v0_color_g;
+        L_v0_color_b;
+        L_v0_color_a;
+        L_v1_texture_u;
+        L_v1_texture_v;
+        L_v1_color_r;
+        L_v1_color_g;
+        L_v1_color_b;
+        L_v1_color_a;
+        L_v2_texture_u;
+        L_v2_texture_v;
+        L_v2_color_r;
+        L_v2_color_g;
+        L_v2_color_b;
+        L_v2_color_a;
+    }
+
+    // Operation nodes that start at cycle 0
+    { rank=same;
+        fp_mul_1;
+        fp_mul_2;
+        fp_mul_3;
+    }
+
+    // Operation nodes that start at cycle 5
+    { rank=same;
+        fp_mul_10;
+        fp_mul_4;
+        fp_mul_6;
+        fp_mul_8;
+    }
+
+    // Operation nodes that start at cycle 10
+    { rank=same;
+        fp_fma_1;
+        fp_fma_3;
+    }
+
+    // Operation nodes that start at cycle 23
+    { rank=same;
+        fp_fma_2;
+        fp_fma_4;
+    }
+
+    // Operation nodes that start at cycle 36
+    { rank=same;
+        fp_recip_1;
+        mem_read_1;
+    }
+
+    // Operation nodes that start at cycle 37
+    { rank=same;
+        fp_cmp_1;
+    }
+
+    // Operation nodes that start at cycle 38
+    { rank=same;
+        mem_write_1;
+    }
+
+    // Operation nodes that start at cycle 58
+    { rank=same;
+        fp_mul_5;
+        fp_mul_7;
+        fp_mul_9;
+    }
+
+    // Operation nodes that start at cycle 63
+    { rank=same;
+        fp_to_fx2_23_1;
+        fp_to_fx2_23_2;
+        fp_to_fx2_23_3;
+    }
+
+    // Operation nodes that start at cycle 65
+    { rank=same;
+        fx_2_23_mul_1;
+        fx_2_23_mul_2;
+        fx_2_23_to_fx_2_8_1;
+        fx_2_23_to_fx_2_8_2;
+        fx_2_23_to_fx_2_8_3;
+    }
+
+    // Operation nodes that start at cycle 66
+    { rank=same;
+        fx_9_8_mul_1;
+        fx_9_8_mul_2;
+        fx_9_8_mul_3;
+        fx_9_8_mul_4;
+    }
+
+    // Operation nodes that start at cycle 67
+    { rank=same;
+        fx_2_23_fma_1;
+        fx_2_23_fma_3;
+    }
+
+    // Operation nodes that start at cycle 68
+    { rank=same;
+        fx_9_8_fma_1;
+        fx_9_8_fma_3;
+        fx_9_8_fma_5;
+        fx_9_8_fma_7;
+    }
+
+    // Operation nodes that start at cycle 70
+    { rank=same;
+        fx_2_23_fma_2;
+        fx_2_23_fma_4;
+        fx_9_8_fma_2;
+        fx_9_8_fma_4;
+        fx_9_8_fma_6;
+        fx_9_8_fma_8;
+    }
+
+    // Operation nodes that start at cycle 72
+    { rank=same;
+        fx_9_8_to_u8_1;
+        fx_9_8_to_u8_2;
+        fx_9_8_to_u8_3;
+        fx_9_8_to_u8_4;
+    }
+
+    // Final outputs
+    OUT_u [label="u", shape=box, style=filled, fillcolor="lightyellow"];
+    OUT_v [label="v", shape=box, style=filled, fillcolor="lightyellow"];
+    OUT_argb [label="argb", shape=box, style=filled, fillcolor="lightyellow"];
+    fx_2_23_fma_2 -> OUT_u;
+    fx_2_23_fma_4 -> OUT_v;
+    fx_9_8_to_u8_4 -> OUT_argb;
+    fx_9_8_to_u8_1 -> OUT_argb;
+    fx_9_8_to_u8_2 -> OUT_argb;
+    fx_9_8_to_u8_3 -> OUT_argb;
+
+    { rank=sink;
+        OUT_u;
+        OUT_v;
+        OUT_argb;
+    }
+}

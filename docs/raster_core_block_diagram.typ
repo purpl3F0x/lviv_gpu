@@ -48,8 +48,14 @@
       name: [
         #text("Thread Orchestrator", size: 16pt, weight: "bold") \ \
         #text(
-          "Traverses the bounding box in a snake pattern\n interpolating the per-pixel (per-thread) coeeficients\n and",
-          size: 8pt,
+          "Traverses the bounding box in a snake pattern\ninterpolating the per-pixel (per-thread) coeeficients\n and synchronizes the threads\n",
+          size: 9pt,
+          weight: "regular",
+        )
+
+        #text(
+          [Pixel regection ($e_(0,1,2)>=0$ and Z) is done on threads],
+          size: 9pt,
           weight: "regular",
         )
       ],

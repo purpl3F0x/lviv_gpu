@@ -14,6 +14,7 @@ RTL_SRCS = ../../rtl/gpu_types_pkg.sv \
 		   ../../rtl/fx_9_8_fma.sv \
 		   ../../rtl/fx_9_8_mul.sv \
 		   ../../rtl/fx_9_8_to_u8.sv \
+		   ../../rtl/z_buffer_ram.sv \
 		   ../../rtl/thread.sv
 TB_SRCS  = tb_thread.sv
 

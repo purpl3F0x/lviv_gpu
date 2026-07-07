@@ -3,6 +3,7 @@
 import gpu_types_pkg::*;
 
 module tb_thread;
+  localparam int ZBufDepth = (1 << PIXEL_ADDR_W);
   logic                       clk;
   logic                       rst_n;
 
@@ -26,19 +27,32 @@ module tb_thread;
   logic                       z_wr_en;
   logic    [PIXEL_ADDR_W-1:0] z_wr_addr;
   logic    [            31:0] z_wr_data;
+  localparam logic [31:0] ZramDefault = 32'h3F80_0000;  // 1.0f
 
-  logic                       z_rd_en_d1;
-  logic    [PIXEL_ADDR_W-1:0] z_rd_addr_d1;
-  localparam logic [31:0] ZramDefault = 32'h40E0_0000;  // 7.0f
+  // Use the shared z-buffer module in behavioral mode for simulation.
+  z_buffer_ram #(
+      .ADDR_WIDTH(PIXEL_ADDR_W),
+      .USE_XPM(1'b0)
+  ) u_z_buffer_ram (
+      .clk(clk),
+      .rst_n(1'b1),
+      .ready(),
+      .wr_en(z_wr_en),
+      .wr_addr(z_wr_addr),
+      .din(z_wr_data),
+      .rd_en(z_rd_en),
+      .rd_addr(z_rd_addr),
+      .dout(z_rd_data)
+  );
 
-  // Simple synchronous z-memory model
-  always_ff @(posedge clk) begin
-    if (z_rd_en) begin
-      z_rd_data <= ZramDefault;
-    end else begin
-      z_rd_data <= 32'hXXXX_XXXX;
+  task automatic init_zbuffer_mem;
+    int i;
+    begin
+      for (i = 0; i < ZBufDepth; i++) begin
+        u_z_buffer_ram.gen_behav_ram.mem[i] = ZramDefault;
+      end
     end
-  end
+  endtask
 
 
 
@@ -51,6 +65,7 @@ module tb_thread;
   bit                          expected_pass_q     [$];
   logic     [PIXEL_ADDR_W-1:0] expected_wr_addr_q  [$];
   logic     [            31:0] expected_wr_data_q  [$];
+  logic     [            31:0] expected_z_mem[ZBufDepth];
 
   int                          sent_count;
   int                          recv_count;
@@ -58,6 +73,12 @@ module tb_thread;
   int                          expected_pass_total;
   int                          wr_count;
   int                          expected_wr_total;
+  int                          rd_count;
+  bit                          rd_logged;
+  int                          gen_reject_count;
+  int                          pipe_en_count;
+  int                          v0_count;
+  int                          v36_count;
 
   function automatic logic [31:0] fbits(input shortreal v);
     return $shortrealtobits(v);
@@ -96,7 +117,7 @@ module tb_thread;
     return q;
   endfunction
 
-  // Match fp_cmp_le behavior used in thread.
+  // Match fp_cmp_le ordering used in RTL.
   function automatic bit fp32_le_bits(input logic [31:0] a, input logic [31:0] b);
     bit sa, sb;
     sa = a[31];
@@ -127,6 +148,7 @@ module tb_thread;
     shortreal pw0, pw1, pw2;
     shortreal eu, ev, er, eg, eb, ea;
     logic [31:0] z_bits;
+    logic [31:0] z_ref_bits;
     bit pass;
 
     iw0 = e0 * inv_area;
@@ -135,7 +157,8 @@ module tb_thread;
 
     z = (v2z * iw2) + (v1z * iw1) + (v0z * iw0);
     z_bits = fbits(z);
-    pass = fp32_le_bits(z_bits, ZramDefault);
+    z_ref_bits = expected_z_mem[mem_addr];
+    pass = fp32_le_bits(z_bits, z_ref_bits);
 
     invW = (v2w * iw2) + (v1w * iw1) + (v0w * iw0);
 
@@ -151,18 +174,19 @@ module tb_thread;
     eb = (v2b * pw2) + (v1b * pw1) + (v0b * pw0);
     ea = (v2a * pw2) + (v1a * pw1) + (v0a * pw0);
 
-    expected_u_q.push_back(eu);
-    expected_v_q.push_back(ev);
-    expected_r_q.push_back(er);
-    expected_g_q.push_back(eg);
-    expected_b_q.push_back(eb);
-    expected_a_q.push_back(ea);
-    expected_pass_q.push_back(pass);
     if (pass) begin
+      expected_u_q.push_back(eu);
+      expected_v_q.push_back(ev);
+      expected_r_q.push_back(er);
+      expected_g_q.push_back(eg);
+      expected_b_q.push_back(eb);
+      expected_a_q.push_back(ea);
+      expected_pass_q.push_back(1'b1);
       expected_pass_total++;
       expected_wr_total++;
       expected_wr_addr_q.push_back(mem_addr);
       expected_wr_data_q.push_back(z_bits);
+      expected_z_mem[mem_addr] = z_bits;
     end
   endtask
 
@@ -267,6 +291,10 @@ module tb_thread;
     in_data.e2 = fbits(e2);
     in_data.inv_area = fbits(inv_area);
     in_data.addr = mem_addr[PIXEL_ADDR_W-1:0];
+
+    if (in_data.e0[31] || in_data.e1[31] || in_data.e2[31]) begin
+      gen_reject_count++;
+    end
 
     push_expected(v0z, v1z, v2z, v0w, v1w, v2w, v0u, v1u, v2u, v0v, v1v, v2v,
             c0r, c1r, c2r, c0g, c1g, c2g, c0b, c1b, c2b, c0a, c1a, c2a,
@@ -406,12 +434,37 @@ module tb_thread;
           $display("[TB][ERROR] z_wr_addr mismatch: exp=%0d got=%0d", exp_addr, z_wr_addr);
           err_count++;
         end
-        if ($bitstoshortreal(z_wr_data) - $bitstoshortreal(exp_data) > 0.0001) begin
+        if ($bitstoshortreal(z_wr_data) - $bitstoshortreal(exp_data) > 0.0001 ||
+            $bitstoshortreal(exp_data) - $bitstoshortreal(z_wr_data) > 0.0001) begin
           $display("[TB][ERROR] z_wr_data mismatch: exp=0x%08h got=0x%08h", exp_data, z_wr_data);
           err_count++;
         end
       end
       wr_count++;
+    end
+  end
+
+  // Read-side probe: helps debug z-compare gating issues.
+  always @(posedge clk) begin
+    if (!rst_n) begin
+      // no-op
+    end else if (z_rd_en === 1'b1) begin
+      rd_count++;
+      if (!rd_logged) begin
+        $display("[TB][DBG] first z read: addr=%0d data=0x%08h", z_rd_addr, z_rd_data);
+        rd_logged = 1'b1;
+      end
+    end
+  end
+
+  // Internal flow probes.
+  always @(posedge clk) begin
+    if (!rst_n) begin
+      // no-op
+    end else begin
+      if (dut.pipe_en_internal === 1'b1) pipe_en_count++;
+      if (dut.valid_pipe[0] === 1'b1) v0_count++;
+      if (dut.valid_pipe[36] === 1'b1) v36_count++;
     end
   end
 
@@ -475,10 +528,24 @@ module tb_thread;
     expected_pass_total = 0;
     wr_count = 0;
     expected_wr_total = 0;
+    rd_count = 0;
+    rd_logged = 1'b0;
+    gen_reject_count = 0;
+    pipe_en_count = 0;
+    v0_count = 0;
+    v36_count = 0;
+
+    init_zbuffer_mem();
+    begin
+      int i;
+      for (i = 0; i < ZBufDepth; i++) begin
+        expected_z_mem[i] = ZramDefault;
+      end
+    end
 
     repeat (10) @(posedge clk);
     rst_n = 1'b1;
-    repeat (5) @(posedge clk);
+    repeat (2) @(posedge clk);
 
     // Drive tokens while random backpressure runs.
     fork
@@ -496,12 +563,15 @@ module tb_thread;
     // Drain time.
     repeat (400) @(posedge clk);
 
-    $display("[TB] sent=%0d recv=%0d expected_pass=%0d writes=%0d/%0d pending=%0d errors=%0d",
-             sent_count, recv_count, expected_pass_total, wr_count, expected_wr_total,
-             expected_pass_q.size(), err_count);
+    $display({
+      "[TB] sent=%0d recv=%0d expected_pass=%0d reads=%0d writes=%0d/%0d ",
+      "gen_reject=%0d pipe_en=%0d v0=%0d v36=%0d pending=%0d errors=%0d"
+    }, sent_count, recv_count, expected_pass_total, rd_count, wr_count, expected_wr_total,
+         gen_reject_count, pipe_en_count, v0_count, v36_count, expected_pass_q.size(), err_count);
 
-    if (recv_count != sent_count) begin
-      $display("[TB][ERROR] Output count mismatch: recv=%0d sent=%0d", recv_count, sent_count);
+    if (recv_count != expected_pass_total) begin
+      $display("[TB][ERROR] Output count mismatch: recv=%0d expected_pass=%0d", recv_count,
+               expected_pass_total);
       err_count++;
     end
 

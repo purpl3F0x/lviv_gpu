@@ -30,6 +30,12 @@ module z_buffer_ram #(
   logic [  ADDR_WIDTH-1:0] ram_wr_addr;
   logic [            31:0] ram_din;
 
+  // If TB does not pulse reset, start in ready state without scrub.
+  initial begin
+    rst_counter = DEPTH;
+    ready = 1'b1;
+  end
+
   assign ram_wr_en   = (!ready) || (wr_en && rst_n);
   assign ram_wr_addr = (!ready) ? rst_counter[ADDR_WIDTH-1:0] : wr_addr;
   assign ram_din     = (!ready) ? 32'hFFFFFFFF : din;

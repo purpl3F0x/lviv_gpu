@@ -75,7 +75,8 @@ module thread (
   thread_data_in_t thread_data_buf;
 
   // Reject triangles with e0 < 0 or e1 < 0 or e2 < 0
-  logic skid_valid_in = valid_in & (in_data.e0[31]==0) & (in_data.e1[31]==0) & (in_data.e2[31]==0);
+  logic skid_valid_in;
+  assign skid_valid_in = valid_in & (in_data.e0[31] == 0) & (in_data.e1[31] == 0) & (in_data.e2[31] == 0);
 
   axis_skid_buffer #(
       .WIDTH(INBUNDLEWIDTH)

@@ -3,5 +3,5 @@ tb_sim*
 *.d
 *.o
 *.exe
-__pycache__/**
-*.pyc
+**/__pycache__/
+**/*.pyc 

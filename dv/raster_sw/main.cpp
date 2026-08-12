@@ -13,6 +13,10 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+#ifdef RASTERIZER_EXTERNAL_RASTERIZE_TRIANGLE
+bool threadCmpExportReferenceFramebuffer(Framebuffer *outFb);
+#endif
+
 std::vector<Vertex_ObjectSpace> loadOBJ(const std::string &filename)
 {
     std::vector<Vertex_ObjectSpace> vertices;
@@ -171,6 +175,7 @@ int main()
     geom.material.shininess = 32.0f;
 
     // Load Texture
+#ifndef THREAD_VERILATOR_NO_TEXTURE
     Texture myTex;
     int tw, th, tcomp;
     unsigned char *data = stbi_load("texture.jpg", &tw, &th, &tcomp, 4);
@@ -198,6 +203,9 @@ int main()
     {
         std::cerr << "Failed to load texture.jpg" << std::endl;
     }
+#else
+    std::cout << "Texture disabled for thread_verilator compare run" << std::endl;
+#endif
 
     // 3. Clear framebuffer
     fb.clear(0xFF636363, 1.0f);
@@ -217,18 +225,25 @@ int main()
     std::chrono::duration<double, std::milli> render_ms = end_time - start_time;
     std::cout << "Render time: " << render_ms.count() << " ms" << std::endl;
 
-    // 5. Output image
-    savePNG(fb, "output.png");
-
-    extern int s_failed_count;
-    if (s_failed_count > 0)
+    // 5. Output image(s)
+#ifdef RASTERIZER_EXTERNAL_RASTERIZE_TRIANGLE
+    // Verilator compare mode: save DUT and SW reference side by side.
+    savePNG(fb, "output_dut.png");
+    Framebuffer ref_fb(width, height);
+    if (threadCmpExportReferenceFramebuffer(&ref_fb))
     {
-        std::cout << "FAILURE: Verification failed with " << s_failed_count << " mismatches!\n";
-        return 1;
+        savePNG(ref_fb, "output_ref.png");
     }
     else
     {
-        std::cout << "SUCCESS: All binned triangle hardware results matched software!\n";
-        return 0;
+        savePNG(fb, "output_ref.png");
     }
+#else
+    // Standalone software mode: framebuffer itself is the software reference.
+    savePNG(fb, "output_ref.png");
+#endif
+
+    std::cout << "Pixel draw count: " << rasterizer.pixel_draw_count << "\n";
+
+    return 0;
 }

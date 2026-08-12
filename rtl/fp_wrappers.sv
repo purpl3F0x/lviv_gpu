@@ -458,7 +458,12 @@ module fp_to_fx2_23 #(
 
   always_comb begin
     a_real = `BITSTOSHORTREAL(s_axis_a_tdata);
-    scaled = $rtoi(a_real * 8388608.0);  // 2^23
+    // Round to nearest instead of truncating toward zero.
+    if (a_real >= 0.0) begin
+      scaled = $rtoi((a_real * 8388608.0) + 0.5);  // 2^23
+    end else begin
+      scaled = $rtoi((a_real * 8388608.0) - 0.5);  // 2^23
+    end
     res_bits = scaled[24:0];
   end
 

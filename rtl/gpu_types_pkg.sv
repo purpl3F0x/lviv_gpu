@@ -11,10 +11,13 @@ package gpu_types_pkg;
   parameter int MAX_RES_X = 4096;
   parameter int MAX_RES_Y = 4096;
 
+  parameter int NUM_OF_THREADS = 4;
+
   // Calculated Widths
   parameter int TILE_ID_W_X = $clog2(MAX_RES_X / TILE_SIZE_X);
   parameter int TILE_ID_W_Y = $clog2(MAX_RES_Y / TILE_SIZE_Y);
   parameter int PIXEL_ADDR_W = $clog2(TILE_SIZE_X * TILE_SIZE_Y);
+  parameter int PIXEL_ADDR_W_THREAD = $clog2(TILE_SIZE_X * TILE_SIZE_Y / NUM_OF_THREADS);
 
   typedef enum logic [2:0] {
     REPLACE = 0,
@@ -24,6 +27,11 @@ package gpu_types_pkg;
     ADD = 4,
     COLOR = 5
   } fragment_op_t;
+
+  typedef enum logic {
+    TEXTURE_CLAMP = 1'b0,
+    TEXTURE_TILE = 1'b1
+  } texture_address_mode_t;
 
   typedef struct packed {
     logic [7:0] a;  // Alpha
@@ -53,23 +61,27 @@ package gpu_types_pkg;
   } vertex_t;
 
   // Thread ingress token after frontend preprocessing.
-  // Texture u/v arrive as UQ2.23 in this token.
+  // Texture u/v arrive in the narrower fixed-point format used by the thread path.
   typedef struct packed {
-    logic [PIXEL_ADDR_W-1:0] addr;
+    logic [PIXEL_ADDR_W_THREAD-1:0] addr;
+    logic [6:0] tex_id;
+    texture_address_mode_t texture_mode_u;
+    texture_address_mode_t texture_mode_v;
+    fragment_op_t texture_function;
     logic [31:0] inv_area;
     logic [31:0] e2;
     logic [31:0] e1;
     logic [31:0] e0;
-    logic [24:0] v2_v;
-    logic [24:0] v2_u;
+    logic [17:0] v2_v;
+    logic [17:0] v2_u;
     logic [31:0] v2_w;
     logic [31:0] v2_z;
-    logic [24:0] v1_v;
-    logic [24:0] v1_u;
+    logic [17:0] v1_v;
+    logic [17:0] v1_u;
     logic [31:0] v1_w;
     logic [31:0] v1_z;
-    logic [24:0] v0_v;
-    logic [24:0] v0_u;
+    logic [17:0] v0_v;
+    logic [17:0] v0_u;
     logic [31:0] v0_w;
     logic [31:0] v0_z;
     logic [7:0] v0_color_a;

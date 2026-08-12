@@ -4,6 +4,7 @@
 
 // Define our base scalar type for easy substitution later (e.g. to fixed point
 // for RTL)
+#include <ap_fixed.h>
 
 // Generic float/double implementations
 template <typename T> inline int math_floor(T val)
@@ -14,6 +15,36 @@ template <typename T> inline int math_floor(T val)
 template <typename T> inline int math_ceil(T val)
 {
     return static_cast<int>(std::ceil(val));
+}
+
+// Specializations for ap_fixed
+template <int W, int I> inline int math_floor(ap_fixed<W, I> val)
+{
+    int i = val.to_int();
+    if (val < 0 && val != ap_fixed<W, I>(i))
+        return i - 1;
+    return i;
+}
+
+template <int W, int I> inline int math_ceil(ap_fixed<W, I> val)
+{
+    int i = val.to_int();
+    if (val > 0 && val != ap_fixed<W, I>(i))
+        return i + 1;
+    return i;
+}
+
+template <int W, int I> inline int math_floor(ap_ufixed<W, I> val)
+{
+    return val.to_int();
+}
+
+template <int W, int I> inline int math_ceil(ap_ufixed<W, I> val)
+{
+    int i = val.to_int();
+    if (val > 0 && val != ap_ufixed<W, I>(i))
+        return i + 1;
+    return i;
 }
 
 template <typename T> struct tvec2

@@ -8,12 +8,14 @@ RTL_SRCS = ../../rtl/gpu_types_pkg.sv \
            ../../rtl/fp_cmp_le.sv \
 		   ../../rtl/axis_skid_buffer.sv \
 		   ../../rtl/delay_pipe.sv \
-		   ../../rtl/fx_2_23_fma.sv \
-		   ../../rtl/fx_2_23_mul.sv \
-		   ../../rtl/fx_2_23_to_fx_2_8.sv \
-		   ../../rtl/fx_9_8_fma.sv \
-		   ../../rtl/fx_9_8_mul.sv \
-		   ../../rtl/fx_9_8_to_u8.sv \
+		   ../../rtl/fx_texture_mul.sv \
+		   ../../rtl/fx_texture_fma.sv \
+		   ../../rtl/fx_color_mul.sv \
+		   ../../rtl/fx_color_fma.sv \
+		   ../../rtl/fx_color_to_u8.sv \
+		   ../../rtl/fragment_shader.sv \
+		   ../../rtl/texture_address_generator.sv \
+		   ../../rtl/texture_cache.sv \
 		   ../../rtl/z_buffer_ram.sv \
 		   ../../rtl/thread.sv
 TB_SRCS  = tb_thread.sv

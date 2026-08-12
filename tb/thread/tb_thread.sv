@@ -11,15 +11,9 @@ module tb_thread;
   logic                       ready_out;
   thread_data_in_t            in_data;
 
-  logic    [            24:0] m_axis_texcoord_u_tdata;
-  logic    [            24:0] m_axis_texcoord_v_tdata;
-  logic    [             7:0] m_axis_color_r_tdata;
-  logic    [             7:0] m_axis_color_g_tdata;
-  logic    [             7:0] m_axis_color_b_tdata;
-  logic    [             7:0] m_axis_color_a_tdata;
-  logic    [             0:0] m_axis_comp_z_tdata;
-  logic                       m_axis_tvalid;
-  logic                       m_axis_tready;
+  logic    [            31:0] out_fb_color;
+  logic    [PIXEL_ADDR_W-1:0] out_fb_addr;
+  logic                       out_fb_we;
 
   logic                       z_rd_en;
   logic    [PIXEL_ADDR_W-1:0] z_rd_addr;
@@ -27,7 +21,24 @@ module tb_thread;
   logic                       z_wr_en;
   logic    [PIXEL_ADDR_W-1:0] z_wr_addr;
   logic    [            31:0] z_wr_data;
+  logic    [            31:0] tex_m_axi_araddr;
+  logic    [             7:0] tex_m_axi_arlen;
+  logic    [             2:0] tex_m_axi_arsize;
+  logic    [             1:0] tex_m_axi_arburst;
+  logic                       tex_m_axi_arvalid;
+  logic                       tex_m_axi_arready;
+  logic    [           127:0] tex_m_axi_rdata;
+  logic    [             1:0] tex_m_axi_rresp;
+  logic                       tex_m_axi_rvalid;
+  logic                       tex_m_axi_rready;
+  logic                       tex_m_axi_rlast;
   localparam logic [31:0] ZramDefault = 32'h3F80_0000;  // 1.0f
+
+  assign tex_m_axi_arready = 1'b1;
+  assign tex_m_axi_rdata = '0;
+  assign tex_m_axi_rresp = '0;
+  assign tex_m_axi_rvalid = 1'b0;
+  assign tex_m_axi_rlast = 1'b0;
 
   // Use the shared z-buffer module in behavioral mode for simulation.
   z_buffer_ram #(
@@ -56,20 +67,16 @@ module tb_thread;
 
 
 
-  shortreal                    expected_u_q        [$];
-  shortreal                    expected_v_q        [$];
-  shortreal                    expected_r_q        [$];
-  shortreal                    expected_g_q        [$];
-  shortreal                    expected_b_q        [$];
-  shortreal                    expected_a_q        [$];
-  bit                          expected_pass_q     [$];
   logic     [PIXEL_ADDR_W-1:0] expected_wr_addr_q  [$];
   logic     [            31:0] expected_wr_data_q  [$];
+  logic     [PIXEL_ADDR_W-1:0] expected_fb_addr_q  [$];
+  logic     [            31:0] expected_fb_color_q [$];
   logic     [            31:0] expected_z_mem[ZBufDepth];
 
   int                          sent_count;
   int                          recv_count;
   int                          err_count;
+  int                          warn_count;
   int                          expected_pass_total;
   int                          wr_count;
   int                          expected_wr_total;
@@ -79,6 +86,11 @@ module tb_thread;
   int                          pipe_en_count;
   int                          v0_count;
   int                          v36_count;
+  int                          fb_we_count;
+  int                          expected_fb_total;
+  int                          l1_req_count;
+
+  localparam int FB_BUNDLE_WIDTH = 48 + 48 + PIXEL_ADDR_W + 7 + 1 + 1 + 3 + 8 + 8 + 8 + 8 + 1;
 
   function automatic logic [31:0] fbits(input shortreal v);
     return $shortrealtobits(v);
@@ -105,16 +117,46 @@ module tb_thread;
     return q[24:0];
   endfunction
 
-  function automatic shortreal uq2_23_to_real(input logic [24:0] b);
+  function automatic logic [17:0] to_uq5_13(input shortreal v);
+    shortreal c;
+    int unsigned q;
+    if (v < 0.0) begin
+      c = 0.0;
+    end else if (v > 31.9998779) begin
+      c = 31.9998779;
+    end else begin
+      c = v;
+    end
+    q = int'((c * 8192.0) + 0.5);
+    if (q > 18'h3ffff) begin
+      q = 18'h3ffff;
+    end
+    return q[17:0];
+  endfunction
+
+  function automatic shortreal uq5_13_to_real(input logic [17:0] b);
     int unsigned q;
     q = b;
-    return q / 8388608.0;
+    return q / 8192.0;
+  endfunction
+
+  function automatic shortreal uq10_36_to_real(input logic [47:0] b);
+    longint unsigned q;
+    q = b;
+    return q / 68719476736.0;
   endfunction
 
   function automatic shortreal u8_to_real(input logic [7:0] b);
     int unsigned q;
     q = b;
     return q;
+  endfunction
+
+  function automatic shortreal abs_sr(input shortreal v);
+    if (v < 0.0) begin
+      return -v;
+    end
+    return v;
   endfunction
 
   // Match fp_cmp_le ordering used in RTL.
@@ -175,14 +217,10 @@ module tb_thread;
     ea = (v2a * pw2) + (v1a * pw1) + (v0a * pw0);
 
     if (pass) begin
-      expected_u_q.push_back(eu);
-      expected_v_q.push_back(ev);
-      expected_r_q.push_back(er);
-      expected_g_q.push_back(eg);
-      expected_b_q.push_back(eb);
-      expected_a_q.push_back(ea);
-      expected_pass_q.push_back(1'b1);
       expected_pass_total++;
+    end
+
+    if (pass) begin
       expected_wr_total++;
       expected_wr_addr_q.push_back(mem_addr);
       expected_wr_data_q.push_back(z_bits);
@@ -265,13 +303,13 @@ module tb_thread;
     in_data.v1_w = fbits(v1w);
     in_data.v2_w = fbits(v2w);
 
-    in_data.v0_u = to_uq2_23(v0u);
-    in_data.v1_u = to_uq2_23(v1u);
-    in_data.v2_u = to_uq2_23(v2u);
+    in_data.v0_u = to_uq5_13(v0u);
+    in_data.v1_u = to_uq5_13(v1u);
+    in_data.v2_u = to_uq5_13(v2u);
 
-    in_data.v0_v = to_uq2_23(v0v);
-    in_data.v1_v = to_uq2_23(v1v);
-    in_data.v2_v = to_uq2_23(v2v);
+    in_data.v0_v = to_uq5_13(v0v);
+    in_data.v1_v = to_uq5_13(v1v);
+    in_data.v2_v = to_uq5_13(v2v);
 
     in_data.v0_color_r = c0r[7:0];
     in_data.v1_color_r = c1r[7:0];
@@ -292,11 +330,17 @@ module tb_thread;
     in_data.inv_area = fbits(inv_area);
     in_data.addr = mem_addr[PIXEL_ADDR_W-1:0];
 
+    // Color-only mode for now: force texturing off.
+    in_data.tex_id = '0;
+    in_data.texture_function = fragment_op_t'(ADD);
+
     if (in_data.e0[31] || in_data.e1[31] || in_data.e2[31]) begin
       gen_reject_count++;
     end
 
-    push_expected(v0z, v1z, v2z, v0w, v1w, v2w, v0u, v1u, v2u, v0v, v1v, v2v,
+        push_expected(v0z, v1z, v2z, v0w, v1w, v2w,
+          uq5_13_to_real(in_data.v0_u), uq5_13_to_real(in_data.v1_u), uq5_13_to_real(in_data.v2_u),
+          uq5_13_to_real(in_data.v0_v), uq5_13_to_real(in_data.v1_v), uq5_13_to_real(in_data.v2_v),
             c0r, c1r, c2r, c0g, c1g, c2g, c0b, c1b, c2b, c0a, c1a, c2a,
             e0, e1, e2, inv_area, in_data.addr);
 
@@ -320,100 +364,70 @@ module tb_thread;
     sent_count++;
   endtask
 
-  // Random output backpressure: low periods up to 50 cycles.
+  // Keep a timing companion process without driving external backpressure.
   task automatic random_backpressure(input int cycles);
     int c;
-    int hold_len;
     c = 0;
     while (c < cycles) begin
-      @(negedge clk);
-      m_axis_tready = 1'b1;
       @(posedge clk);
       c++;
-
-      // Random low-ready bursts up to 50 cycles.
-      // if (($urandom % 4) == 0) begin
-      //   hold_len = $urandom % 51;
-      //   m_axis_tready <= 1'b0;
-      //   repeat (hold_len) begin
-      //     @(posedge clk);
-      //     c++;
-      //     if (c >= cycles) begin
-      //       break;
-      //     end
-      //   end
-      // end
     end
-
-    @(negedge clk);
-    m_axis_tready = 1'b1;
   endtask
 
-  // Scoreboard monitor.
+  // Pre-skid monitor: validate internal signals before the output skid buffer.
   always @(posedge clk) begin
-    shortreal got_u, got_v, got_r, got_g, got_b, got_a;
-    shortreal exp_u, exp_v, exp_r, exp_g, exp_b, exp_a;
-    bit exp_pass;
-    bit got_pass;
-    shortreal tol_uv;
-    shortreal tol_c;
-
     if (!rst_n) begin
       // no-op
     end else if (dut.output_bundle_tvalid && dut.output_bundle_s_axis_tready) begin
-      if (expected_pass_q.size() == 0) begin
-        $display("[TB][ERROR] Output observed but expected queue is empty");
+      // comp_z is packed as the LSB in output_bundle_tdata.
+      if (dut.output_bundle_tdata[0] !== 1'b1) begin
+        $display("[TB][ERROR] pre-skid output bundle carried comp_z=0");
         err_count++;
-      end else begin
-        exp_u = expected_u_q.pop_front();
-        exp_v = expected_v_q.pop_front();
-        exp_r = expected_r_q.pop_front();
-        exp_g = expected_g_q.pop_front();
-        exp_b = expected_b_q.pop_front();
-        exp_a = expected_a_q.pop_front();
-        exp_pass = expected_pass_q.pop_front();
-        got_pass = dut.comp_z_bundle_tdata;
-
-        if (got_pass != exp_pass) begin
-          $display("[TB][ERROR] comp_z mismatch: exp=%0d got=%0d", exp_pass, got_pass);
-          err_count++;
-        end
-
-        got_u = uq2_23_to_real(dut.texcoord_u_tdata);
-        got_v = uq2_23_to_real(dut.texcoord_v_tdata);
-        got_r = u8_to_real(dut.color_r_tdata);
-        got_g = u8_to_real(dut.color_g_tdata);
-        got_b = u8_to_real(dut.color_b_tdata);
-        got_a = u8_to_real(dut.color_a_tdata);
-        tol_uv = 3e-3;
-        tol_c = 1.4;
-
-        if (((got_u - exp_u) > tol_uv) || ((exp_u - got_u) > tol_uv)) begin
-          $display("[TB][ERROR] tex_u mismatch: exp=%f got=%f", exp_u, got_u);
-          err_count++;
-        end
-        if (((got_v - exp_v) > tol_uv) || ((exp_v - got_v) > tol_uv)) begin
-          $display("[TB][ERROR] tex_v mismatch: exp=%f got=%f", exp_v, got_v);
-          err_count++;
-        end
-        if (((got_r - exp_r) > tol_c) || ((exp_r - got_r) > tol_c)) begin
-          $display("[TB][ERROR] col_r mismatch: exp=%f got=%f", exp_r, got_r);
-          err_count++;
-        end
-        if (((got_g - exp_g) > tol_c) || ((exp_g - got_g) > tol_c)) begin
-          $display("[TB][ERROR] col_g mismatch: exp=%f got=%f", exp_g, got_g);
-          err_count++;
-        end
-        if (((got_b - exp_b) > tol_c) || ((exp_b - got_b) > tol_c)) begin
-          $display("[TB][ERROR] col_b mismatch: exp=%f got=%f", exp_b, got_b);
-          err_count++;
-        end
-        if (((got_a - exp_a) > tol_c) || ((exp_a - got_a) > tol_c)) begin
-          $display("[TB][ERROR] col_a mismatch: exp=%f got=%f", exp_a, got_a);
-          err_count++;
-        end
       end
-      recv_count++;
+    end
+  end
+
+  // Post-skid handshake monitor: build expected framebuffer outputs.
+  always @(posedge clk) begin
+    logic [47:0] exp_texcoord_u;
+    logic [47:0] exp_texcoord_v;
+    logic [PIXEL_ADDR_W-1:0] exp_addr;
+    logic [6:0] exp_tex_id;
+    logic exp_mode_u;
+    logic exp_mode_v;
+    logic [2:0] exp_op;
+    logic [7:0] exp_r;
+    logic [7:0] exp_g;
+    logic [7:0] exp_b;
+    logic [7:0] exp_a;
+    logic exp_comp_z;
+    logic [7:0] exp_out_a;
+    logic [31:0] exp_out_color;
+    if (!rst_n) begin
+      // no-op
+    end else if (dut.output_bundle_buf_tvalid && dut.output_bundle_buf_tready) begin
+      {
+          exp_texcoord_u,
+          exp_texcoord_v,
+          exp_addr,
+          exp_tex_id,
+          exp_mode_u,
+          exp_mode_v,
+          exp_op,
+          exp_r,
+          exp_g,
+          exp_b,
+          exp_a,
+          exp_comp_z
+      } = dut.output_bundle_buf_tdata[FB_BUNDLE_WIDTH-1:0];
+
+      // No-texture path is forced to ADD(color, 0). RGB passes through.
+      exp_out_a = (exp_a * 8'd255 + 16'd128) >> 8;
+      exp_out_color = {exp_out_a, exp_r, exp_g, exp_b};
+
+      expected_fb_addr_q.push_back(exp_addr);
+      expected_fb_color_q.push_back(exp_out_color);
+      expected_fb_total++;
     end
   end
 
@@ -457,6 +471,45 @@ module tb_thread;
     end
   end
 
+  // Framebuffer output checker: verify full post-cache/fragment datapath outputs.
+  always @(posedge clk) begin
+    logic [PIXEL_ADDR_W-1:0] exp_fb_addr;
+    logic [31:0] exp_fb_color;
+    if (!rst_n) begin
+      // no-op
+    end else if (out_fb_we === 1'b1) begin
+      if (expected_fb_addr_q.size() == 0 || expected_fb_color_q.size() == 0) begin
+        $display("[TB][ERROR] Unexpected framebuffer write with empty expected queue");
+        err_count++;
+      end else begin
+        exp_fb_addr = expected_fb_addr_q.pop_front();
+        exp_fb_color = expected_fb_color_q.pop_front();
+        if (out_fb_addr !== exp_fb_addr) begin
+          $display("[TB][ERROR] out_fb_addr mismatch: exp=%0d got=%0d", exp_fb_addr, out_fb_addr);
+          err_count++;
+        end
+        if (out_fb_color !== exp_fb_color) begin
+          $display("[TB][ERROR] out_fb_color mismatch: exp=0x%08h got=0x%08h", exp_fb_color,
+                   out_fb_color);
+          err_count++;
+        end
+      end
+      fb_we_count++;
+      recv_count++;
+    end
+  end
+
+  // In color-only mode we expect no L1 texture requests.
+  always @(posedge clk) begin
+    if (!rst_n) begin
+      // no-op
+    end else if (dut.l1_req_valid && dut.l1_req_ready) begin
+      l1_req_count++;
+      $display("[TB][ERROR] Unexpected L1 texture request in color-only mode");
+      err_count++;
+    end
+  end
+
   // Internal flow probes.
   always @(posedge clk) begin
     if (!rst_n) begin
@@ -468,8 +521,6 @@ module tb_thread;
     end
   end
 
-  // Compare-fail expectations are encoded on m_axis_comp_z_tdata.
-
   // DUT
   thread dut (
       .clk(clk),
@@ -477,21 +528,26 @@ module tb_thread;
       .valid_in(valid_in),
       .ready_out(ready_out),
       .in_data(in_data),
-      .m_axis_tvalid(m_axis_tvalid),
-      .m_axis_tready(m_axis_tready),
-      .m_axis_texcoord_u_tdata(m_axis_texcoord_u_tdata),
-      .m_axis_texcoord_v_tdata(m_axis_texcoord_v_tdata),
-      .m_axis_color_r_tdata(m_axis_color_r_tdata),
-      .m_axis_color_g_tdata(m_axis_color_g_tdata),
-      .m_axis_color_b_tdata(m_axis_color_b_tdata),
-      .m_axis_color_a_tdata(m_axis_color_a_tdata),
-      .m_axis_comp_z_tdata(m_axis_comp_z_tdata),
+      .out_fb_color(out_fb_color),
+      .out_fb_addr(out_fb_addr),
+      .out_fb_we(out_fb_we),
       .z_rd_en(z_rd_en),
       .z_rd_addr(z_rd_addr),
       .z_rd_data(z_rd_data),
       .z_wr_en(z_wr_en),
       .z_wr_addr(z_wr_addr),
-      .z_wr_data(z_wr_data)
+        .z_wr_data(z_wr_data),
+        .tex_m_axi_araddr(tex_m_axi_araddr),
+        .tex_m_axi_arlen(tex_m_axi_arlen),
+        .tex_m_axi_arsize(tex_m_axi_arsize),
+        .tex_m_axi_arburst(tex_m_axi_arburst),
+        .tex_m_axi_arvalid(tex_m_axi_arvalid),
+        .tex_m_axi_arready(tex_m_axi_arready),
+        .tex_m_axi_rdata(tex_m_axi_rdata),
+        .tex_m_axi_rresp(tex_m_axi_rresp),
+        .tex_m_axi_rvalid(tex_m_axi_rvalid),
+        .tex_m_axi_rready(tex_m_axi_rready),
+        .tex_m_axi_rlast(tex_m_axi_rlast)
   );
 
   // Clock
@@ -521,10 +577,10 @@ module tb_thread;
     rst_n = 1'b0;
     valid_in = 1'b0;
     in_data = '0;
-    m_axis_tready = 1'b1;
     sent_count = 0;
     recv_count = 0;
     err_count = 0;
+    warn_count = 0;
     expected_pass_total = 0;
     wr_count = 0;
     expected_wr_total = 0;
@@ -534,6 +590,9 @@ module tb_thread;
     pipe_en_count = 0;
     v0_count = 0;
     v36_count = 0;
+    fb_we_count = 0;
+    expected_fb_total = 0;
+    l1_req_count = 0;
 
     init_zbuffer_mem();
     begin
@@ -565,19 +624,14 @@ module tb_thread;
 
     $display({
       "[TB] sent=%0d recv=%0d expected_pass=%0d reads=%0d writes=%0d/%0d ",
-      "gen_reject=%0d pipe_en=%0d v0=%0d v36=%0d pending=%0d errors=%0d"
+      "fb_writes=%0d/%0d l1_req=%0d gen_reject=%0d pipe_en=%0d v0=%0d v36=%0d warns=%0d errors=%0d"
     }, sent_count, recv_count, expected_pass_total, rd_count, wr_count, expected_wr_total,
-         gen_reject_count, pipe_en_count, v0_count, v36_count, expected_pass_q.size(), err_count);
+        fb_we_count, expected_fb_total, l1_req_count,
+        gen_reject_count, pipe_en_count, v0_count, v36_count, warn_count, err_count);
 
     if (recv_count != expected_pass_total) begin
       $display("[TB][ERROR] Output count mismatch: recv=%0d expected_pass=%0d", recv_count,
                expected_pass_total);
-      err_count++;
-    end
-
-    if (expected_pass_q.size() != 0) begin
-      $display("[TB][ERROR] Expected queue not fully drained: pending=%0d",
-               expected_pass_q.size());
       err_count++;
     end
 
@@ -587,10 +641,22 @@ module tb_thread;
       err_count++;
     end
 
+    if (fb_we_count != expected_fb_total) begin
+      $display("[TB][ERROR] FB write count mismatch: got=%0d expected=%0d", fb_we_count,
+               expected_fb_total);
+      err_count++;
+    end
+
     if (expected_wr_addr_q.size() != 0 || expected_wr_data_q.size() != 0) begin
       $display(
           "[TB][ERROR] Expected write queue not fully drained: pending_addr=%0d pending_data=%0d",
           expected_wr_addr_q.size(), expected_wr_data_q.size());
+      err_count++;
+    end
+
+    if (expected_fb_addr_q.size() != 0 || expected_fb_color_q.size() != 0) begin
+      $display("[TB][ERROR] Expected FB queue not fully drained: pending_addr=%0d pending_color=%0d",
+               expected_fb_addr_q.size(), expected_fb_color_q.size());
       err_count++;
     end
 

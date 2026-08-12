@@ -14,17 +14,12 @@ SUPPORTED_OPS = {
     "mux",
     "mem_read",
     "mem_write",
-    # Fixed-point arithmetic (all Q8.8 / 16-bit)
-    "fx_8_8_mul",
-    "fx_8_8_fma",
-    "fx_9_8_mul",
-    "fx_9_8_fma",
-    "fx_2_23_mul",
-    "fx_2_23_fma",
+    "fx_color_mul",
+    "fx_color_fma",
+    "fx_texture_mul",
+    "fx_texture_fma",
     "fp_to_fx2_23",
-    "fp_to_fx2_8",
-    "fx_2_23_to_fx_2_8",
-    "fx_9_8_to_u8",
+    "fx_color_to_u8",
 }
 
 
@@ -39,39 +34,32 @@ DEFAULT_LATENCIES = {
     "mem_read": 1,
     "mem_write": 1,
     # Fixed-point op latencies follow the RTL pipeline depths.
-    "fx_9_8_mul": 2,
-    "fx_9_8_fma": 2,
-    "fx_2_23_mul": 2,
-    "fx_2_23_fma": 3,
-    "fx_2_23_to_fx_2_8": 1,
-    "fx_9_8_to_u8": 1,
+    "fx_color_mul": 1,
+    "fx_color_fma": 2,
+    "fx_texture_mul": 1,
+    "fx_texture_fma": 2,
+    "fx_color_to_u8": 1,
     # Xilinx conversion wrappers are 2-cycle latency.
     "fp_to_fx2_23": 2,
-    "fp_to_fx2_8": 2,
 }
 
 # Output bit-width for each op type (default 32 for fp ops).
-# All fx ops use Q8.8 = 16 bits.
 _FX_OP_WIDTHS = {
-    "fx_8_8_mul": 16,
-    "fx_8_8_fma": 16,
-    "fx_9_8_mul": 17,
-    "fx_9_8_fma": 17,
-    "fx_2_23_mul": 25,
-    "fx_2_23_fma": 25,
+    "fx_color_mul": 33,
+    "fx_color_fma": 33,
+    "fx_texture_mul": 48,
+    "fx_texture_fma": 48,
     "fp_to_fx2_23": 25,
-    "fp_to_fx2_8": 16,
-    "fx_2_23_to_fx_2_8": 16,
-    "fx_9_8_to_u8": 8,
+    "fx_color_to_u8": 8,
 }
 
 # Leaf-signal type → bit width.
 _LEAF_TYPE_WIDTHS = {
     "addr_t": 14,
     "uint8_t": 8,
-    "fx_2_8": 16,  # stored as Q8.8 word; upper bits zero for valid bary coords
-    "fx_8_8": 16,
-    "fx_9_8": 17,
+    "fx_color": 33,
+    "fx_texture": 18,
+    "fx_texture_accum": 48,
     "fx_2_23": 25,
 }
 
@@ -238,7 +226,7 @@ class HardwareDAG:
 
     def add_binary_operation(self, op_type, left, right, expr, op_symbol=""):
         _FP_BINARY = {"fp_add", "fp_sub", "fp_mul"}
-        _FX_BINARY = {"fx_8_8_mul", "fx_9_8_mul", "fx_2_23_mul"}
+        _FX_BINARY = {"fx_color_mul", "fx_texture_mul"}
         if op_type not in _FP_BINARY | _FX_BINARY:
             raise ValueError(f"Unsupported binary op type: {op_type}")
 
@@ -275,9 +263,7 @@ class HardwareDAG:
         if op_type not in (
             "fp_recip",
             "fp_to_fx2_23",
-            "fp_to_fx2_8",
-            "fx_2_23_to_fx_2_8",
-            "fx_9_8_to_u8",
+            "fx_color_to_u8",
         ):
             raise ValueError(f"Unsupported unary op type: {op_type}")
 
@@ -470,9 +456,8 @@ class HardwareDAG:
             op_type
             in (
                 "fp_fma",
-                "fx_8_8_fma",
-                "fx_9_8_fma",
-                "fx_2_23_fma",
+                "fx_color_fma",
+                "fx_texture_fma",
             )
             and produced_inputs
         ):
@@ -484,13 +469,10 @@ class HardwareDAG:
             "fp_mul",
             "fp_recip",
             "mux",
-            "fx_8_8_mul",
-            "fx_9_8_mul",
-            "fx_2_23_mul",
+            "fx_color_mul",
+            "fx_texture_mul",
             "fp_to_fx2_23",
-            "fp_to_fx2_8",
-            "fx_2_23_to_fx_2_8",
-            "fx_9_8_to_u8",
+            "fx_color_to_u8",
         ):
             if produced_inputs:
                 return produced_inputs[-1]
@@ -727,7 +709,7 @@ class HardwareDAG:
 
             for idx, sig in enumerate(inputs):
                 color_info = _color_leaf_info(sig)
-                if color_info and getattr(sig, "type", "") == "fx_9_8":
+                if color_info and getattr(sig, "type", "") == "fx_color":
                     vertex_name, chan = color_info
                     extra_delay = dst_start
                     packed_src_ref = _color_pack_ref(vertex_name)
@@ -1027,53 +1009,36 @@ class HardwareDAG:
                     lines.append(f"    .a({a}), .b({b}),")
                     lines.append(f"    .result({out_wire}[0])")
                     lines.append(");")
-            elif info.op_type == "fx_8_8_mul":
+            elif info.op_type == "fx_color_mul":
                 a = input_ref_by_edge[(node, 0)]
                 b = input_ref_by_edge[(node, 1)]
-                lines.append(f"fx_8_8_mul u_{unit} (")
+                lines.append(f"fx_color_mul u_{unit} (")
                 lines.append("    .clk(clk), .clken(pipe_en_internal),")
                 lines.append(f"    .a({a}), .b({b}),")
                 lines.append(f"    .q({out_wire})")
                 lines.append(");")
-            elif info.op_type == "fx_8_8_fma":
+            elif info.op_type == "fx_color_fma":
                 a = input_ref_by_edge[(node, 0)]
                 b = input_ref_by_edge[(node, 1)]
                 c = input_ref_by_edge[(node, 2)]
-                lines.append(f"fx_8_8_fma u_{unit} (")
+                lines.append(f"fx_color_fma u_{unit} (")
                 lines.append("    .clk(clk), .clken(pipe_en_internal),")
                 lines.append(f"    .a({a}), .b({b}), .c({c}),")
                 lines.append(f"    .q({out_wire})")
                 lines.append(");")
-            elif info.op_type == "fx_9_8_mul":
+            elif info.op_type == "fx_texture_mul":
                 a = input_ref_by_edge[(node, 0)]
                 b = input_ref_by_edge[(node, 1)]
-                lines.append(f"fx_9_8_mul u_{unit} (")
+                lines.append(f"fx_texture_mul u_{unit} (")
                 lines.append("    .clk(clk), .clken(pipe_en_internal),")
                 lines.append(f"    .a({a}), .b({b}),")
                 lines.append(f"    .q({out_wire})")
                 lines.append(");")
-            elif info.op_type == "fx_9_8_fma":
+            elif info.op_type == "fx_texture_fma":
                 a = input_ref_by_edge[(node, 0)]
                 b = input_ref_by_edge[(node, 1)]
                 c = input_ref_by_edge[(node, 2)]
-                lines.append(f"fx_9_8_fma u_{unit} (")
-                lines.append("    .clk(clk), .clken(pipe_en_internal),")
-                lines.append(f"    .a({a}), .b({b}), .c({c}),")
-                lines.append(f"    .q({out_wire})")
-                lines.append(");")
-            elif info.op_type == "fx_2_23_mul":
-                a = input_ref_by_edge[(node, 0)]
-                b = input_ref_by_edge[(node, 1)]
-                lines.append(f"fx_2_23_mul u_{unit} (")
-                lines.append("    .clk(clk), .clken(pipe_en_internal),")
-                lines.append(f"    .a({a}), .b({b}),")
-                lines.append(f"    .q({out_wire})")
-                lines.append(");")
-            elif info.op_type == "fx_2_23_fma":
-                a = input_ref_by_edge[(node, 0)]
-                b = input_ref_by_edge[(node, 1)]
-                c = input_ref_by_edge[(node, 2)]
-                lines.append(f"fx_2_23_fma u_{unit} (")
+                lines.append(f"fx_texture_fma u_{unit} (")
                 lines.append("    .clk(clk), .clken(pipe_en_internal),")
                 lines.append(f"    .a({a}), .b({b}), .c({c}),")
                 lines.append(f"    .q({out_wire})")
@@ -1089,29 +1054,11 @@ class HardwareDAG:
                 lines.append("    .m_axis_result_tvalid(),")
                 lines.append(f"    .m_axis_result_tdata({out_wire})")
                 lines.append(");")
-            elif info.op_type == "fp_to_fx2_8":
+            elif info.op_type == "fx_color_to_u8":
                 a = input_ref_by_edge[(node, 0)]
-                lines.append(f"fp_to_fx2_8 u_{unit} (")
-                lines.append(
-                    "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
-                )
-                lines.append(f"    .s_axis_a_tvalid({valid_in}),")
-                lines.append(f"    .s_axis_a_tdata({a}),")
-                lines.append("    .m_axis_result_tvalid(),")
-                lines.append(f"    .m_axis_result_tdata({out_wire})")
-                lines.append(");")
-            elif info.op_type == "fx_2_23_to_fx_2_8":
-                a = input_ref_by_edge[(node, 0)]
-                lines.append(f"fx_2_23_to_fx_2_8 u_{unit} (")
+                lines.append(f"fx_color_to_u8 u_{unit} (")
                 lines.append("    .clk(clk), .clken(pipe_en_internal),")
-                lines.append(f"    .in_fx2_23({a}),")
-                lines.append(f"    .out_fx2_8({out_wire})")
-                lines.append(");")
-            elif info.op_type == "fx_9_8_to_u8":
-                a = input_ref_by_edge[(node, 0)]
-                lines.append(f"fx_9_8_to_u8 u_{unit} (")
-                lines.append("    .clk(clk), .clken(pipe_en_internal),")
-                lines.append(f"    .in_fx9_8({a}),")
+                lines.append(f"    .in_fx_color({a}),")
                 lines.append(f"    .out_u8({out_wire})")
                 lines.append(");")
         lines.append("")
@@ -1207,9 +1154,17 @@ class HardwareDAG:
                 return "+"
             if info.op_type == "fp_sub":
                 return "-"
-            if info.op_type in ("fp_mul", "fx_8_8_mul", "fx_9_8_mul", "fx_2_23_mul"):
+            if info.op_type in (
+                "fp_mul",
+                "fx_color_mul",
+                "fx_texture_mul",
+            ):
                 return "*"
-            if info.op_type in ("fp_fma", "fx_8_8_fma", "fx_9_8_fma", "fx_2_23_fma"):
+            if info.op_type in (
+                "fp_fma",
+                "fx_color_fma",
+                "fx_texture_fma",
+            ):
                 return "FMA"
             if info.op_type == "fp_recip":
                 return "1/x"
@@ -1223,11 +1178,7 @@ class HardwareDAG:
                 return "MEM_WR"
             if info.op_type == "fp_to_fx2_23":
                 return "to\\nQ2.23"
-            if info.op_type == "fp_to_fx2_8":
-                return "to\\nQ2.8"
-            if info.op_type == "fx_2_23_to_fx_2_8":
-                return "Q2.23\\n->Q2.8"
-            if info.op_type == "fx_9_8_to_u8":
+            if info.op_type == "fx_color_to_u8":
                 return "to\\nu8"
             return info.op_type
 
@@ -1473,33 +1424,41 @@ class Signal:
             raise ValueError("Signals must belong to the same DAG")
         a_type = getattr(self, "type", "float_t")
         b_type = getattr(other, "type", "float_t")
-        if (a_type == "uint8_t" and b_type in ("fx_2_8", "fx_8_8")) or (
-            b_type == "uint8_t" and a_type in ("fx_2_8", "fx_8_8")
+        if (a_type == "uint8_t" and b_type == "fx_2_23") or (
+            b_type == "uint8_t" and a_type == "fx_2_23"
         ):
-            a = self._as_fx9_8_operand()
-            b = other._as_fx9_8_operand()
-            expr = f"({a.expr} * {b.expr})"
-            node_id = self.dag.add_binary_operation("fx_9_8_mul", a, b, expr, "*")
+            color = self if a_type == "uint8_t" else other
+            coeff = other if a_type == "uint8_t" else self
+            expr = f"({self.expr} * {other.expr})"
+            node_id = self.dag.add_binary_operation(
+                "fx_color_mul", color, coeff, expr, "*"
+            )
             return Signal(
                 self.dag,
                 hw_id=node_id,
                 expr=expr,
-                type="fx_9_8",
+                type="fx_color",
                 valid_expr=self.dag.ops[node_id].valid_expr,
             )
-        # Fixed-point multiply dispatch by type family.
-        if a_type in ("fx_2_8", "fx_8_8") and b_type in ("fx_2_8", "fx_8_8"):
-            op, res_type = "fx_8_8_mul", "fx_8_8"
-        elif a_type == "fx_9_8" and b_type == "fx_9_8":
-            op, res_type = "fx_9_8_mul", "fx_9_8"
-        elif a_type == "fx_2_23" and b_type == "fx_2_23":
-            op, res_type = "fx_2_23_mul", "fx_2_23"
-        else:
-            if a_type != b_type:
-                raise TypeError(
-                    f"Unsupported mul type combination: {a_type} * {b_type}"
-                )
-            op, res_type = "fp_mul", a_type
+        if (a_type == "fx_texture" and b_type == "fx_2_23") or (
+            b_type == "fx_texture" and a_type == "fx_2_23"
+        ):
+            texture = self if a_type == "fx_texture" else other
+            coeff = other if a_type == "fx_texture" else self
+            expr = f"({self.expr} * {other.expr})"
+            node_id = self.dag.add_binary_operation(
+                "fx_texture_mul", coeff, texture, expr, "*"
+            )
+            return Signal(
+                self.dag,
+                hw_id=node_id,
+                expr=expr,
+                type="fx_texture_accum",
+                valid_expr=self.dag.ops[node_id].valid_expr,
+            )
+        if a_type != b_type:
+            raise TypeError(f"Unsupported mul type combination: {a_type} * {b_type}")
+        op, res_type = "fp_mul", a_type
         expr = f"({self.expr} * {other.expr})"
         node_id = self.dag.add_binary_operation(op, self, other, expr, "*")
         return Signal(
@@ -1508,48 +1467,6 @@ class Signal:
             expr=expr,
             type=res_type,
             valid_expr=self.dag.ops[node_id].valid_expr,
-        )
-
-    def _as_fx9_8_operand(self):
-        """Return a zero-padded Q9.8 view of this signal without adding latency."""
-        if self.type == "fx_9_8":
-            return self
-        if self.type == "uint8_t":
-            base = f"thread_data_buf.{self.dag._leaf_struct_field(self)}"
-            return Signal(
-                self.dag,
-                hw_id=self.hw_id,
-                expr=self.expr,
-                type="fx_9_8",
-                valid_expr=self.valid_expr,
-                sv_ref=f"{{1'b0, {base}, 8'h00}}",
-            )
-        if self.type in ("fx_2_8", "fx_8_8"):
-            return Signal(
-                self.dag,
-                hw_id=self.hw_id,
-                expr=self.expr,
-                type="fx_9_8",
-                valid_expr=self.valid_expr,
-                sv_ref=f"{{1'b0, {self.expr}}}",
-            )
-        raise TypeError(f"Cannot zero-pad signal of type {self.type} to fx_9_8")
-
-    def as_fx8_8(self):
-        """Zero-latency conversion: extend uint8 to Q8.8 by appending 8 zero
-        LSBs.  No pipeline stage is inserted; the SV expression
-        {thread_data_buf.xxx, 8'h00} is used directly at the connection
-        site."""
-        if self.type != "uint8_t":
-            raise TypeError("as_fx8_8 is only supported for uint8_t signals")
-        base = f"thread_data_buf.{self.dag._leaf_struct_field(self)}"
-        return Signal(
-            self.dag,
-            hw_id=None,
-            expr=self.expr,  # keep original name for buffer/delay naming
-            type="fx_8_8",
-            valid_expr=self.valid_expr,
-            sv_ref=f"{{{base}, 8'h00}}",  # verbatim SV wire reference
         )
 
     def as_fx2_23(self):
@@ -1566,34 +1483,12 @@ class Signal:
             valid_expr=self.dag.ops[node_id].valid_expr,
         )
 
-    def as_fx2_8(self):
-        """Convert to Q2.8.
-
-        - float_t  -> Q2.8 via fp_to_fx2_8 wrapper (2 cycles)
-        - fx_2_23  -> Q2.8 via fx_2_23_to_fx_2_8 (round-to-nearest, 1 cycle)
-        """
-        if self.type == "float_t":
-            expr = f"fp_to_fx2_8({self.expr})"
-            node_id = self.dag.add_unary_operation("fp_to_fx2_8", self, expr)
-        elif self.type == "fx_2_23":
-            expr = f"fx_2_23_to_fx_2_8({self.expr})"
-            node_id = self.dag.add_unary_operation("fx_2_23_to_fx_2_8", self, expr)
-        else:
-            raise TypeError("as_fx2_8 is supported only for float_t or fx_2_23 signals")
-        return Signal(
-            self.dag,
-            hw_id=node_id,
-            expr=expr,
-            type="fx_2_8",
-            valid_expr=self.dag.ops[node_id].valid_expr,
-        )
-
     def as_u8(self):
         """Convert UQ9.8 fixed-point to uint8 with rounding/clamp."""
-        if self.type != "fx_9_8":
-            raise TypeError("as_u8 is only supported for fx_9_8 signals")
-        expr = f"fx_9_8_to_u8({self.expr})"
-        node_id = self.dag.add_unary_operation("fx_9_8_to_u8", self, expr)
+        if self.type != "fx_color":
+            raise TypeError("as_u8 is only supported for fx_color signals")
+        expr = f"fx_color_to_u8({self.expr})"
+        node_id = self.dag.add_unary_operation("fx_color_to_u8", self, expr)
         return Signal(
             self.dag,
             hw_id=node_id,
@@ -1619,10 +1514,7 @@ class Signal:
 
     @staticmethod
     def fx_fma(a, b, c):
-        """Fixed-point FMA: a * b + c, all operands Q8.8 (fx_2_8/fx_8_8).
-        Uses fx_8_8_fma; result is fx_8_8 (16-bit Q8.8).
-        fx_2_8 coefficients are stored in Q8.8 words with upper bits zero.
-        """
+        """Fixed-point FMA helper for supported fixed-point families."""
         for sig in (a, b, c):
             if not isinstance(sig, Signal):
                 raise TypeError("fx_fma requires Signal operands")
@@ -1631,54 +1523,39 @@ class Signal:
         a_type = getattr(a, "type", "")
         b_type = getattr(b, "type", "")
         c_type = getattr(c, "type", "")
-        if "uint8_t" in (a_type, b_type, c_type) and {
-            a_type,
-            b_type,
-            c_type,
-        } <= {"uint8_t", "fx_2_8", "fx_8_8", "fx_9_8"}:
-            a9 = a._as_fx9_8_operand()
-            b9 = b._as_fx9_8_operand()
-            c9 = c._as_fx9_8_operand()
-            expr = f"fx_fma({a9.expr}, {b9.expr}, {c9.expr})"
-            node_id = a.dag.add_fma_operation(a9, b9, c9, expr, op_type="fx_9_8_fma")
+        if {a_type, b_type} == {"uint8_t", "fx_2_23"} and c_type == "fx_color":
+            color = a if a_type == "uint8_t" else b
+            coeff = b if a_type == "uint8_t" else a
+            expr = f"fx_fma({a.expr}, {b.expr}, {c.expr})"
+            node_id = a.dag.add_fma_operation(
+                color, coeff, c, expr, op_type="fx_color_fma"
+            )
             return Signal(
                 a.dag,
                 hw_id=node_id,
                 expr=expr,
-                type="fx_9_8",
+                type="fx_color",
                 valid_expr=a.dag.ops[node_id].valid_expr,
             )
-        if a_type in ("fx_2_8", "fx_8_8") and b_type in ("fx_2_8", "fx_8_8"):
-            if c_type not in ("fx_2_8", "fx_8_8"):
-                raise TypeError(
-                    f"fx_fma Q8.8 path requires c in fx_2_8/fx_8_8, got: {c_type}"
-                )
-            op_type = "fx_8_8_fma"
-            out_type = "fx_8_8"
-        elif a_type == "fx_9_8" and b_type == "fx_9_8":
-            if c_type != "fx_9_8":
-                raise TypeError(f"fx_fma Q9.8 path requires c in fx_9_8, got: {c_type}")
-            op_type = "fx_9_8_fma"
-            out_type = "fx_9_8"
-        elif a_type == "fx_2_23" and b_type == "fx_2_23":
-            if c_type != "fx_2_23":
-                raise TypeError(
-                    f"fx_fma Q2.23 path requires c in fx_2_23, got: {c_type}"
-                )
-            op_type = "fx_2_23_fma"
-            out_type = "fx_2_23"
-        else:
-            raise TypeError(
-                f"Unsupported fx_fma type combination: {a_type} * {b_type} + {c_type}"
+        if {a_type, b_type} == {
+            "fx_texture",
+            "fx_2_23",
+        } and c_type == "fx_texture_accum":
+            texture = a if a_type == "fx_texture" else b
+            coeff = b if a_type == "fx_texture" else a
+            expr = f"fx_fma({a.expr}, {b.expr}, {c.expr})"
+            node_id = a.dag.add_fma_operation(
+                coeff, texture, c, expr, op_type="fx_texture_fma"
             )
-        expr = f"fx_fma({a.expr}, {b.expr}, {c.expr})"
-        node_id = a.dag.add_fma_operation(a, b, c, expr, op_type=op_type)
-        return Signal(
-            a.dag,
-            hw_id=node_id,
-            expr=expr,
-            type=out_type,
-            valid_expr=a.dag.ops[node_id].valid_expr,
+            return Signal(
+                a.dag,
+                hw_id=node_id,
+                expr=expr,
+                type="fx_texture_accum",
+                valid_expr=a.dag.ops[node_id].valid_expr,
+            )
+        raise TypeError(
+            f"Unsupported fx_fma type combination: {a_type} * {b_type} + {c_type}"
         )
 
     @staticmethod
@@ -1695,34 +1572,41 @@ class Signal:
         a_type = getattr(a, "type", "")
         b_type = getattr(b, "type", "")
         c_type = getattr(c, "type", "")
-        if "uint8_t" in (a_type, b_type, c_type) and {
-            a_type,
-            b_type,
-            c_type,
-        } <= {"uint8_t", "fx_2_8", "fx_8_8", "fx_9_8"}:
-            a9 = a._as_fx9_8_operand()
-            b9 = b._as_fx9_8_operand()
-            c9 = c._as_fx9_8_operand()
-            expr = f"fma({a9.expr}, {b9.expr}, {c9.expr})"
-            node_id = a.dag.add_fma_operation(a9, b9, c9, expr, op_type="fx_9_8_fma")
+        if {a_type, b_type} == {"uint8_t", "fx_2_23"} and c_type == "fx_color":
+            color = a if a_type == "uint8_t" else b
+            coeff = b if a_type == "uint8_t" else a
+            expr = f"fma({a.expr}, {b.expr}, {c.expr})"
+            node_id = a.dag.add_fma_operation(
+                color, coeff, c, expr, op_type="fx_color_fma"
+            )
             return Signal(
                 a.dag,
                 hw_id=node_id,
                 expr=expr,
-                type="fx_9_8",
+                type="fx_color",
+                valid_expr=a.dag.ops[node_id].valid_expr,
+            )
+        if {a_type, b_type} == {
+            "fx_texture",
+            "fx_2_23",
+        } and c_type == "fx_texture_accum":
+            texture = a if a_type == "fx_texture" else b
+            coeff = b if a_type == "fx_texture" else a
+            expr = f"fma({a.expr}, {b.expr}, {c.expr})"
+            node_id = a.dag.add_fma_operation(
+                coeff, texture, c, expr, op_type="fx_texture_fma"
+            )
+            return Signal(
+                a.dag,
+                hw_id=node_id,
+                expr=expr,
+                type="fx_texture_accum",
                 valid_expr=a.dag.ops[node_id].valid_expr,
             )
         if a.type != b.type or a.type != c.type:
             raise TypeError("fma requires matching signal types")
 
-        if a.type in ("fx_2_8", "fx_8_8"):
-            op_type = "fx_8_8_fma"
-        elif a.type == "fx_9_8":
-            op_type = "fx_9_8_fma"
-        elif a.type == "fx_2_23":
-            op_type = "fx_2_23_fma"
-        else:
-            op_type = "fp_fma"
+        op_type = "fp_fma"
 
         expr = f"fma({a.expr}, {b.expr}, {c.expr})"
         node_id = a.dag.add_fma_operation(a, b, c, expr, op_type=op_type)
@@ -1836,8 +1720,6 @@ if __name__ == "__main__":
         "fp_cmp": 1,
         "mem_read": 1,
         "mem_write": 1,
-        "fx_8_8_mul": 1,
-        "fx_8_8_fma": 1,
     }
 
     dag = HardwareDAG(latencies=latencies)
@@ -1862,13 +1744,13 @@ if __name__ == "__main__":
     # v0_normal_over_w_z = Signal(dag, name="v0_normal_over_w_z")
     # v1_normal_over_w_z = Signal(dag, name="v1_normal_over_w_z")
     # v2_normal_over_w_z = Signal(dag, name="v2_normal_over_w_z")
-    # Texture channels are already converted to Q2.23 upstream.
-    v0_texture_u = Signal(dag, name="v0_texture_u", type="fx_2_23")
-    v1_texture_u = Signal(dag, name="v1_texture_u", type="fx_2_23")
-    v2_texture_u = Signal(dag, name="v2_texture_u", type="fx_2_23")
-    v0_texture_v = Signal(dag, name="v0_texture_v", type="fx_2_23")
-    v1_texture_v = Signal(dag, name="v1_texture_v", type="fx_2_23")
-    v2_texture_v = Signal(dag, name="v2_texture_v", type="fx_2_23")
+    # Texture channels arrive as the narrower upstream fixed-point format.
+    v0_texture_u = Signal(dag, name="v0_texture_u", type="fx_texture")
+    v1_texture_u = Signal(dag, name="v1_texture_u", type="fx_texture")
+    v2_texture_u = Signal(dag, name="v2_texture_u", type="fx_texture")
+    v0_texture_v = Signal(dag, name="v0_texture_v", type="fx_texture")
+    v1_texture_v = Signal(dag, name="v1_texture_v", type="fx_texture")
+    v2_texture_v = Signal(dag, name="v2_texture_v", type="fx_texture")
     v0_color_r = Signal(dag, name="v0_color_r", type="uint8_t")
     v1_color_r = Signal(dag, name="v1_color_r", type="uint8_t")
     v2_color_r = Signal(dag, name="v2_color_r", type="uint8_t")
@@ -1906,19 +1788,15 @@ if __name__ == "__main__":
     t1 = t1_fp.as_fx2_23()
     t2 = t2_fp.as_fx2_23()
 
-    t0_small = t0.as_fx2_8()
-    t1_small = t1.as_fx2_8()
-    t2_small = t2.as_fx2_8()
-
     # Interpolate u, v
     u = interpolate(v0_texture_u, v1_texture_u, v2_texture_u, t0, t1, t2)
     v = interpolate(v0_texture_v, v1_texture_v, v2_texture_v, t0, t1, t2)
 
     # Interpolate color channels
-    r_fx = interpolate(v0_color_r, v1_color_r, v2_color_r, t0_small, t1_small, t2_small)
-    g_fx = interpolate(v0_color_g, v1_color_g, v2_color_g, t0_small, t1_small, t2_small)
-    b_fx = interpolate(v0_color_b, v1_color_b, v2_color_b, t0_small, t1_small, t2_small)
-    a_fx = interpolate(v0_color_a, v1_color_a, v2_color_a, t0_small, t1_small, t2_small)
+    r_fx = interpolate(v0_color_r, v1_color_r, v2_color_r, t0, t1, t2)
+    g_fx = interpolate(v0_color_g, v1_color_g, v2_color_g, t0, t1, t2)
+    b_fx = interpolate(v0_color_b, v1_color_b, v2_color_b, t0, t1, t2)
+    a_fx = interpolate(v0_color_a, v1_color_a, v2_color_a, t0, t1, t2)
 
     r = r_fx.as_u8()
     g = g_fx.as_u8()

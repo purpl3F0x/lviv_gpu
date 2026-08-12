@@ -242,8 +242,8 @@ Vertex_ScreenSpace GeometryEngine::perspectiveDivideAndViewport(const Vertex_Cli
     float norm_y = vIn.normal.y * invW;
     float norm_z = vIn.normal.z * invW;
 
-    float tex_x = vIn.texcoord.x * invW;
-    float tex_y = vIn.texcoord.y * invW;
+    float tex_x = vIn.texcoord.x;
+    float tex_y = vIn.texcoord.y;
 
     // Convert to final pipeline types
     vOut.position.x = (posX);

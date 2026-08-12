@@ -1,0 +1,9 @@
+BasedOnStyle: Microsoft
+ColumnLimit: 120
+# PenaltyBreakAssignment: 1000
+# PenaltyBreakBeforeFirstCallParameter: 1000
+# PenaltyBreakFirstLessLess: 1000
+# PenaltyReturnTypeOnItsOwnLine: 1000
+# AlignOperands: Align
+# BreakBeforeBinaryOperators: All
+# BreakBinaryOperations: OnePerLine

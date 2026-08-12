@@ -1,6 +1,7 @@
 module z_buffer_ram #(
     parameter int ADDR_WIDTH = 12,
-    parameter bit USE_XPM = 1'b1
+  parameter bit USE_XPM    = 1'b0,
+  parameter logic [31:0] RESET_Z_VALUE = 32'h3F80_0000
 ) (
     input  logic clk,
     input  logic rst_n,
@@ -15,50 +16,102 @@ module z_buffer_ram #(
     input  logic                  rd_en,
     input  logic [ADDR_WIDTH-1:0] rd_addr,
     output logic [          31:0] dout
-
 );
 
+  localparam int ForwardDepth = 3;
+
   localparam int DEPTH = 2 ** ADDR_WIDTH;
+
 `ifdef XILINX
   localparam bit UseXpmImpl = 1'b1;
 `else
   localparam bit UseXpmImpl = USE_XPM;
 `endif
 
-  logic [2*ADDR_WIDTH-1:0] rst_counter;
-  logic                    ram_wr_en;
-  logic [  ADDR_WIDTH-1:0] ram_wr_addr;
-  logic [            31:0] ram_din;
+  // =========================================================================
+  // 1. Reset / Scrubbing Logic
+  // =========================================================================
+  typedef enum logic [0:0] {
+    ZBUF_SCRUB = 1'b0,
+    ZBUF_READY = 1'b1
+  } zbuf_state_t;
 
-  // If TB does not pulse reset, start in ready state without scrub.
-  initial begin
-    rst_counter = DEPTH;
-    ready = 1'b1;
-  end
+  zbuf_state_t            zbuf_state;
+  logic [ADDR_WIDTH-1:0] scrub_addr;
+  logic                  ram_wr_en;
+  logic [ADDR_WIDTH-1:0] ram_wr_addr;
+  logic [          31:0] ram_din;
 
-  assign ram_wr_en   = (!ready) || (wr_en && rst_n);
-  assign ram_wr_addr = (!ready) ? rst_counter[ADDR_WIDTH-1:0] : wr_addr;
-  assign ram_din     = (!ready) ? 32'hFFFFFFFF : din;
+  // While scrubbing, ignore functional writes and only clear memory to far depth.
+  assign ready       = (zbuf_state == ZBUF_READY);
+  assign ram_wr_en   = (zbuf_state == ZBUF_SCRUB) || (wr_en && rst_n && ready);
+  assign ram_wr_addr = (zbuf_state == ZBUF_SCRUB) ? scrub_addr : wr_addr;
+  assign ram_din     = (zbuf_state == ZBUF_SCRUB) ? RESET_Z_VALUE : din;
 
-  // reset logic
-  always_ff @(posedge clk) begin
+  always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      rst_counter <= 0;
-      ready <= 0;
-    end else if (rst_counter != DEPTH) begin
-      rst_counter <= rst_counter + 1;
-      ready <= 0;
+      zbuf_state <= ZBUF_SCRUB;
+      scrub_addr <= '0;
     end else begin
-      ready <= 1;
+      unique case (zbuf_state)
+        ZBUF_SCRUB: begin
+          if (scrub_addr == ADDR_WIDTH'(DEPTH - 1)) begin
+            zbuf_state <= ZBUF_READY;
+          end else begin
+            scrub_addr <= scrub_addr + 1'b1;
+          end
+        end
+        ZBUF_READY: begin
+          // Stay ready until reset.
+        end
+      endcase
     end
   end
 
+  // =========================================================================
+  // 2. Parameterized In-Flight Write Tracking Shift Register
+  // =========================================================================
+  // Registered read address aligned with 1-cycle BRAM read latency
+  logic [ADDR_WIDTH-1:0] rd_addr_d1;
+
+  // Pipeline history queues (Index 0 = current input, Index 1..N-1 = history)
+  logic                  wr_en_q    [ForwardDepth];
+  logic [ADDR_WIDTH-1:0] wr_addr_q  [ForwardDepth];
+  logic [          31:0] wr_din_q   [ForwardDepth];
+
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      rd_addr_d1 <= '0;
+      for (int i = 0; i < ForwardDepth; i++) begin
+        wr_en_q[i]   <= 1'b0;
+        wr_addr_q[i] <= '0;
+        wr_din_q[i]  <= '0;
+      end
+    end else begin
+      // Target read address being evaluated at raw BRAM output
+      if (rd_en) rd_addr_d1 <= rd_addr;
+
+      // Shift Register Stage 0: Capture active write input
+      wr_en_q[0]   <= wr_en && ready;
+      wr_addr_q[0] <= wr_addr;
+      wr_din_q[0]  <= din;
+
+      // Shift Register Stages 1 to ForwardDepth-1
+      for (int i = 1; i < ForwardDepth; i++) begin
+        wr_en_q[i]   <= wr_en_q[i-1];
+        wr_addr_q[i] <= wr_addr_q[i-1];
+        wr_din_q[i]  <= wr_din_q[i-1];
+      end
+    end
+  end
+
+  // =========================================================================
+  // 3. Block RAM Implementation (Synchronous 1-Cycle Read)
+  // =========================================================================
+  logic [31:0] raw_bram_dout;
+
   generate
     if (UseXpmImpl) begin : gen_xpm_ram
-      logic [31:0] xpm_dout;
-      logic        bypass_d;
-      logic [31:0] bypass_data_d;
-
       xpm_memory_sdpram #(
           .ADDR_WIDTH_A           (ADDR_WIDTH),
           .ADDR_WIDTH_B           (ADDR_WIDTH),
@@ -94,28 +147,13 @@ module z_buffer_ram #(
           .injectdbiterra(1'b0),
           .clkb          (clk),
           .rstb          (1'b0),
-          .enb           (1'b1),
+          .enb           (rd_en),
           .regceb        (1'b1),
           .addrb         (rd_addr),
-          .doutb         (xpm_dout),
+          .doutb         (raw_bram_dout),
           .sbiterrb      (),
           .dbiterrb      ()
       );
-
-      always_ff @(posedge clk) begin
-        if (!rst_n) begin
-          bypass_d      <= 1'b0;
-          bypass_data_d <= 32'b0;
-        end else begin
-          bypass_d      <= wr_en && (rd_addr == wr_addr);
-          bypass_data_d <= din;
-        end
-      end
-
-      always_comb begin
-        if (bypass_d) dout = bypass_data_d;
-        else dout = xpm_dout;
-      end
     end else begin : gen_behav_ram
       (* ram_style = "block" *)
       logic [31:0] mem[DEPTH];
@@ -126,10 +164,28 @@ module z_buffer_ram #(
         end
       end
 
-      always_comb begin
-        if ((rd_addr == wr_addr) && wr_en) dout = din;
-        else dout = mem[rd_addr];
+      // Synchronous BRAM read inference matching XPM 1-cycle latency
+      always_ff @(posedge clk) begin
+        if (rd_en) begin
+          raw_bram_dout <= mem[rd_addr];
+        end
       end
     end
   endgenerate
+
+  // =========================================================================
+  // 4. Parameterized Priority Forwarding Mux
+  // =========================================================================
+  // Scans from youngest (index 0) to oldest (index ForwardDepth-1)
+  always_comb begin
+    dout = raw_bram_dout;  // Default fallback: BRAM output
+
+    // Loop backwards so that lower indices (youngest writes) override higher indices
+    for (int i = ForwardDepth - 1; i >= 0; i--) begin
+      if (wr_en_q[i] && (wr_addr_q[i] == rd_addr_d1)) begin
+        dout = wr_din_q[i];
+      end
+    end
+  end
+
 endmodule

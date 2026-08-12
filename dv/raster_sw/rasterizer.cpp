@@ -1,273 +1,9 @@
 #include "rasterizer.h"
-#include "Vraster_core.h"
-#include "verilated.h"
 #include <algorithm>
-#include <cmath>
-#include <cstdlib>
 #include <iostream>
-#include <string>
 
-
-extern "C" double dpi_bits_to_float(uint32_t bits)
-{
-    union {
-        uint32_t i;
-        float f;
-    } u;
-    u.i = bits;
-    return (double)u.f;
-}
-
-extern "C" uint32_t dpi_float_to_bits(double val)
-{
-    union {
-        uint32_t i;
-        float f;
-    } u;
-    u.f = (float)val;
-    return u.i;
-}
-
-// Statically instantiated Verilator objects for hardware verification
-static VerilatedContext *s_contextp = nullptr;
-static Vraster_core *s_top = nullptr;
-int s_failed_count = 0;
-
-static void init_verilator()
-{
-    if (!s_contextp)
-    {
-        s_contextp = new VerilatedContext();
-        s_top = new Vraster_core{s_contextp};
-
-        // Assert reset
-        s_top->clk = 0;
-        s_top->rst_n = 0;
-        s_top->valid_in = 0;
-        s_top->ready_in = 0;
-        s_top->eval();
-
-        // Toggle clock a few times
-        for (int i = 0; i < 10; ++i)
-        {
-            s_top->clk = 1;
-            s_top->eval();
-            s_top->clk = 0;
-            s_top->eval();
-        }
-
-        s_top->rst_n = 1;
-        s_top->eval();
-    }
-}
-
-static void step_clock()
-{
-    s_contextp->timeInc(1);
-    s_top->clk = 1;
-    s_top->eval();
-
-    s_contextp->timeInc(1);
-    s_top->clk = 0;
-    s_top->eval();
-}
-
-static void pack_vertex_sw(VlWide<10> &v_in, const Vertex_ScreenSpace &v)
-{
-    v_in[9] = *reinterpret_cast<const uint32_t *>(&v.position.x);
-    v_in[8] = *reinterpret_cast<const uint32_t *>(&v.position.y);
-    v_in[7] = *reinterpret_cast<const uint32_t *>(&v.position.z);
-    v_in[6] = *reinterpret_cast<const uint32_t *>(&v.position.w);
-    v_in[5] = *reinterpret_cast<const uint32_t *>(&v.normal_over_w.x);
-    v_in[4] = *reinterpret_cast<const uint32_t *>(&v.normal_over_w.y);
-    v_in[3] = *reinterpret_cast<const uint32_t *>(&v.normal_over_w.z);
-    v_in[2] = v.color;
-    v_in[1] = *reinterpret_cast<const uint32_t *>(&v.texcoord_over_w.x);
-    v_in[0] = *reinterpret_cast<const uint32_t *>(&v.texcoord_over_w.y);
-}
-
-static bool compare_floats_sw(float actual, float expected, const std::string &name, float tolerance = 1e-4f)
-{
-    if (std::isnan(actual) && std::isnan(expected))
-        return true;
-
-    uint32_t act_raw = *reinterpret_cast<uint32_t *>(&actual);
-    uint32_t exp_raw = *reinterpret_cast<uint32_t *>(&expected);
-    if (act_raw == exp_raw)
-        return true;
-
-    float diff = std::abs(actual - expected);
-    if (diff > tolerance)
-    {
-        if (expected != 0.0f && (diff / std::abs(expected)) < tolerance)
-        {
-            return true;
-        }
-        std::cout << "  Mismatch in " << name << ": Actual = " << actual << " (0x" << std::hex << act_raw
-                  << "), Expected = " << expected << " (0x" << exp_raw << std::dec << "), Diff = " << diff << "\n";
-        return false;
-    }
-    return true;
-}
-
-static void verify_hardware_triangle(const Vertex_ScreenSpace &v0, const Vertex_ScreenSpace &v1,
-                                     const Vertex_ScreenSpace &v2, int tile_x_id, int tile_y_id, float e0_row,
-                                     float e1_row, float e2_row, float e0_dx, float e0_dy, float e1_dx, float e1_dy,
-                                     float e2_dx, float e2_dy, float invArea, int minX, int minY, int maxX, int maxY)
-{
-    init_verilator();
-
-    // Wait until ready_out is high
-    int timeout = 0;
-    while (!s_top->ready_out)
-    {
-        s_top->valid_in = 0;
-        step_clock();
-        if (++timeout > 1000)
-        {
-            std::cerr << "Timeout waiting for ready_out in SW rasterizer integration!" << std::endl;
-            exit(1);
-        }
-    }
-
-    // Send V0
-    pack_vertex_sw(s_top->vertex_in, v0);
-    s_top->tile_x_id = tile_x_id;
-    s_top->tile_y_id = tile_y_id;
-    s_top->valid_in = 1;
-    step_clock();
-
-    // Send V1
-    pack_vertex_sw(s_top->vertex_in, v1);
-    s_top->valid_in = 1;
-    step_clock();
-
-    // Send V2
-    pack_vertex_sw(s_top->vertex_in, v2);
-    s_top->valid_in = 1;
-    step_clock();
-
-    // Clear valid_in
-    s_top->valid_in = 0;
-
-    // Wait for valid_out
-    timeout = 0;
-    while (!s_top->valid_out)
-    {
-        step_clock();
-        if (++timeout > 1000)
-        {
-            std::cerr << "Timeout waiting for valid_out in SW rasterizer integration!" << std::endl;
-            exit(1);
-        }
-    }
-
-    // Retrieve outputs
-    float act_e0_row = *reinterpret_cast<float *>(&s_top->out_e0_00);
-    float act_e1_row = *reinterpret_cast<float *>(&s_top->out_e1_00);
-    float act_e2_row = *reinterpret_cast<float *>(&s_top->out_e2_00);
-    float act_e0_10 = *reinterpret_cast<float *>(&s_top->out_e0_10);
-    float act_e1_10 = *reinterpret_cast<float *>(&s_top->out_e1_10);
-    float act_e2_10 = *reinterpret_cast<float *>(&s_top->out_e2_10);
-    float act_e0_01 = *reinterpret_cast<float *>(&s_top->out_e0_01);
-    float act_e1_01 = *reinterpret_cast<float *>(&s_top->out_e1_01);
-    float act_e2_01 = *reinterpret_cast<float *>(&s_top->out_e2_01);
-    float act_e0_11 = *reinterpret_cast<float *>(&s_top->out_e0_11);
-    float act_e1_11 = *reinterpret_cast<float *>(&s_top->out_e1_11);
-    float act_e2_11 = *reinterpret_cast<float *>(&s_top->out_e2_11);
-    float act_e0_dx = *reinterpret_cast<float *>(&s_top->out_e0_dx_2x);
-    float act_e0_dy = *reinterpret_cast<float *>(&s_top->out_e0_dy_2x);
-    float act_e1_dx = *reinterpret_cast<float *>(&s_top->out_e1_dx_2x);
-    float act_e1_dy = *reinterpret_cast<float *>(&s_top->out_e1_dy_2x);
-    float act_e2_dx = *reinterpret_cast<float *>(&s_top->out_e2_dx_2x);
-    float act_e2_dy = *reinterpret_cast<float *>(&s_top->out_e2_dy_2x);
-    float act_invArea = *reinterpret_cast<float *>(&s_top->out_invArea);
-    float act_minX_local = (float)s_top->out_minX_local;
-    float act_minY_local = (float)s_top->out_minY_local;
-    float act_width = (float)s_top->out_width;
-    float act_height = (float)s_top->out_height;
-
-    float p_min_x_even = (float)minX + 0.5f;
-    float p_min_y_even = (float)minY + 0.5f;
-
-    auto edgeFunc = [](float ax, float ay, float bx, float by, float cx, float cy) {
-        return (cx - ax) * (by - ay) - (cy - ay) * (bx - ax);
-    };
-
-    float exp_e0_row = edgeFunc(v1.position.x, v1.position.y, v2.position.x, v2.position.y, p_min_x_even, p_min_y_even);
-    float exp_e1_row = edgeFunc(v2.position.x, v2.position.y, v0.position.x, v0.position.y, p_min_x_even, p_min_y_even);
-    float exp_e2_row = edgeFunc(v0.position.x, v0.position.y, v1.position.x, v1.position.y, p_min_x_even, p_min_y_even);
-
-    float exp_e0_10 = exp_e0_row + e0_dx;
-    float exp_e1_10 = exp_e1_row + e1_dx;
-    float exp_e2_10 = exp_e2_row + e2_dx;
-
-    float exp_e0_01 = exp_e0_row + e0_dy;
-    float exp_e1_01 = exp_e1_row + e1_dy;
-    float exp_e2_01 = exp_e2_row + e2_dy;
-
-    float exp_e0_11 = exp_e0_row + e0_dx + e0_dy;
-    float exp_e1_11 = exp_e1_row + e1_dx + e1_dy;
-    float exp_e2_11 = exp_e2_row + e2_dx + e2_dy;
-
-    float exp_minX_local = (float)(minX & 127);
-    float exp_minY_local = (float)(minY & 127);
-    float exp_width = (float)(maxX - minX);
-    float exp_height = (float)(maxY - minY);
-
-    float exp_e0_dx_2x = e0_dx + e0_dx;
-    float exp_e0_dy_2x = e0_dy + e0_dy;
-    float exp_e1_dx_2x = e1_dx + e1_dx;
-    float exp_e1_dy_2x = e1_dy + e1_dy;
-    float exp_e2_dx_2x = e2_dx + e2_dx;
-    float exp_e2_dy_2x = e2_dy + e2_dy;
-
-    // Check match
-    bool match = true;
-    match &= compare_floats_sw(act_e0_row, exp_e0_row, "out_e0_row", 2e-3f);
-    match &= compare_floats_sw(act_e1_row, exp_e1_row, "out_e1_row", 2e-3f);
-    match &= compare_floats_sw(act_e2_row, exp_e2_row, "out_e2_row", 2e-3f);
-    match &= compare_floats_sw(act_e0_10, exp_e0_10, "out_e0_10", 2e-3f);
-    match &= compare_floats_sw(act_e1_10, exp_e1_10, "out_e1_10", 2e-3f);
-    match &= compare_floats_sw(act_e2_10, exp_e2_10, "out_e2_10", 2e-3f);
-    match &= compare_floats_sw(act_e0_01, exp_e0_01, "out_e0_01", 2e-3f);
-    match &= compare_floats_sw(act_e1_01, exp_e1_01, "out_e1_01", 2e-3f);
-    match &= compare_floats_sw(act_e2_01, exp_e2_01, "out_e2_01", 2e-3f);
-    match &= compare_floats_sw(act_e0_11, exp_e0_11, "out_e0_11", 2e-3f);
-    match &= compare_floats_sw(act_e1_11, exp_e1_11, "out_e1_11", 2e-3f);
-    match &= compare_floats_sw(act_e2_11, exp_e2_11, "out_e2_11", 2e-3f);
-    match &= compare_floats_sw(act_e0_dx, exp_e0_dx_2x, "out_e0_dx_2x");
-    match &= compare_floats_sw(act_e0_dy, exp_e0_dy_2x, "out_e0_dy_2x");
-    match &= compare_floats_sw(act_e1_dx, exp_e1_dx_2x, "out_e1_dx_2x");
-    match &= compare_floats_sw(act_e1_dy, exp_e1_dy_2x, "out_e1_dy_2x");
-    match &= compare_floats_sw(act_e2_dx, exp_e2_dx_2x, "out_e2_dx_2x");
-    match &= compare_floats_sw(act_e2_dy, exp_e2_dy_2x, "out_e2_dy_2x");
-    match &= compare_floats_sw(act_invArea, invArea, "out_invArea", 1e-3f);
-    match &= compare_floats_sw(act_minX_local, exp_minX_local, "out_minX_local");
-    match &= compare_floats_sw(act_minY_local, exp_minY_local, "out_minY_local");
-    match &= compare_floats_sw(act_width, exp_width, "out_width");
-    match &= compare_floats_sw(act_height, exp_height, "out_height");
-
-    if (!match)
-    {
-        s_failed_count++;
-        std::cout << "Mismatch found at tile (" << tile_x_id << ", " << tile_y_id << ")!\n";
-        std::cout << "Vertices: \n"
-                  << "  v0 = (" << v0.position.x << ", " << v0.position.y << ")\n"
-                  << "  v1 = (" << v1.position.x << ", " << v1.position.y << ")\n"
-                  << "  v2 = (" << v2.position.x << ", " << v2.position.y << ")\n";
-        if (s_failed_count > 10)
-        {
-            std::cout << "Too many failures! Terminating simulation.\n";
-            exit(1);
-        }
-    }
-
-    // Handshake complete - set ready_in to clear valid_out
-    s_top->ready_in = 1;
-    step_clock();
-    s_top->ready_in = 0;
-}
+#include <ap_fixed.h>
+#include <ap_int.h>
 
 struct ColorU8
 {
@@ -304,6 +40,12 @@ void Rasterizer::binningPass()
         }
     }
 
+    double totalWidth = 0;
+    double totalHeight = 0;
+    double totalClampedWidth = 0;
+    double totalClampedHeight = 0;
+    size_t validTriangles = 0;
+
     for (size_t i = 0; i < triangle_list.size(); ++i)
     {
         const auto &tri = triangle_list[i];
@@ -311,14 +53,27 @@ void Rasterizer::binningPass()
         const Vertex_ScreenSpace &v1 = tri[1];
         const Vertex_ScreenSpace &v2 = tri[2];
 
+        // Raw BB
+        float rawMinX = std::min({v0.position.x, v1.position.x, v2.position.x});
+        float rawMaxX = std::max({v0.position.x, v1.position.x, v2.position.x});
+        float rawMinY = std::min({v0.position.y, v1.position.y, v2.position.y});
+        float rawMaxY = std::max({v0.position.y, v1.position.y, v2.position.y});
+
+        totalWidth += (double)(rawMaxX - rawMinX);
+        totalHeight += (double)(rawMaxY - rawMinY);
+        validTriangles++;
+
         // Triangle bounding box
-        int triMinX = std::max(0, math_floor(std::min({v0.position.x, v1.position.x, v2.position.x})));
-        int triMinY = std::max(0, math_floor(std::min({v0.position.y, v1.position.y, v2.position.y})));
-        int triMaxX = std::min(fb->width - 1, math_ceil(std::max({v0.position.x, v1.position.x, v2.position.x})));
-        int triMaxY = std::min(fb->height - 1, math_ceil(std::max({v0.position.y, v1.position.y, v2.position.y})));
+        int triMinX = std::max(0, math_floor(rawMinX));
+        int triMinY = std::max(0, math_floor(rawMinY));
+        int triMaxX = std::min(fb->width - 1, math_ceil(rawMaxX));
+        int triMaxY = std::min(fb->height - 1, math_ceil(rawMaxY));
 
         if (triMinX > triMaxX || triMinY > triMaxY)
             continue;
+
+        totalClampedWidth += (double)(triMaxX - triMinX);
+        totalClampedHeight += (double)(triMaxY - triMinY);
 
         // Bins overlap
         int startBinX = triMinX / BIN_SIZE;
@@ -376,6 +131,14 @@ void Rasterizer::binningPass()
                 }
             }
         }
+    }
+
+    if (validTriangles > 0)
+    {
+        std::cout << "Average Raw BB Width: " << (totalWidth / validTriangles) << std::endl;
+        std::cout << "Average Raw BB Height: " << (totalHeight / validTriangles) << std::endl;
+        std::cout << "Average Clamped BB Width: " << (totalClampedWidth / validTriangles) << std::endl;
+        std::cout << "Average Clamped BB Height: " << (totalClampedHeight / validTriangles) << std::endl;
     }
 }
 
@@ -456,13 +219,14 @@ void Rasterizer::rasterizeBins(bool dump_bins)
 // -----------------------------------------------------------------------------
 // STEP 4: Rasterization (Edge Equations & Perspective-Correct Barycentric)
 // -----------------------------------------------------------------------------
+#ifndef RASTERIZER_EXTERNAL_RASTERIZE_TRIANGLE
 void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_ScreenSpace &v1,
                                    const Vertex_ScreenSpace &v2, int binMinX, int binMinY, int binMaxX, int binMaxY,
                                    uint32_t *tileColor, float *tileDepth)
 {
 
     // Toggle the type of the interpolation her
-    // typedef ap_fixed<44, 21> interp_type;
+    // typedef ap_fixed<48, 24> interp_type;
     typedef float interp_type;
     // typedef ap_fixed<38, 14> bb_type;
 
@@ -471,13 +235,13 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_Sc
     const tvec2<interp_type> p1(v1.position.x, v1.position.y);
     const tvec2<interp_type> p2(v2.position.x, v2.position.y);
 
-    // Extract colors for linear interpolation (using 8-bit channels 0-255)
+    // Extract colors and pre-divide by w (using position.w which holds 1/w) for perspective-correct interpolation
     const ColorU8 uc0 = unpackU8(v0.color);
     const ColorU8 uc1 = unpackU8(v1.color);
     const ColorU8 uc2 = unpackU8(v2.color);
-    const tvec4<interp_type> c0(uc0.r, uc0.g, uc0.b, uc0.a);
-    const tvec4<interp_type> c1(uc1.r, uc1.g, uc1.b, uc1.a);
-    const tvec4<interp_type> c2(uc2.r, uc2.g, uc2.b, uc2.a);
+    const tvec4<ap_fixed<17, 9, AP_RND>> c0(uc0.r, uc0.g, uc0.b, uc0.a);
+    const tvec4<ap_fixed<17, 9, AP_RND>> c1(uc1.r, uc1.g, uc1.b, uc1.a);
+    const tvec4<ap_fixed<17, 9, AP_RND>> c2(uc2.r, uc2.g, uc2.b, uc2.a);
 
     // Triangle Area (for Barycentric normalization)
     interp_type area = edgeFunction(p0, p1, p2);
@@ -485,11 +249,18 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_Sc
     // Calculate invArea precisely using the chosen interpolation type (done once per triangle)
     interp_type invArea = interp_type(1.0f) / (interp_type)area;
 
+    typedef float bb_type;
+    typedef int p_min_type;
+
     // Calculate the triangle's bounding box in screen space
-    int triMinX = std::min({math_floor(v0.position.x), math_floor(v1.position.x), math_floor(v2.position.x)});
-    int triMinY = std::min({math_floor(v0.position.y), math_floor(v1.position.y), math_floor(v2.position.y)});
-    int triMaxX = std::max({math_ceil(v0.position.x), math_ceil(v1.position.x), math_ceil(v2.position.x)});
-    int triMaxY = std::max({math_ceil(v0.position.y), math_ceil(v1.position.y), math_ceil(v2.position.y)});
+    p_min_type triMinX = std::min(
+        {math_floor((bb_type)v0.position.x), math_floor((bb_type)v1.position.x), math_floor((bb_type)v2.position.x)});
+    p_min_type triMinY = std::min(
+        {math_floor((bb_type)v0.position.y), math_floor((bb_type)v1.position.y), math_floor((bb_type)v2.position.y)});
+    p_min_type triMaxX = std::max(
+        {math_ceil((bb_type)v0.position.x), math_ceil((bb_type)v1.position.x), math_ceil((bb_type)v2.position.x)});
+    p_min_type triMaxY = std::max(
+        {math_ceil((bb_type)v0.position.y), math_ceil((bb_type)v1.position.y), math_ceil((bb_type)v2.position.y)});
 
     // Align to 2x2 blocks: min is even (0, 2, 4...), max is odd (1, 3, 5...)
     triMinX = triMinX & ~1;
@@ -503,8 +274,22 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_Sc
     int maxX = std::min(binMaxX, triMaxX);
     int maxY = std::min(binMaxY, triMaxY);
 
+    // No Bounding Box Logic
+    minX = binMinX;
+    minY = binMinY;
+    maxX = binMaxX;
+    maxY = binMaxY;
+
+    // auto x_size = maxX - minX;
+    // auto y_size = maxY - minY;
+    // auto x_start = minY % BIN_SIZE;
+    // auto y_start = minX % BIN_SIZE;
+
     // Calculate initial edge functions at the center of the top-left pixel of the intersected bounding box
-    tvec2<interp_type> p_min(interp_type(minX) + interp_type(0.5f), interp_type(minY) + interp_type(0.5f));
+    tvec2<interp_type> p_min(p_min_type(minX) + p_min_type(0.5f), p_min_type(minY) + p_min_type(0.5f));
+    // tvec2<interp_type> p_min_left(p_min_type(minX) + p_min_type(1.5f), p_min_type(minY) + p_min_type(0.5f));
+    // tvec2<interp_type> p_min_bottom(p_min_type(minX) + p_min_type(0.5f), p_min_type(minY) + p_min_type(1.5f));
+    // tvec2<interp_type> p_min_bottom_left(p_min_type(minX) + p_min_type(1.5f), p_min_type(minY) + p_min_type(1.5f));
 
     // Track EXACT edge functions (unnormalized) to avoid precision loss across scanlines
     interp_type e0_row = edgeFunction(p1, p2, p_min);
@@ -521,10 +306,25 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_Sc
     interp_type e1_dy = (p2.x - p0.x);
     interp_type e2_dy = (p0.x - p1.x);
 
-    // Call Verilator verification
-    verify_hardware_triangle(v0, v1, v2, binMinX / BIN_SIZE, binMinY / BIN_SIZE, (float)e0_row, (float)e1_row,
-                             (float)e2_row, (float)e0_dx, (float)e0_dy, (float)e1_dx, (float)e1_dy, (float)e2_dx,
-                             (float)e2_dy, (float)invArea, minX, minY, maxX, maxY);
+    interp_type e0_00 = e0_row;
+    interp_type e1_00 = e1_row;
+    interp_type e2_00 = e2_row;
+
+    interp_type e0_10 = e0_row + e0_dx;
+    interp_type e1_10 = e1_row + e1_dx;
+    interp_type e2_10 = e2_row + e2_dx;
+
+    interp_type e0_01 = e0_row + e0_dy;
+    interp_type e1_01 = e1_row + e1_dy;
+    interp_type e2_01 = e2_row + e2_dy;
+
+    interp_type e0_11 = e0_row + e0_dx + e0_dy;
+    interp_type e1_11 = e1_row + e1_dx + e1_dy;
+    interp_type e2_11 = e2_row + e2_dx + e2_dy;
+
+    // std::cout << e0_row << " " << e1_row << " " << e2_row << " " << e0_dx << " " << e1_dx << " " << e2_dx << " "
+    //           << e0_dy << " " << e1_dy << " " << e2_dy << " " << minX % BIN_SIZE << " " << minY % BIN_SIZE <<
+    //           "\n";
 
     // --- HW STEP 2: Scanline Traversal / Rasterization ---
     // Rasterize within the intersected bounding box
@@ -536,6 +336,9 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_Sc
 
         for (int x = minX; x <= maxX; ++x)
         {
+
+            pixel_draw_count++;
+
             // --- STEP 3: Inside/Outside Test ---
             if (e0 >= 0 && e1 >= 0 && e2 >= 0)
             {
@@ -560,30 +363,55 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_Sc
                                        iw2 * (interp_type)v2.position.w;
 
                     // --- STEP 7: Perspective-Correct Attribute Interpolation ---
-                    auto normal_over_w =
-                        tvec3<interp_type>(v0.normal_over_w.x, v0.normal_over_w.y, v0.normal_over_w.z) * iw0 +
-                        tvec3<interp_type>(v1.normal_over_w.x, v1.normal_over_w.y, v1.normal_over_w.z) * iw1 +
-                        tvec3<interp_type>(v2.normal_over_w.x, v2.normal_over_w.y, v2.normal_over_w.z) * iw2;
+                    // auto normal_over_w =
+                    //     tvec3<interp_type>(v0.normal_over_w.x, v0.normal_over_w.y, v0.normal_over_w.z) * iw0 +
+                    //     tvec3<interp_type>(v1.normal_over_w.x, v1.normal_over_w.y, v1.normal_over_w.z) * iw1 +
+                    //     tvec3<interp_type>(v2.normal_over_w.x, v2.normal_over_w.y, v2.normal_over_w.z) * iw2;
 
-                    auto texcoord_over_w = tvec2<interp_type>(v0.texcoord_over_w.x, v0.texcoord_over_w.y) * iw0 +
-                                           tvec2<interp_type>(v1.texcoord_over_w.x, v1.texcoord_over_w.y) * iw1 +
-                                           tvec2<interp_type>(v2.texcoord_over_w.x, v2.texcoord_over_w.y) * iw2;
+                    // auto texcoord_over_w = tvec2<interp_type>(v0.texcoord_over_w.x, v0.texcoord_over_w.y) * iw0 +
+                    //                        tvec2<interp_type>(v1.texcoord_over_w.x, v1.texcoord_over_w.y) * iw1 +
+                    //                        tvec2<interp_type>(v2.texcoord_over_w.x, v2.texcoord_over_w.y) * iw2;
 
-                    auto color_interp = c0 * iw0 + c1 * iw1 + c2 * iw2;
+                    // auto color_interp = c0 * iw0 + c1 * iw1 + c2 * iw2;
 
                     interp_type w = interp_type(1.0f) / invW;
+
+
+                    float t0_fp = iw0 * v0.position.w * w;
+                    float t1_fp = iw1 * v1.position.w * w;
+                    float t2_fp = iw2 * v2.position.w * w;
+
+                    ap_fixed<25, 2, AP_RND> t0 = t0_fp;
+                    ap_fixed<25, 2, AP_RND> t1 = t1_fp;
+                    ap_fixed<25, 2, AP_RND> t2 = t2_fp;
+
+                    ap_fixed<10, 2, AP_RND> t0_small = t0_fp;
+                    ap_fixed<10, 2, AP_RND> t1_small = t1_fp;
+                    ap_fixed<10, 2, AP_RND> t2_small = t2_fp;
 
                     // --- STEP 8: Programmable Fragment Shader Assembly ---
                     Fragment_In fIn;
                     fIn.screenCoord = tvec2<float>(x, y);
                     fIn.depth = z;
-                    fIn.normal = tvec3<float>(normal_over_w.x * w, normal_over_w.y * w, normal_over_w.z * w);
-                    fIn.texcoord = tvec2<float>(texcoord_over_w.x * w, texcoord_over_w.y * w);
+                    // fIn.normal = tvec3<float>(normal_over_w.x * w, normal_over_w.y * w, normal_over_w.z * w);
+                    // fIn.texcoord = tvec2<float>(texcoord_over_w.x * w, texcoord_over_w.y * w);
 
-                    ColorU8 c_interp_u8 = {(uint8_t)std::max(0, std::min(255, (int)color_interp.x)),
-                                           (uint8_t)std::max(0, std::min(255, (int)color_interp.y)),
-                                           (uint8_t)std::max(0, std::min(255, (int)color_interp.z)),
-                                           (uint8_t)std::max(0, std::min(255, (int)color_interp.w))};
+                    fIn.texcoord.x = t0 * (ap_fixed<17, 4, AP_RND>)v0.texcoord_over_w.x +
+                                     t1 * (ap_fixed<17, 4, AP_RND>)v1.texcoord_over_w.x +
+                                     t2 * (ap_fixed<17, 4, AP_RND>)v2.texcoord_over_w.x;
+                    fIn.texcoord.y = t0 * (ap_fixed<17, 4, AP_RND>)v0.texcoord_over_w.y +
+                                     t1 * (ap_fixed<17, 4, AP_RND>)v1.texcoord_over_w.y +
+                                     t2 * (ap_fixed<17, 4, AP_RND>)v2.texcoord_over_w.y;
+
+                    auto color_interp_corrected = c0 * (ap_fixed<17, 9, AP_RND>)t0 + c1 * (ap_fixed<17, 9, AP_RND>)t1 +
+                                                  c2 * (ap_fixed<17, 9, AP_RND>)t2;
+
+                    // auto color_interp_corrected = color_interp * w;
+
+                    ColorU8 c_interp_u8 = {(uint8_t)std::max(0, std::min(255, (int)color_interp_corrected.x)),
+                                           (uint8_t)std::max(0, std::min(255, (int)color_interp_corrected.y)),
+                                           (uint8_t)std::max(0, std::min(255, (int)color_interp_corrected.z)),
+                                           (uint8_t)std::max(0, std::min(255, (int)color_interp_corrected.w))};
                     fIn.color = packU8(c_interp_u8);
 
                     uint32_t finalColor = fragmentShader(fIn);
@@ -601,6 +429,7 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_Sc
         e2_row += e2_dy;
     }
 }
+#endif
 
 // -----------------------------------------------------------------------------
 // STEP 5: Fragment Shader

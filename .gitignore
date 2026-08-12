@@ -1,2 +1,7 @@
 *.vcd
 tb_sim*
+*.d
+*.o
+*.exe
+__pycache__/**
+*.pyc

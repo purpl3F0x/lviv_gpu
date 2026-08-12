@@ -1,8 +1,9 @@
 // Fragment Shader (Wasabi)
 // Copyright (c) 2026 Stavros Avramidis
 
-// TODO: Variable pipeline latency
-// TODO: Disable unused paths
+// See:
+//  - https://www.talisman.org/opengl-1.1/Reference/glTexEnv.html#Description
+//  - https://registry.khronos.org/OpenGL-Refpages/gl2.1/xhtml/glTexEnv.xml
 
 `timescale 1ns / 1ns
 
@@ -220,10 +221,10 @@ module fragment_shader (
       add_g_s4 <= add_g_s3;
       add_b_s4 <= add_b_s3;
 
-      div_r <= (sum_r + 17'd128) >> 8;
-      div_g <= (sum_g + 17'd128) >> 8;
-      div_b <= (sum_b + 17'd128) >> 8;
-      div_a <= (prod_a_s3 + 16'd128) >> 8;
+      div_r <= {sum_r + 17'd128}[15:8];
+      div_g <= {sum_g + 17'd128}[15:8];
+      div_b <= {sum_b + 17'd128}[15:8];
+      div_a <= {prod_a_s3 + 16'd128}[15:8];
 
       // ========================================================
       // STAGE 5 (Final Output Selection)

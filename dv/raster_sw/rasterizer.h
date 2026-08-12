@@ -42,8 +42,10 @@ class Rasterizer
     Framebuffer *fb;
     TextureUnit textureUnit;
 
+    uint64_t pixel_draw_count = 0;
+
     // TBR State
-    static constexpr int BIN_SIZE = 128;
+    static const int BIN_SIZE = 128;
     int num_bins_x;
     int num_bins_y;
     std::vector<std::vector<Bin>> bins;
@@ -87,10 +89,6 @@ class Rasterizer
                            int minX, int minY, int maxX, int maxY, uint32_t *tileColor, float *tileDepth);
 
     uint32_t fragmentShader(const Fragment_In &fIn);
-
-    static constexpr float TILE_TO_FLOAT_LUT(int tile_idx) {
-        return (float)(tile_idx * BIN_SIZE) + 0.5f;
-    }
 
     // Helpers
     template <typename T> T edgeFunction(const tvec2<T> &a, const tvec2<T> &b, const tvec2<T> &c)

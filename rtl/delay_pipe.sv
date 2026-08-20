@@ -20,7 +20,11 @@ module delay_pipe #(
     logic [WIDTH-1:0] pipe[STAGES];
 
     always_ff @(posedge clk) begin
-      if (clken) begin
+      if (!rst_n) begin
+        for (int i = 0; i < STAGES; i++) begin
+          pipe[i] <= '0;
+        end
+      end else if (clken) begin
         pipe[0] <= data_in;
         for (int i = 1; i < STAGES; i++) begin
           pipe[i] <= pipe[i-1];

@@ -53,7 +53,7 @@ module z_buffer_ram #(
       zbuf_state <= ZBUF_SCRUB;
       scrub_addr <= '0;
     end else begin
-      unique case (zbuf_state)
+      case (zbuf_state)
         ZBUF_SCRUB: begin
           if (scrub_addr == ADDR_WIDTH'(DEPTH - 1)) begin
             zbuf_state <= ZBUF_READY;
@@ -64,6 +64,7 @@ module z_buffer_ram #(
         ZBUF_READY: begin
           // Stay ready until reset.
         end
+        default: begin end
       endcase
     end
   end

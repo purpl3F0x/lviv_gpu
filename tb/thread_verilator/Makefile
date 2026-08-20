@@ -13,6 +13,7 @@ TARGET = $(BUILD_DIR)/rasterizer_thread.exe
 
 SV_SRCS = ../../rtl/gpu_types_pkg.sv \
           thread_verilator_wrap.sv \
+          ../../tb/common/axi_ram.v \
           ../../rtl/fp_wrappers.sv \
           ../../rtl/fp_cmp_le.sv \
           ../../rtl/axis_skid_buffer.sv \
@@ -37,7 +38,6 @@ CPP_SRCS = ../../dv/raster_sw/main.cpp \
 VERILATOR_CFLAGS = --CFLAGS -std=c++20 \
                    --CFLAGS -O2 \
                    --CFLAGS -DRASTERIZER_EXTERNAL_RASTERIZE_TRIANGLE \
-                   --CFLAGS -DTHREAD_VERILATOR_NO_TEXTURE \
                    --CFLAGS -I$(RASTER_SW_DIR) \
                    --CFLAGS -I$(HLS_INCLUDE_DIR) \
                    --CFLAGS -Wno-deprecated-enum-enum-conversion

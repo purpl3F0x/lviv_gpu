@@ -14,7 +14,8 @@
 #include "stb_image_write.h"
 
 #ifdef RASTERIZER_EXTERNAL_RASTERIZE_TRIANGLE
-bool threadCmpExportReferenceFramebuffer(Framebuffer *outFb);
+extern void threadCmpProgramTexture(const std::vector<uint32_t> &pixels, int width, int height);
+extern void threadCmpSaveReferenceImage(const char *path);
 #endif
 
 std::vector<Vertex_ObjectSpace> loadOBJ(const std::string &filename)
@@ -91,9 +92,10 @@ std::vector<Vertex_ObjectSpace> loadOBJ(const std::string &filename)
                 uint8_t g = static_cast<uint8_t>(std::abs(vertex.normal.y) * 255.0f);
                 uint8_t b = static_cast<uint8_t>(std::abs(vertex.normal.z) * 255.0f);
                 vertex.color = (a << 24) | (r << 16) | (g << 8) | b;
-                // Procedural planar mapping for testing since Suzanne has no UVs
-                float u = vertex.position.x * 0.5f + 0.5f;
-                float v = vertex.position.y * 0.5f + 0.5f;
+                // Procedural planar mapping - UV scale > 1 causes tiling with REPEAT wrap mode
+                const float uvScale = 4.0f;
+                float u = (vertex.position.x * 0.5f + 0.5f) * uvScale;
+                float v = (vertex.position.y * 0.5f + 0.5f) * uvScale;
                 vertex.texcoord = Vec2(u, v);
                 face_verts.push_back(vertex);
             }
@@ -178,7 +180,8 @@ int main()
 #ifndef THREAD_VERILATOR_NO_TEXTURE
     Texture myTex;
     int tw, th, tcomp;
-    unsigned char *data = stbi_load("texture.jpg", &tw, &th, &tcomp, 4);
+    const char *texture_path = "texture_3.jpg";
+    unsigned char *data = stbi_load(texture_path, &tw, &th, &tcomp, 4);
     if (data)
     {
         myTex.width = tw;
@@ -193,15 +196,20 @@ int main()
             myTex.pixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
         }
         stbi_image_free(data);
-        std::cout << "Loaded texture.jpg (" << tw << "x" << th << ")" << std::endl;
+        std::cout << "Loaded " << texture_path << " (" << tw << "x" << th << ")" << std::endl;
 
         rasterizer.textureUnit.enabled = true;
         rasterizer.textureUnit.boundTexture = &myTex;
         rasterizer.textureUnit.envMode = TexEnvMode::MODULATE;
+
+#ifdef RASTERIZER_EXTERNAL_RASTERIZE_TRIANGLE
+        threadCmpProgramTexture(myTex.pixels, tw, th);
+#endif
     }
     else
     {
-        std::cerr << "Failed to load texture.jpg" << std::endl;
+        std::cerr << "Failed to load " << texture_path << std::endl;
+        return 1;
     }
 #else
     std::cout << "Texture disabled for thread_verilator compare run" << std::endl;
@@ -209,7 +217,6 @@ int main()
 
     // 3. Clear framebuffer
     fb.clear(0xFF636363, 1.0f);
-
     // 4. Draw!
     auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -227,17 +234,10 @@ int main()
 
     // 5. Output image(s)
 #ifdef RASTERIZER_EXTERNAL_RASTERIZE_TRIANGLE
-    // Verilator compare mode: save DUT and SW reference side by side.
+    // Verilator compare mode: save the DUT image and the software reference
+    // image side by side for visual diffing.
     savePNG(fb, "output_dut.png");
-    Framebuffer ref_fb(width, height);
-    if (threadCmpExportReferenceFramebuffer(&ref_fb))
-    {
-        savePNG(ref_fb, "output_ref.png");
-    }
-    else
-    {
-        savePNG(fb, "output_ref.png");
-    }
+    threadCmpSaveReferenceImage("output_ref.png");
 #else
     // Standalone software mode: framebuffer itself is the software reference.
     savePNG(fb, "output_ref.png");

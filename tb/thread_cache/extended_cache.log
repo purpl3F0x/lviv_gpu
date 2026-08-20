@@ -1,0 +1,1714 @@
+iverilog -g2012 -o tb_sim ../../rtl/gpu_types_pkg.sv ../../rtl/fp_wrappers.sv ../../rtl/fp_cmp_le.sv ../../rtl/axis_skid_buffer.sv ../../rtl/delay_pipe.sv ../../rtl/fx_texture_mul.sv ../../rtl/fx_texture_fma.sv ../../rtl/fx_color_mul.sv ../../rtl/fx_color_fma.sv ../../rtl/fx_color_to_u8.sv ../../rtl/fragment_shader.sv ../../rtl/texture_address_generator.sv ../../rtl/texture_cache.sv ../../rtl/z_buffer_ram.sv ../../rtl/thread.sv ../common/axi_ram.v tb_thread_cache.sv
+../../rtl/fp_wrappers.sv:529: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in '+scaled[31:0]').
+../../rtl/fp_cmp_le.sv:25: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'a[31:0]').
+../../rtl/fp_cmp_le.sv:26: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'b[31:0]').
+../../rtl/fp_wrappers.sv:467: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in '+scaled[31:0]').
+../../rtl/fp_wrappers.sv:467: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in '+scaled[31:0]').
+../../rtl/fp_wrappers.sv:467: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in '+scaled[31:0]').
+../../rtl/texture_address_generator.sv:109: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'tex_idx_s1[7:0]').
+../../rtl/texture_address_generator.sv:142: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'x_scaled[22:0]').
+../../rtl/texture_address_generator.sv:143: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'y_scaled[22:0]').
+../../rtl/texture_cache.sv:98: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in '+way[31:0]').
+../../rtl/texture_cache.sv:256: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'addr[31:0]').
+../../rtl/texture_cache.sv:315: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'refill_pixel_index[5:0]').
+../../rtl/texture_cache.sv:316: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'refill_pixel_index[5:0]').
+../../rtl/texture_cache.sv:317: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'm_axi_rdata[127:0]').
+../../rtl/texture_cache.sv:318: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'm_axi_rdata[127:0]').
+../../rtl/texture_cache.sv:319: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'm_axi_rdata[127:0]').
+../../rtl/texture_cache.sv:320: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'm_axi_rdata[127:0]').
+../../rtl/texture_cache.sv:321: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'm_axi_rdata[127:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'post_skid_bundle[153:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'post_skid_bundle[153:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'post_skid_bundle[153:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'post_skid_bundle[153:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'post_skid_bundle[153:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'post_skid_bundle[153:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'post_skid_bundle[153:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'post_skid_bundle[153:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'post_skid_bundle[153:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'post_skid_bundle[153:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'post_skid_bundle[153:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'post_skid_bundle[153:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'address_token_s3[187:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'address_token_s3[187:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'address_token_s3[187:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'address_token_s3[187:0]').
+:0: sorry: constant selects in always_* processes are not fully supported (the process will be sensitive to all bits in 'address_token_s3[187:0]').
+tb_thread_cache.sv:194: warning: System task ($display) cannot be synthesized in an always_ff process.
+tb_thread_cache.sv:202: warning: System task ($display) cannot be synthesized in an always_ff process.
+tb_thread_cache.sv:211: warning: System task ($display) cannot be synthesized in an always_ff process.
+tb_thread_cache.sv:218: warning: System task ($display) cannot be synthesized in an always_ff process.
+tb_thread_cache.sv:221: warning: System task ($display) cannot be synthesized in an always_ff process.
+tb_thread_cache.sv:224: warning: System task ($display) cannot be synthesized in an always_ff process.
+../../rtl/fp_wrappers.sv:460: warning: Assigning to a non-integral variable (a_real) cannot be synthesized in an always_comb process.
+../../rtl/fp_wrappers.sv:460: warning: Assigning to a non-integral variable (a_real) cannot be synthesized in an always_comb process.
+../../rtl/fp_wrappers.sv:460: warning: Assigning to a non-integral variable (a_real) cannot be synthesized in an always_comb process.
+../../rtl/fp_wrappers.sv:527: warning: Assigning to a non-integral variable (a_real) cannot be synthesized in an always_comb process.
+../../rtl/texture_address_generator.sv:52: vvp.tgt sorry: Case unique/unique0 qualities are ignored.
+../../rtl/texture_cache.sv:507: vvp.tgt sorry: Case unique/unique0 qualities are ignored.
+../../rtl/thread.sv:1622: vvp.tgt sorry: Case unique/unique0 qualities are ignored.
+vvp tb_sim
+VCD info: dumpfile waves.vcd opened for output.
+[TRACE] gate token u=000000800000 v=000000800000 color=ffffffff comp=1
+[TRACE] gate token u=000002800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00000040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00000100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ffaabbccff778899ff445566ff112233 last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00475aff00465aff00455aff00445a last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff004b5aff004a5aff00495aff00485a last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff004f5aff004e5aff004d5aff004c5a last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00535aff00525aff00515aff00505a last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00575aff00565aff00555aff00545a last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff005b5aff005a5aff00595aff00585a last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff005f5aff005e5aff005d5aff005c5a last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00635aff00625aff00615aff00605a last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00675aff00665aff00655aff00645a last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff006b5aff006a5aff00695aff00685a last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff006f5aff006e5aff006d5aff006c5a last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00735aff00725aff00715aff00705a last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00775aff00765aff00755aff00745a last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff007b5aff007a5aff00795aff00785a last=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff007f5aff007e5aff007d5aff007c5a last=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff112233
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] L1 request addr=00XxxxXx token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff445566
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000010800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00000040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff112233
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000020800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00000140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00000500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01435aff01425aff01415aff01405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01475aff01465aff01455aff01445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff014b5aff014a5aff01495aff01485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff014f5aff014e5aff014d5aff014c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01535aff01525aff01515aff01505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01575aff01565aff01555aff01545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff015b5aff015a5aff01595aff01585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff015f5aff015e5aff015d5aff015c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01635aff01625aff01615aff01605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01675aff01665aff01655aff01645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff016b5aff016a5aff01695aff01685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff016f5aff016e5aff016d5aff016c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01735aff01725aff01715aff01705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01775aff01765aff01755aff01745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff017b5aff017a5aff01795aff01785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff017f5aff017e5aff017d5aff017c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff01405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000030800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00000140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff01405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000040800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00000440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00001100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04435aff04425aff04415aff04405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04475aff04465aff04455aff04445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff044b5aff044a5aff04495aff04485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff044f5aff044e5aff044d5aff044c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04535aff04525aff04515aff04505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04575aff04565aff04555aff04545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff045b5aff045a5aff04595aff04585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff045f5aff045e5aff045d5aff045c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04635aff04625aff04615aff04605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04675aff04665aff04655aff04645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff046b5aff046a5aff04695aff04685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff046f5aff046e5aff046d5aff046c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04735aff04725aff04715aff04705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04775aff04765aff04755aff04745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff047b5aff047a5aff04795aff04785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff047f5aff047e5aff047d5aff047c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff04405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000050800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00000440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff04405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000060800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00000540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00001500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05435aff05425aff05415aff05405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05475aff05465aff05455aff05445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff054b5aff054a5aff05495aff05485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff054f5aff054e5aff054d5aff054c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05535aff05525aff05515aff05505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05575aff05565aff05555aff05545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff055b5aff055a5aff05595aff05585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff055f5aff055e5aff055d5aff055c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05635aff05625aff05615aff05605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05675aff05665aff05655aff05645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff056b5aff056a5aff05695aff05685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff056f5aff056e5aff056d5aff056c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05735aff05725aff05715aff05705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05775aff05765aff05755aff05745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff057b5aff057a5aff05795aff05785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff057f5aff057e5aff057d5aff057c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff05405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000070800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00000540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff05405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000080800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00001040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00004100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10435aff10425aff10415aff10405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10475aff10465aff10455aff10445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff104b5aff104a5aff10495aff10485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff104f5aff104e5aff104d5aff104c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10535aff10525aff10515aff10505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10575aff10565aff10555aff10545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff105b5aff105a5aff10595aff10585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff105f5aff105e5aff105d5aff105c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10635aff10625aff10615aff10605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10675aff10665aff10655aff10645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff106b5aff106a5aff10695aff10685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff106f5aff106e5aff106d5aff106c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10735aff10725aff10715aff10705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10775aff10765aff10755aff10745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff107b5aff107a5aff10795aff10785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff107f5aff107e5aff107d5aff107c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff10405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000090800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00001040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff10405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=0000a0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00001140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00004500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11435aff11425aff11415aff11405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11475aff11465aff11455aff11445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff114b5aff114a5aff11495aff11485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff114f5aff114e5aff114d5aff114c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11535aff11525aff11515aff11505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11575aff11565aff11555aff11545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff115b5aff115a5aff11595aff11585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff115f5aff115e5aff115d5aff115c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11635aff11625aff11615aff11605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11675aff11665aff11655aff11645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff116b5aff116a5aff11695aff11685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff116f5aff116e5aff116d5aff116c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11735aff11725aff11715aff11705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11775aff11765aff11755aff11745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff117b5aff117a5aff11795aff11785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff117f5aff117e5aff117d5aff117c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff11405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=0000b0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00001140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff11405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=0000c0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00001440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00005100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14435aff14425aff14415aff14405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14475aff14465aff14455aff14445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff144b5aff144a5aff14495aff14485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff144f5aff144e5aff144d5aff144c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14535aff14525aff14515aff14505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14575aff14565aff14555aff14545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff145b5aff145a5aff14595aff14585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff145f5aff145e5aff145d5aff145c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14635aff14625aff14615aff14605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14675aff14665aff14655aff14645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff146b5aff146a5aff14695aff14685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff146f5aff146e5aff146d5aff146c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14735aff14725aff14715aff14705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14775aff14765aff14755aff14745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff147b5aff147a5aff14795aff14785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff147f5aff147e5aff147d5aff147c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff14405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=0000d0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00001440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff14405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=0000e0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00001540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00005500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15435aff15425aff15415aff15405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15475aff15465aff15455aff15445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff154b5aff154a5aff15495aff15485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff154f5aff154e5aff154d5aff154c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15535aff15525aff15515aff15505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15575aff15565aff15555aff15545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff155b5aff155a5aff15595aff15585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff155f5aff155e5aff155d5aff155c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15635aff15625aff15615aff15605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15675aff15665aff15655aff15645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff156b5aff156a5aff15695aff15685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff156f5aff156e5aff156d5aff156c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15735aff15725aff15715aff15705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15775aff15765aff15755aff15745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff157b5aff157a5aff15795aff15785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff157f5aff157e5aff157d5aff157c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff15405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=0000f0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00001540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff15405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000100800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00004040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00010100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ffaabbccff778899ff445566ff112233 last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00475aff00465aff00455aff00445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff004b5aff004a5aff00495aff00485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff004f5aff004e5aff004d5aff004c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00535aff00525aff00515aff00505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00575aff00565aff00555aff00545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff005b5aff005a5aff00595aff00585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff005f5aff005e5aff005d5aff005c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00635aff00625aff00615aff00605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00675aff00665aff00655aff00645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff006b5aff006a5aff00695aff00685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff006f5aff006e5aff006d5aff006c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00735aff00725aff00715aff00705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00775aff00765aff00755aff00745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff007b5aff007a5aff00795aff00785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff007f5aff007e5aff007d5aff007c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff112233
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff40405a got=ff112233
+[TRACE] gate token u=000110800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00004040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff112233
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff40405a got=ff112233
+[TRACE] gate token u=000120800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00004140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00010500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01435aff01425aff01415aff01405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01475aff01465aff01455aff01445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff014b5aff014a5aff01495aff01485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff014f5aff014e5aff014d5aff014c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01535aff01525aff01515aff01505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01575aff01565aff01555aff01545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff015b5aff015a5aff01595aff01585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff015f5aff015e5aff015d5aff015c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01635aff01625aff01615aff01605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01675aff01665aff01655aff01645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff016b5aff016a5aff01695aff01685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff016f5aff016e5aff016d5aff016c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01735aff01725aff01715aff01705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01775aff01765aff01755aff01745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff017b5aff017a5aff01795aff01785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff017f5aff017e5aff017d5aff017c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff01405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff41405a got=ff01405a
+[TRACE] gate token u=000130800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00004140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff01405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff41405a got=ff01405a
+[TRACE] gate token u=000140800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00004440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00011100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04435aff04425aff04415aff04405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04475aff04465aff04455aff04445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff044b5aff044a5aff04495aff04485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff044f5aff044e5aff044d5aff044c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04535aff04525aff04515aff04505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04575aff04565aff04555aff04545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff045b5aff045a5aff04595aff04585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff045f5aff045e5aff045d5aff045c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04635aff04625aff04615aff04605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04675aff04665aff04655aff04645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff046b5aff046a5aff04695aff04685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff046f5aff046e5aff046d5aff046c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04735aff04725aff04715aff04705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04775aff04765aff04755aff04745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff047b5aff047a5aff04795aff04785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff047f5aff047e5aff047d5aff047c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff04405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff44405a got=ff04405a
+[TRACE] gate token u=000150800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00004440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff04405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff44405a got=ff04405a
+[TRACE] gate token u=000160800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00004540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00011500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05435aff05425aff05415aff05405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05475aff05465aff05455aff05445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff054b5aff054a5aff05495aff05485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff054f5aff054e5aff054d5aff054c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05535aff05525aff05515aff05505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05575aff05565aff05555aff05545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff055b5aff055a5aff05595aff05585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff055f5aff055e5aff055d5aff055c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05635aff05625aff05615aff05605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05675aff05665aff05655aff05645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff056b5aff056a5aff05695aff05685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff056f5aff056e5aff056d5aff056c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05735aff05725aff05715aff05705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05775aff05765aff05755aff05745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff057b5aff057a5aff05795aff05785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff057f5aff057e5aff057d5aff057c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff05405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff45405a got=ff05405a
+[TRACE] gate token u=000170800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00004540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff05405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff45405a got=ff05405a
+[TRACE] gate token u=000180800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00005040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00014100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10435aff10425aff10415aff10405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10475aff10465aff10455aff10445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff104b5aff104a5aff10495aff10485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff104f5aff104e5aff104d5aff104c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10535aff10525aff10515aff10505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10575aff10565aff10555aff10545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff105b5aff105a5aff10595aff10585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff105f5aff105e5aff105d5aff105c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10635aff10625aff10615aff10605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10675aff10665aff10655aff10645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff106b5aff106a5aff10695aff10685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff106f5aff106e5aff106d5aff106c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10735aff10725aff10715aff10705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10775aff10765aff10755aff10745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff107b5aff107a5aff10795aff10785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff107f5aff107e5aff107d5aff107c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff10405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff50405a got=ff10405a
+[TRACE] gate token u=000190800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00005040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff10405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff50405a got=ff10405a
+[TRACE] gate token u=0001a0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00005140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00014500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11435aff11425aff11415aff11405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11475aff11465aff11455aff11445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff114b5aff114a5aff11495aff11485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff114f5aff114e5aff114d5aff114c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11535aff11525aff11515aff11505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11575aff11565aff11555aff11545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff115b5aff115a5aff11595aff11585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff115f5aff115e5aff115d5aff115c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11635aff11625aff11615aff11605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11675aff11665aff11655aff11645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff116b5aff116a5aff11695aff11685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff116f5aff116e5aff116d5aff116c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11735aff11725aff11715aff11705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11775aff11765aff11755aff11745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff117b5aff117a5aff11795aff11785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff117f5aff117e5aff117d5aff117c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff11405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff51405a got=ff11405a
+[TRACE] gate token u=0001b0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00005140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff11405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff51405a got=ff11405a
+[TRACE] gate token u=0001c0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00005440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00015100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14435aff14425aff14415aff14405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14475aff14465aff14455aff14445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff144b5aff144a5aff14495aff14485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff144f5aff144e5aff144d5aff144c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14535aff14525aff14515aff14505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14575aff14565aff14555aff14545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff145b5aff145a5aff14595aff14585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff145f5aff145e5aff145d5aff145c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14635aff14625aff14615aff14605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14675aff14665aff14655aff14645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff146b5aff146a5aff14695aff14685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff146f5aff146e5aff146d5aff146c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14735aff14725aff14715aff14705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14775aff14765aff14755aff14745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff147b5aff147a5aff14795aff14785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff147f5aff147e5aff147d5aff147c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff14405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff54405a got=ff14405a
+[TRACE] gate token u=0001d0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00005440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff14405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff54405a got=ff14405a
+[TRACE] gate token u=0001e0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00005540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00015500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15435aff15425aff15415aff15405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15475aff15465aff15455aff15445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff154b5aff154a5aff15495aff15485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff154f5aff154e5aff154d5aff154c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15535aff15525aff15515aff15505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15575aff15565aff15555aff15545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff155b5aff155a5aff15595aff15585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff155f5aff155e5aff155d5aff155c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15635aff15625aff15615aff15605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15675aff15665aff15655aff15645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff156b5aff156a5aff15695aff15685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff156f5aff156e5aff156d5aff156c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15735aff15725aff15715aff15705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15775aff15765aff15755aff15745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff157b5aff157a5aff15795aff15785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff157f5aff157e5aff157d5aff157c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff15405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff55405a got=ff15405a
+[TRACE] gate token u=0001f0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00005540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff15405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff55405a got=ff15405a
+[TRACE] gate token u=000200800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00010040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00040100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ffaabbccff778899ff445566ff112233 last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00475aff00465aff00455aff00445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff004b5aff004a5aff00495aff00485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff004f5aff004e5aff004d5aff004c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00535aff00525aff00515aff00505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00575aff00565aff00555aff00545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff005b5aff005a5aff00595aff00585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff005f5aff005e5aff005d5aff005c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00635aff00625aff00615aff00605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00675aff00665aff00655aff00645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff006b5aff006a5aff00695aff00685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff006f5aff006e5aff006d5aff006c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00735aff00725aff00715aff00705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00775aff00765aff00755aff00745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff007b5aff007a5aff00795aff00785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff007f5aff007e5aff007d5aff007c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff112233
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff00405a got=ff112233
+[TRACE] gate token u=000210800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00010040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff112233
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff00405a got=ff112233
+[TRACE] gate token u=000220800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00010140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00040500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01435aff01425aff01415aff01405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01475aff01465aff01455aff01445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff014b5aff014a5aff01495aff01485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff014f5aff014e5aff014d5aff014c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01535aff01525aff01515aff01505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01575aff01565aff01555aff01545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff015b5aff015a5aff01595aff01585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff015f5aff015e5aff015d5aff015c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01635aff01625aff01615aff01605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01675aff01665aff01655aff01645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff016b5aff016a5aff01695aff01685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff016f5aff016e5aff016d5aff016c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01735aff01725aff01715aff01705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01775aff01765aff01755aff01745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff017b5aff017a5aff01795aff01785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff017f5aff017e5aff017d5aff017c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff01405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000230800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00010140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff01405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000240800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00010440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00041100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04435aff04425aff04415aff04405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04475aff04465aff04455aff04445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff044b5aff044a5aff04495aff04485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff044f5aff044e5aff044d5aff044c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04535aff04525aff04515aff04505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04575aff04565aff04555aff04545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff045b5aff045a5aff04595aff04585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff045f5aff045e5aff045d5aff045c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04635aff04625aff04615aff04605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04675aff04665aff04655aff04645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff046b5aff046a5aff04695aff04685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff046f5aff046e5aff046d5aff046c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04735aff04725aff04715aff04705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04775aff04765aff04755aff04745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff047b5aff047a5aff04795aff04785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff047f5aff047e5aff047d5aff047c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff04405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000250800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00010440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff04405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000260800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00010540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00041500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05435aff05425aff05415aff05405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05475aff05465aff05455aff05445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff054b5aff054a5aff05495aff05485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff054f5aff054e5aff054d5aff054c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05535aff05525aff05515aff05505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05575aff05565aff05555aff05545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff055b5aff055a5aff05595aff05585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff055f5aff055e5aff055d5aff055c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05635aff05625aff05615aff05605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05675aff05665aff05655aff05645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff056b5aff056a5aff05695aff05685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff056f5aff056e5aff056d5aff056c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05735aff05725aff05715aff05705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05775aff05765aff05755aff05745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff057b5aff057a5aff05795aff05785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff057f5aff057e5aff057d5aff057c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff05405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000270800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00010540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff05405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000280800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00011040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00044100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10435aff10425aff10415aff10405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10475aff10465aff10455aff10445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff104b5aff104a5aff10495aff10485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff104f5aff104e5aff104d5aff104c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10535aff10525aff10515aff10505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10575aff10565aff10555aff10545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff105b5aff105a5aff10595aff10585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff105f5aff105e5aff105d5aff105c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10635aff10625aff10615aff10605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10675aff10665aff10655aff10645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff106b5aff106a5aff10695aff10685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff106f5aff106e5aff106d5aff106c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10735aff10725aff10715aff10705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10775aff10765aff10755aff10745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff107b5aff107a5aff10795aff10785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff107f5aff107e5aff107d5aff107c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff10405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000290800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00011040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff10405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=0002a0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00011140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00044500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11435aff11425aff11415aff11405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11475aff11465aff11455aff11445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff114b5aff114a5aff11495aff11485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff114f5aff114e5aff114d5aff114c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11535aff11525aff11515aff11505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11575aff11565aff11555aff11545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff115b5aff115a5aff11595aff11585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff115f5aff115e5aff115d5aff115c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11635aff11625aff11615aff11605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11675aff11665aff11655aff11645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff116b5aff116a5aff11695aff11685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff116f5aff116e5aff116d5aff116c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11735aff11725aff11715aff11705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11775aff11765aff11755aff11745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff117b5aff117a5aff11795aff11785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff117f5aff117e5aff117d5aff117c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff11405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=0002b0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00011140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff11405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=0002c0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00011440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00045100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14435aff14425aff14415aff14405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14475aff14465aff14455aff14445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff144b5aff144a5aff14495aff14485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff144f5aff144e5aff144d5aff144c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14535aff14525aff14515aff14505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14575aff14565aff14555aff14545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff145b5aff145a5aff14595aff14585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff145f5aff145e5aff145d5aff145c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14635aff14625aff14615aff14605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14675aff14665aff14655aff14645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff146b5aff146a5aff14695aff14685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff146f5aff146e5aff146d5aff146c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14735aff14725aff14715aff14705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14775aff14765aff14755aff14745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff147b5aff147a5aff14795aff14785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff147f5aff147e5aff147d5aff147c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff14405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=0002d0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00011440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff14405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=0002e0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00011540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00045500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15435aff15425aff15415aff15405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15475aff15465aff15455aff15445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff154b5aff154a5aff15495aff15485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff154f5aff154e5aff154d5aff154c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15535aff15525aff15515aff15505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15575aff15565aff15555aff15545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff155b5aff155a5aff15595aff15585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff155f5aff155e5aff155d5aff155c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15635aff15625aff15615aff15605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15675aff15665aff15655aff15645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff156b5aff156a5aff15695aff15685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff156f5aff156e5aff156d5aff156c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15735aff15725aff15715aff15705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15775aff15765aff15755aff15745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff157b5aff157a5aff15795aff15785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff157f5aff157e5aff157d5aff157c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff15405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=0002f0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00011540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff15405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[TRACE] gate token u=000300800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00014040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00050100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ffaabbccff778899ff445566ff112233 last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00475aff00465aff00455aff00445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff004b5aff004a5aff00495aff00485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff004f5aff004e5aff004d5aff004c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00535aff00525aff00515aff00505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00575aff00565aff00555aff00545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff005b5aff005a5aff00595aff00585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff005f5aff005e5aff005d5aff005c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00635aff00625aff00615aff00605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00675aff00665aff00655aff00645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff006b5aff006a5aff00695aff00685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff006f5aff006e5aff006d5aff006c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00735aff00725aff00715aff00705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00775aff00765aff00755aff00745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff007b5aff007a5aff00795aff00785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff007f5aff007e5aff007d5aff007c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff112233
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff40405a got=ff112233
+[TRACE] gate token u=000310800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00014040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff112233
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff40405a got=ff112233
+[TRACE] gate token u=000320800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00014140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00050500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01435aff01425aff01415aff01405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01475aff01465aff01455aff01445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff014b5aff014a5aff01495aff01485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff014f5aff014e5aff014d5aff014c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01535aff01525aff01515aff01505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01575aff01565aff01555aff01545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff015b5aff015a5aff01595aff01585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff015f5aff015e5aff015d5aff015c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01635aff01625aff01615aff01605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01675aff01665aff01655aff01645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff016b5aff016a5aff01695aff01685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff016f5aff016e5aff016d5aff016c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01735aff01725aff01715aff01705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff01775aff01765aff01755aff01745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff017b5aff017a5aff01795aff01785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff017f5aff017e5aff017d5aff017c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff01405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff41405a got=ff01405a
+[TRACE] gate token u=000330800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00014140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff01405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff41405a got=ff01405a
+[TRACE] gate token u=000340800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00014440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00051100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04435aff04425aff04415aff04405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04475aff04465aff04455aff04445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff044b5aff044a5aff04495aff04485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff044f5aff044e5aff044d5aff044c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04535aff04525aff04515aff04505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04575aff04565aff04555aff04545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff045b5aff045a5aff04595aff04585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff045f5aff045e5aff045d5aff045c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04635aff04625aff04615aff04605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04675aff04665aff04655aff04645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff046b5aff046a5aff04695aff04685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff046f5aff046e5aff046d5aff046c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04735aff04725aff04715aff04705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff04775aff04765aff04755aff04745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff047b5aff047a5aff04795aff04785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff047f5aff047e5aff047d5aff047c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff04405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff44405a got=ff04405a
+[TRACE] gate token u=000350800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00014440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff04405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff44405a got=ff04405a
+[TRACE] gate token u=000360800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00014540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00051500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05435aff05425aff05415aff05405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05475aff05465aff05455aff05445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff054b5aff054a5aff05495aff05485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff054f5aff054e5aff054d5aff054c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05535aff05525aff05515aff05505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05575aff05565aff05555aff05545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff055b5aff055a5aff05595aff05585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff055f5aff055e5aff055d5aff055c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05635aff05625aff05615aff05605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05675aff05665aff05655aff05645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff056b5aff056a5aff05695aff05685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff056f5aff056e5aff056d5aff056c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05735aff05725aff05715aff05705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff05775aff05765aff05755aff05745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff057b5aff057a5aff05795aff05785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff057f5aff057e5aff057d5aff057c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff05405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff45405a got=ff05405a
+[TRACE] gate token u=000370800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00014540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff05405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff45405a got=ff05405a
+[TRACE] gate token u=000380800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00015040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00054100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10435aff10425aff10415aff10405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10475aff10465aff10455aff10445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff104b5aff104a5aff10495aff10485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff104f5aff104e5aff104d5aff104c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10535aff10525aff10515aff10505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10575aff10565aff10555aff10545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff105b5aff105a5aff10595aff10585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff105f5aff105e5aff105d5aff105c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10635aff10625aff10615aff10605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10675aff10665aff10655aff10645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff106b5aff106a5aff10695aff10685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff106f5aff106e5aff106d5aff106c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10735aff10725aff10715aff10705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff10775aff10765aff10755aff10745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff107b5aff107a5aff10795aff10785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff107f5aff107e5aff107d5aff107c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff10405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff50405a got=ff10405a
+[TRACE] gate token u=000390800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00015040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff10405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff50405a got=ff10405a
+[TRACE] gate token u=0003a0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00015140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00054500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11435aff11425aff11415aff11405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11475aff11465aff11455aff11445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff114b5aff114a5aff11495aff11485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff114f5aff114e5aff114d5aff114c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11535aff11525aff11515aff11505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11575aff11565aff11555aff11545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff115b5aff115a5aff11595aff11585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff115f5aff115e5aff115d5aff115c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11635aff11625aff11615aff11605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11675aff11665aff11655aff11645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff116b5aff116a5aff11695aff11685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff116f5aff116e5aff116d5aff116c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11735aff11725aff11715aff11705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff11775aff11765aff11755aff11745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff117b5aff117a5aff11795aff11785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff117f5aff117e5aff117d5aff117c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff11405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff51405a got=ff11405a
+[TRACE] gate token u=0003b0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00015140 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff11405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff51405a got=ff11405a
+[TRACE] gate token u=0003c0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00015440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00055100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14435aff14425aff14415aff14405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14475aff14465aff14455aff14445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff144b5aff144a5aff14495aff14485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff144f5aff144e5aff144d5aff144c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14535aff14525aff14515aff14505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14575aff14565aff14555aff14545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff145b5aff145a5aff14595aff14585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff145f5aff145e5aff145d5aff145c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14635aff14625aff14615aff14605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14675aff14665aff14655aff14645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff146b5aff146a5aff14695aff14685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff146f5aff146e5aff146d5aff146c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14735aff14725aff14715aff14705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff14775aff14765aff14755aff14745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff147b5aff147a5aff14795aff14785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff147f5aff147e5aff147d5aff147c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff14405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff54405a got=ff14405a
+[TRACE] gate token u=0003d0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00015440 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff14405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff54405a got=ff14405a
+[TRACE] gate token u=0003e0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00015540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00055500 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15435aff15425aff15415aff15405a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15475aff15465aff15455aff15445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff154b5aff154a5aff15495aff15485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff154f5aff154e5aff154d5aff154c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15535aff15525aff15515aff15505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15575aff15565aff15555aff15545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff155b5aff155a5aff15595aff15585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff155f5aff155e5aff155d5aff155c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15635aff15625aff15615aff15605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15675aff15665aff15655aff15645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff156b5aff156a5aff15695aff15685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff156f5aff156e5aff156d5aff156c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15735aff15725aff15715aff15705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff15775aff15765aff15755aff15745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff157b5aff157a5aff15795aff15785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff157f5aff157e5aff157d5aff157c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff15405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff55405a got=ff15405a
+[TRACE] gate token u=0003f0800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00015540 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff15405a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff55405a got=ff15405a
+[TRACE] gate token u=000400800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00040040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00100100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ffaabbccff778899ff445566ff112233 last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00475aff00465aff00455aff00445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff004b5aff004a5aff00495aff00485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff004f5aff004e5aff004d5aff004c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00535aff00525aff00515aff00505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00575aff00565aff00555aff00545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff005b5aff005a5aff00595aff00585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff005f5aff005e5aff005d5aff005c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00635aff00625aff00615aff00605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00675aff00665aff00655aff00645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff006b5aff006a5aff00695aff00685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff006f5aff006e5aff006d5aff006c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00735aff00725aff00715aff00705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00775aff00765aff00755aff00745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff007b5aff007a5aff00795aff00785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff007f5aff007e5aff007d5aff007c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff112233
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[ERR] line refill color mismatch exp=ff00405a got=ff112233
+[TRACE] gate token u=000000800000 v=000000800000 color=ffffffff comp=1
+[TRACE] L1 request addr=00000040 token_tex=0 mode_u=0 mode_v=0 no_texture=0 valid=1
+[TRACE] frag addr_valid=1 use_tex=1 addr_step=1 join_valid=1 join_ready=1 wait=0 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI AR addr=00000100 len=16 mem0=ff00035aff00025aff00015aff00005a
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ffaabbccff778899ff445566ff112233 last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00475aff00465aff00455aff00445a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff004b5aff004a5aff00495aff00485a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff004f5aff004e5aff004d5aff004c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00535aff00525aff00515aff00505a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00575aff00565aff00555aff00545a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff005b5aff005a5aff00595aff00585a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff005f5aff005e5aff005d5aff005c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00635aff00625aff00615aff00605a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00675aff00665aff00655aff00645a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff006b5aff006a5aff00695aff00685a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff006f5aff006e5aff006d5aff006c5a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00735aff00725aff00715aff00705a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff00775aff00765aff00755aff00745a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff007b5aff007a5aff00795aff00785a last=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] AXI R data=ff007f5aff007e5aff007d5aff007c5a last=1
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=0 join_valid=1 join_ready=0 wait=1 resp=0 shader_valid=0
+[TRACE] L1 data=ff112233
+[TRACE] frag addr_valid=0 use_tex=0 addr_step=1 join_valid=1 join_ready=1 wait=1 resp=1 shader_valid=1
+[FAIL] thread_cache test failed with 35 errors
+tb_thread_cache.sv:598: $finish called at 61385000 (1ps)

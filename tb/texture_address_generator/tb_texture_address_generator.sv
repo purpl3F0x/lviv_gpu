@@ -3,11 +3,12 @@
 module tb_texture_address_generator;
 
   localparam int UvFracW = 12;
-  localparam int MaxTexLog2 = 12;
+  localparam int MaxTexLog2 = 11;
   localparam int UvInFracW = 36;
   localparam int ScaledW = UvFracW + MaxTexLog2;
   localparam logic signed [47:0] UvOne = 48'sd1 <<< UvInFracW;
   localparam int PipelineLatency = 3;
+  localparam logic [7:0] NoTextureId = 8'd128;
 
   typedef struct packed {
     logic [31:0] addr;
@@ -17,7 +18,7 @@ module tb_texture_address_generator;
   logic clk;
   logic clken;
 
-  logic [6:0] tex_idx;
+  logic [7:0] tex_idx;
   logic signed [47:0] u_in;
   logic signed [47:0] v_in;
   texture_address_mode_t texture_mode_u;
@@ -92,7 +93,7 @@ module tb_texture_address_generator;
     endcase
   endfunction
 
-  function automatic exp_t model_addr(input logic [6:0] idx,
+  function automatic exp_t model_addr(input logic [7:0] idx,
                                       input logic signed [47:0] u,
                                       input logic signed [47:0] v,
                                       input texture_address_mode_t mode_u,
@@ -111,11 +112,11 @@ module tb_texture_address_generator;
     logic [31:0] swz;
     int bit_idx;
 
-    tex_size = texture_size_lut_model[idx];
+    tex_size = texture_size_lut_model[idx[6:0]];
     u_norm = normalize_uv_model(u, mode_u);
     v_norm = normalize_uv_model(v, mode_v);
 
-    if (tex_size <= 4'd11) begin
+    if (!idx[7]) begin
       x_scaled = {{MaxTexLog2{1'b0}}, u_norm} << tex_size;
       y_scaled = {{MaxTexLog2{1'b0}}, v_norm} << tex_size;
       max_idx = ({{(MaxTexLog2-1){1'b0}}, 1'b1} << tex_size) - 1'b1;
@@ -144,15 +145,16 @@ module tb_texture_address_generator;
 
     swz = 32'd0;
     for (bit_idx = 0; bit_idx < MaxTexLog2; bit_idx++) begin
-      swz[(2*bit_idx)+2] = x_idx[bit_idx];
-      swz[(2*bit_idx)+3] = y_idx[bit_idx];
+      swz[(2*bit_idx)] = x_idx[bit_idx];
+      swz[(2*bit_idx)+1] = y_idx[bit_idx];
     end
 
-    e.addr = texture_lut_model[idx] | swz;
+    // DUT now ORs the word-addressed swizzle directly with a word-addressed LUT base.
+    e.addr = texture_lut_model[idx[6:0]] | swz;
     return e;
   endfunction
 
-  task automatic drive_input(input logic [6:0] idx,
+  task automatic drive_input(input logic [7:0] idx,
                              input logic signed [47:0] u,
                              input logic signed [47:0] v,
                              input texture_address_mode_t mode_u,
@@ -251,7 +253,7 @@ module tb_texture_address_generator;
     write_lut_size(7'd4, 4'd11); // 2048
 
     write_lut_addr(7'd5, 32'h0C00_0000);
-    write_lut_size(7'd5, 4'd12); // invalid -> no_texture
+    write_lut_size(7'd5, 4'd12); // oversized but real id -> no longer no_texture
 
     // Clamp mode checks (edge and in-range).
     drive_input(7'd3, 48'sd0, 48'sd0, TEXTURE_CLAMP, TEXTURE_CLAMP);
@@ -269,8 +271,12 @@ module tb_texture_address_generator;
     drive_input(7'd4, 48'sd1 <<< 36, -((48'sd1 <<< 36) >>> 2), TEXTURE_CLAMP, TEXTURE_TILE);
     drive_input(7'd4, -((48'sd1 <<< 36) >>> 2), 48'sd1 <<< 36, TEXTURE_TILE, TEXTURE_CLAMP);
 
-    // Invalid size produces no_texture.
+    // Oversized size on a real id is no longer treated as no_texture.
     drive_input(7'd5, 48'sd0, 48'sd0, TEXTURE_CLAMP, TEXTURE_CLAMP);
+
+    // Any idx with the MSB set produces no_texture now, not just a single sentinel.
+    drive_input(8'd128, 48'sd0, 48'sd0, TEXTURE_CLAMP, TEXTURE_CLAMP);
+    drive_input(8'd200, 48'sd0, 48'sd0, TEXTURE_CLAMP, TEXTURE_CLAMP);
 
     // Flush pipeline.
     repeat (8) begin

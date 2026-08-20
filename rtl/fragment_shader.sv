@@ -14,21 +14,19 @@ module fragment_shader (
     input logic rst_n,
 
     // Input Data
-    input color_argb_t     pixel_color,
-    input color_argb_t     texture_color,
-    input color_argb_t     env_color,
+    input color_argb_t  pixel_color,
+    input color_argb_t  texture_color,
+    input color_argb_t  env_color,
     input fragment_op_t op,
 
     // Handshake
     input logic valid_in,
-    // output logic ready,
 
     // Output Data
     output color_argb_t fragment_color,
     output logic valid_out
 );
 
-  //   assign ready = 1'b1;  // Fully pipelined, always ready to accept new data
 
   // Combinatorial adders for ADD operation
   logic [8:0] sum_add_r, sum_add_g, sum_add_b;
@@ -221,10 +219,12 @@ module fragment_shader (
       add_g_s4 <= add_g_s3;
       add_b_s4 <= add_b_s3;
 
-      div_r <= {sum_r + 17'd128}[15:8];
-      div_g <= {sum_g + 17'd128}[15:8];
-      div_b <= {sum_b + 17'd128}[15:8];
-      div_a <= {prod_a_s3 + 16'd128}[15:8];
+      /* verilator lint_off WIDTHTRUNC */
+      div_r <= (sum_r + 17'd128) >> 8;
+      div_g <= (sum_g + 17'd128) >> 8;
+      div_b <= (sum_b + 17'd128) >> 8;
+      div_a <= (prod_a_s3 + 16'd128) >> 8;
+      /* verilator lint_on WIDTHTRUNC */
 
       // ========================================================
       // STAGE 5 (Final Output Selection)

@@ -19,7 +19,7 @@ module texture_bram_asym #(
     input  logic                  enaB,
     input  logic [ADDRWIDTHB-1:0] addrB,
     output logic [    WIDTHB-1:0] doB
-  );
+);
   // -----------------------------------------------------------------------------
   // Asymmetric BRAM: wide write port (AXI beat) + narrow read port (pixel word)
   // -----------------------------------------------------------------------------
@@ -228,7 +228,7 @@ module texture_cache #(
   logic          [       WayBits-1:0] tag_clear_way;
   logic                               tag_fill_en;
   logic          [       WayBits-1:0] tag_fill_way;
-  logic                               req_addr_aligned;
+  logic          [    ADDR_WIDTH-1:0] req_byte_addr;
   logic                               axi_rresp_error;
   logic                               req_accepted;
   logic          [              31:0] perf_total_req_q;
@@ -238,11 +238,12 @@ module texture_cache #(
   logic                               perf_rvalid_q;
 
   localparam logic [2:0] PerfAddrTotal = 3'd0;
-  localparam logic [2:0] PerfAddrHit = 3'd1;
-  localparam logic [2:0] PerfAddrMiss = 3'd2;
+  localparam logic [2:0] PerfAddrHit   = 3'd1;
+  localparam logic [2:0] PerfAddrMiss  = 3'd2;
 
-  assign req_addr_aligned = ~|req_addr[PixelOffsetBits-1:0];
-  assign req_accepted = req_valid && req_ready;
+  // Requests use one address per pixel word. AXI uses byte addresses.
+  assign req_byte_addr = req_addr << PixelOffsetBits;
+  assign req_accepted  = req_valid && req_ready;
 
   function automatic [TagBits-1:0] addr_tag(input logic [ADDR_WIDTH-1:0] addr);
     begin
@@ -324,10 +325,7 @@ module texture_cache #(
   end
 
   // External interface wiring and top-level flow-control.
-  assign req_ready     = !flush
-      && (refill_state == REFILL_IDLE)
-      && (!stage0_valid || stage0_hit_found)
-      && (!req_valid || req_addr_aligned);
+  assign req_ready = !flush && (refill_state == REFILL_IDLE) && (!stage0_valid || stage0_hit_found);
   assign m_axi_araddr = refill_base_addr;
   assign m_axi_arlen = 8'(BeatsPerLine - 1);
   assign m_axi_arsize = 3'($clog2(AxiBytes));
@@ -352,7 +350,7 @@ module texture_cache #(
       .rst_n(rst_n),
       .flush(flush),
       .lookup_en(req_valid && req_ready),
-      .lookup_tag(addr_tag(req_addr)),
+      .lookup_tag(addr_tag(req_byte_addr)),
       .lookup_hit_found(tag_lookup_hit_found),
       .lookup_hit_way(tag_lookup_hit_way),
       .clear_en(tag_clear_en),
@@ -477,7 +475,7 @@ module texture_cache #(
         if (req_valid && req_ready) begin
           // Stage0 captures accepted request + tag lookup result.
           stage0_valid     <= 1'b1;
-          stage0_addr      <= req_addr;
+          stage0_addr      <= req_byte_addr;
           stage0_hit_found <= tag_lookup_hit_found;
           stage0_hit_way   <= tag_lookup_hit_way;
         end else begin

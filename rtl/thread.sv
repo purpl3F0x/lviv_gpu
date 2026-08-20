@@ -11,17 +11,20 @@ module thread (
     output logic ready_out,
     input thread_data_in_t in_data,
 
-    output logic [31:0]              out_fb_color,
-    output logic [PIXEL_ADDR_W_THREAD-1:0]  out_fb_addr,
-    output logic                     out_fb_we,
+    output logic empty,
+
+    output logic [                   31:0] out_fb_color,
+    output logic [PIXEL_ADDR_W_THREAD-1:0] out_fb_addr,
+    output logic                           out_fb_valid,
+    output logic                           out_fb_we,
 
     // Z-buffer memory interface
-    output logic                    z_rd_en,
+    output logic                           z_rd_en,
     output logic [PIXEL_ADDR_W_THREAD-1:0] z_rd_addr,
-    input  logic [            31:0] z_rd_data,
-    output logic                    z_wr_en,
+    input  logic [                   31:0] z_rd_data,
+    output logic                           z_wr_en,
     output logic [PIXEL_ADDR_W_THREAD-1:0] z_wr_addr,
-    output logic [            31:0] z_wr_data,
+    output logic [                   31:0] z_wr_data,
 
     // L1 texture cache AXI read channel
     output logic [ 31:0] tex_m_axi_araddr,
@@ -34,13 +37,19 @@ module thread (
     input  logic [  1:0] tex_m_axi_rresp,
     input  logic         tex_m_axi_rvalid,
     output logic         tex_m_axi_rready,
-    input  logic         tex_m_axi_rlast
+    input  logic         tex_m_axi_rlast,
+
+    // Texture LUT programming interface
+    input logic        lut_addr_wr_en,
+    input logic        lut_size_wr_en,
+    input logic [ 6:0] lut_wr_addr,
+    input logic [31:0] lut_wr_data
 
 );
 
-    localparam int THREAD_ADDR_W = PIXEL_ADDR_W_THREAD;
+  localparam int THREAD_ADDR_W = PIXEL_ADDR_W_THREAD;
 
-    logic [THREAD_ADDR_W-1:0] s_axis_addr_tdata;
+  logic [THREAD_ADDR_W-1:0] s_axis_addr_tdata;
 
   // Single ingress skid buffer for the whole orchestrator token.
   localparam int INBUNDLEWIDTH = $bits(thread_data_in_t);
@@ -54,7 +63,9 @@ module thread (
 
   // Reject triangles with e0 < 0 or e1 < 0 or e2 < 0
   logic skid_valid_in;
-  assign skid_valid_in = valid_in & (in_data.e0[31] == 0) & (in_data.e1[31] == 0) & (in_data.e2[31] == 0);
+  assign skid_valid_in = valid_in & (
+    (in_data.e0[31] == 0) & (in_data.e1[31] == 0) & (in_data.e2[31] == 0)
+    );
 
   axis_skid_buffer #(
       .WIDTH(INBUNDLEWIDTH)
@@ -70,7 +81,7 @@ module thread (
   );
 
   assign thread_data_buf   = input_bundle_buf_tdata;
-    assign s_axis_addr_tdata = thread_data_buf.addr[THREAD_ADDR_W-1:0];
+  assign s_axis_addr_tdata = thread_data_buf.addr[THREAD_ADDR_W-1:0];
 
   // -------------------------------
   // ---- Master valid pipeline ----
@@ -215,38 +226,38 @@ module thread (
   logic [31:0] align_fp_mul_3_to_fp_fma_2_i1_d18;
   logic [31:0] align_v2_z_to_fp_fma_4_i0_d23;
   logic [31:0] align_fp_mul_3_to_fp_fma_4_i1_d18;
-    logic [THREAD_ADDR_W-1:0] align_addr_to_mem_read_1_i0_d36;
+  logic [THREAD_ADDR_W-1:0] align_addr_to_mem_read_1_i0_d36;
   logic [31:0] align_fp_fma_4_to_fp_cmp_1_i0_d1;
-    logic [THREAD_ADDR_W-1:0] align_addr_to_mem_write_1_i0_d38;
+  logic [THREAD_ADDR_W-1:0] align_addr_to_mem_write_1_i0_d38;
   logic [31:0] align_fp_fma_4_to_mem_write_1_i1_d2;
   logic [31:0] align_fp_mul_4_to_fp_mul_5_i1_d48;
   logic [31:0] align_fp_mul_6_to_fp_mul_7_i1_d48;
   logic [31:0] align_fp_mul_8_to_fp_mul_9_i1_d48;
-  logic [ 7:0] align_v0_color_r_to_fx_color_mul_1_i0_d65;
-  logic [ 7:0] align_v0_color_g_to_fx_color_mul_2_i0_d65;
-  logic [ 7:0] align_v0_color_b_to_fx_color_mul_3_i0_d65;
-  logic [ 7:0] align_v0_color_a_to_fx_color_mul_4_i0_d65;
+  logic [7:0] align_v0_color_r_to_fx_color_mul_1_i0_d65;
+  logic [7:0] align_v0_color_g_to_fx_color_mul_2_i0_d65;
+  logic [7:0] align_v0_color_b_to_fx_color_mul_3_i0_d65;
+  logic [7:0] align_v0_color_a_to_fx_color_mul_4_i0_d65;
   logic [17:0] align_v0_texture_u_to_fx_texture_mul_1_i1_d65;
   logic [17:0] align_v0_texture_v_to_fx_texture_mul_2_i1_d65;
-  logic [ 7:0] align_v1_color_r_to_fx_color_fma_1_i0_d66;
+  logic [7:0] align_v1_color_r_to_fx_color_fma_1_i0_d66;
   logic [24:0] align_fp_to_fx2_23_2_to_fx_color_fma_1_i1_d1;
-  logic [ 7:0] align_v1_color_g_to_fx_color_fma_3_i0_d66;
+  logic [7:0] align_v1_color_g_to_fx_color_fma_3_i0_d66;
   logic [24:0] align_fp_to_fx2_23_2_to_fx_color_fma_3_i1_d1;
-  logic [ 7:0] align_v1_color_b_to_fx_color_fma_5_i0_d66;
+  logic [7:0] align_v1_color_b_to_fx_color_fma_5_i0_d66;
   logic [24:0] align_fp_to_fx2_23_2_to_fx_color_fma_5_i1_d1;
-  logic [ 7:0] align_v1_color_a_to_fx_color_fma_7_i0_d66;
+  logic [7:0] align_v1_color_a_to_fx_color_fma_7_i0_d66;
   logic [24:0] align_fp_to_fx2_23_2_to_fx_color_fma_7_i1_d1;
   logic [24:0] align_fp_to_fx2_23_2_to_fx_texture_fma_1_i0_d1;
   logic [17:0] align_v1_texture_u_to_fx_texture_fma_1_i1_d66;
   logic [24:0] align_fp_to_fx2_23_2_to_fx_texture_fma_3_i0_d1;
   logic [17:0] align_v1_texture_v_to_fx_texture_fma_3_i1_d66;
-  logic [ 7:0] align_v2_color_r_to_fx_color_fma_2_i0_d68;
+  logic [7:0] align_v2_color_r_to_fx_color_fma_2_i0_d68;
   logic [24:0] align_fp_to_fx2_23_3_to_fx_color_fma_2_i1_d3;
-  logic [ 7:0] align_v2_color_g_to_fx_color_fma_4_i0_d68;
+  logic [7:0] align_v2_color_g_to_fx_color_fma_4_i0_d68;
   logic [24:0] align_fp_to_fx2_23_3_to_fx_color_fma_4_i1_d3;
-  logic [ 7:0] align_v2_color_b_to_fx_color_fma_6_i0_d68;
+  logic [7:0] align_v2_color_b_to_fx_color_fma_6_i0_d68;
   logic [24:0] align_fp_to_fx2_23_3_to_fx_color_fma_6_i1_d3;
-  logic [ 7:0] align_v2_color_a_to_fx_color_fma_8_i0_d68;
+  logic [7:0] align_v2_color_a_to_fx_color_fma_8_i0_d68;
   logic [24:0] align_fp_to_fx2_23_3_to_fx_color_fma_8_i1_d3;
   logic [24:0] align_fp_to_fx2_23_3_to_fx_texture_fma_2_i0_d3;
   logic [17:0] align_v2_texture_u_to_fx_texture_fma_2_i1_d68;
@@ -374,13 +385,13 @@ module thread (
       .data_out(align_fp_mul_3_to_fp_fma_4_i1_d18)
   );
   delay_pipe #(
-    .WIDTH (THREAD_ADDR_W),
+      .WIDTH (THREAD_ADDR_W),
       .STAGES(36)
   ) u_align_addr_to_mem_read_1_i0_d36_data_delay (
       .clk(clk),
       .rst_n(rst_n),
       .clken(pipe_en_internal),
-    .data_in(thread_data_buf.addr[THREAD_ADDR_W-1:0]),
+      .data_in(thread_data_buf.addr[THREAD_ADDR_W-1:0]),
       .data_out(align_addr_to_mem_read_1_i0_d36)
   );
   delay_pipe #(
@@ -394,7 +405,7 @@ module thread (
       .data_out(align_fp_fma_4_to_fp_cmp_1_i0_d1)
   );
   delay_pipe #(
-    .WIDTH (THREAD_ADDR_W),
+      .WIDTH (THREAD_ADDR_W),
       .STAGES(2)
   ) u_align_addr_to_mem_write_1_i0_d38_data_delay (
       .clk(clk),
@@ -899,7 +910,7 @@ module thread (
       .a(fp_fma_3_res),
       .result(fp_recip_1_out)
   );
-  assign z_rd_en = mem_read_1_fire;
+    assign z_rd_en = mem_read_1_fire && pipe_en_internal;
   assign z_rd_addr = align_addr_to_mem_read_1_i0_d36;
   assign mem_read_1_rdata = z_rd_data;
   fp_cmp_le u_fp_cmp_1 (
@@ -914,7 +925,7 @@ module thread (
   );
   assign mem_write_1_fire = valid_pipe[38];
   assign mem_write_1_pred[0] = (fp_cmp_1_pred[0]);
-  assign z_wr_en = mem_write_1_fire && mem_write_1_pred[0];
+    assign z_wr_en = mem_write_1_fire && mem_write_1_pred[0] && pipe_en_internal;
   assign z_wr_addr = align_addr_to_mem_write_1_i0_d38;
   assign z_wr_data = align_fp_fma_4_to_mem_write_1_i1_d2;
   fp_mul #(
@@ -1170,6 +1181,7 @@ module thread (
       comp_z_tdata
   );
   logic [OUTBUNDLEWIDTH-1:0] output_bundle_tdata;
+  logic output_bundle_debug_tvalid;
   logic output_bundle_tvalid;
   logic output_bundle_s_axis_tready;
   logic [OUTBUNDLEWIDTH-1:0] output_bundle_buf_tdata;
@@ -1198,20 +1210,20 @@ module thread (
       .data_in(texcoord_v_tdata),
       .data_out(texcoord_v_bundle_tdata)
   );
-    logic [THREAD_ADDR_W-1:0] addr_bundle_tdata;
+  logic [THREAD_ADDR_W-1:0] addr_bundle_tdata;
   delay_pipe #(
-    .WIDTH (THREAD_ADDR_W),
+      .WIDTH (THREAD_ADDR_W),
       .STAGES(71)
   ) u_align_addr_to_output_bundle_d71 (
       .clk(clk),
       .rst_n(rst_n),
       .clken(pipe_en_internal),
-    .data_in(thread_data_buf.addr[THREAD_ADDR_W-1:0]),
+      .data_in(thread_data_buf.addr[THREAD_ADDR_W-1:0]),
       .data_out(addr_bundle_tdata)
   );
-  logic [6:0] tex_id_bundle_tdata;
+  logic [7:0] tex_id_bundle_tdata;
   delay_pipe #(
-      .WIDTH (7),
+      .WIDTH (8),
       .STAGES(71)
   ) u_align_tex_id_to_output_bundle_d71 (
       .clk(clk),
@@ -1268,7 +1280,7 @@ module thread (
   assign output_bundle_tdata = {
     texcoord_u_bundle_tdata,
     texcoord_v_bundle_tdata,
-        addr_bundle_tdata,
+    addr_bundle_tdata,
     tex_id_bundle_tdata,
     texture_mode_u_bundle_tdata,
     texture_mode_v_bundle_tdata,
@@ -1279,7 +1291,9 @@ module thread (
     color_a_tdata,
     comp_z_bundle_tdata
   };
-  assign output_bundle_tvalid = valid_pipe[71] && (comp_z_bundle_tdata === 1'b1);
+  // Keep raw pipeline-valid visible for debug; gate compare-pass later in the fragment path.
+  assign output_bundle_debug_tvalid = valid_pipe[71];
+  assign output_bundle_tvalid = output_bundle_debug_tvalid;
 
   axis_skid_buffer #(
       .WIDTH(OUTBUNDLEWIDTH)
@@ -1304,167 +1318,156 @@ module thread (
   // * Start of Fragment Pipeline logic  * //
   // ************************************* //
 
-  localparam int POST_COLOR_DELAY_STAGES = 6;
-  localparam int POST_JOIN_BUNDLEWIDTH = 8 + 8 + 8 + 8;
-    localparam int FRAGMENT_SHADER_LATENCY_STAGES = 5;
-
-  logic [                       47:0] post_skid_texcoord_u_tdata;
-  logic [                       47:0] post_skid_texcoord_v_tdata;
-    logic [          THREAD_ADDR_W-1:0] post_skid_addr_tdata;
-  logic [                        6:0] post_skid_tex_id_tdata;
-  logic                               post_skid_texture_mode_u_tdata;
-  logic                               post_skid_texture_mode_v_tdata;
-    fragment_op_t                        post_skid_texture_function_tdata;
-  logic [                        7:0] post_skid_color_r_tdata;
-  logic [                        7:0] post_skid_color_g_tdata;
-  logic [                        7:0] post_skid_color_b_tdata;
-  logic [                        7:0] post_skid_color_a_tdata;
-  logic                               post_skid_comp_z_tdata;
-
-  logic [POST_COLOR_DELAY_STAGES-1:0] texture_pipe_valid;
-  logic                               texture_pipe_advance;
-  logic                               texture_address_clken;
-  logic [                       31:0] texture_addr_tdata;
-  logic                               texture_no_texture_tdata;
-  logic                               l1_req_valid;
-  logic                               l1_req_ready;
-  logic                               l1_resp_valid;
-  logic [                       31:0] l1_resp_data;
-  logic [                       31:0] l1_perf_total_req;
-  logic [                       31:0] l1_perf_hit_req;
-  logic [                       31:0] l1_perf_miss_req;
-  logic                               use_texture_s2;
-  logic                               use_texture_s5;
-    logic [                        2:0] texture_function_s5_tdata;
-    logic [                        2:0] fragment_op_s5_tdata;
-    logic [          THREAD_ADDR_W-1:0] delayed_addr_s5_tdata;
-    logic [          THREAD_ADDR_W-1:0] fb_addr_tdata;
-    logic [                       31:0] texture_color_s5_tdata;
-    logic [                       31:0] texture_color_for_shader_s5_tdata;
-    logic [                       31:0] pixel_color_s5_tdata;
-    color_argb_t                        fragment_pixel_color_tdata;
-    color_argb_t                        fragment_texture_color_tdata;
-    color_argb_t                        fragment_env_color_tdata;
-    color_argb_t                        fragment_color_tdata;
-    logic                               fragment_valid_tdata;
-  logic [  POST_JOIN_BUNDLEWIDTH-1:0] color_delay_in_tdata;
-  logic [  POST_JOIN_BUNDLEWIDTH-1:0] color_delay_out_tdata;
-  logic [                        7:0] delayed_color_r_tdata;
-  logic [                        7:0] delayed_color_g_tdata;
-  logic [                        7:0] delayed_color_b_tdata;
-  logic [                        7:0] delayed_color_a_tdata;
-
-  assign {
-      post_skid_texcoord_u_tdata,
-      post_skid_texcoord_v_tdata,
-      post_skid_addr_tdata,
-      post_skid_tex_id_tdata,
-      post_skid_texture_mode_u_tdata,
-      post_skid_texture_mode_v_tdata,
-      post_skid_texture_function_tdata,
-      post_skid_color_r_tdata,
-      post_skid_color_g_tdata,
-      post_skid_color_b_tdata,
-      post_skid_color_a_tdata,
-      post_skid_comp_z_tdata
-  } = output_bundle_buf_tdata;
-
-  assign color_delay_in_tdata = {
-    post_skid_color_r_tdata,
-    post_skid_color_g_tdata,
-    post_skid_color_b_tdata,
-    post_skid_color_a_tdata
-  };
-
-  assign use_texture_s2 = texture_pipe_valid[2] && !texture_no_texture_tdata;
-  assign l1_req_valid = use_texture_s2;
-  assign texture_pipe_advance =
-      (!use_texture_s2 || l1_req_ready)
-      && (!texture_pipe_valid[5]
-          || !use_texture_s5
-          || l1_resp_valid);
-  assign output_bundle_buf_tready = texture_pipe_advance;
-  assign texture_address_clken = texture_pipe_advance;
-
-  delay_pipe #(
-      .WIDTH (POST_JOIN_BUNDLEWIDTH),
-      .STAGES(POST_COLOR_DELAY_STAGES)
-  ) u_align_post_skid_color_to_texture_join_d6 (
-      .clk(clk),
-      .rst_n(rst_n),
-      .clken(texture_pipe_advance),
-      .data_in(color_delay_in_tdata),
-      .data_out(color_delay_out_tdata)
-  );
 
 
-  delay_pipe #(
-      .WIDTH (3),
-      .STAGES(POST_COLOR_DELAY_STAGES)
-  ) u_align_texture_function_to_fragment_input_d6 (
-      .clk(clk),
-      .rst_n(rst_n),
-      .clken(texture_pipe_advance),
-      .data_in(post_skid_texture_function_tdata),
-      .data_out(texture_function_s5_tdata)
-  );
+  localparam int FRAGMENT_SHADER_LATENCY_STAGES = 5;
 
-  delay_pipe #(
-    .WIDTH (THREAD_ADDR_W),
-      .STAGES(POST_COLOR_DELAY_STAGES)
-  ) u_align_post_skid_addr_to_fragment_input_d6 (
-      .clk(clk),
-      .rst_n(rst_n),
-      .clken(texture_pipe_advance),
-      .data_in(post_skid_addr_tdata),
-      .data_out(delayed_addr_s5_tdata)
-  );
+  typedef struct packed {
+    logic [47:0] texcoord_u;
+    logic [47:0] texcoord_v;
+    logic [THREAD_ADDR_W-1:0] addr;
+    logic [7:0] tex_id;
+    texture_address_mode_t texture_mode_u;
+    texture_address_mode_t texture_mode_v;
+    fragment_op_t texture_function;
+    color_argb_t color;
+    logic comp_z;
+    logic valid;
+  } fragment_token_t;
+
+  typedef struct packed {
+    fragment_token_t token;
+    logic [31:0] texture_addr;
+    logic no_texture;
+  } address_token_t;
+
+  typedef struct packed {
+    logic [47:0] texcoord_u;
+    logic [47:0] texcoord_v;
+    logic [THREAD_ADDR_W-1:0] addr;
+    logic [7:0] tex_id;
+    texture_address_mode_t texture_mode_u;
+    texture_address_mode_t texture_mode_v;
+    fragment_op_t texture_function;
+    logic [7:0] color_r;
+    logic [7:0] color_g;
+    logic [7:0] color_b;
+    logic [7:0] color_a;
+    logic comp_z;
+  } fragment_bundle_t;
+
+  typedef struct packed {
+    logic [31:0] texture_addr;
+    color_argb_t pixel_color;
+    fragment_op_t op;
+    logic [THREAD_ADDR_W-1:0] addr;
+    logic comp_z;
+    logic use_texture;
+  } fragment_request_token_t;
+
+  fragment_token_t post_skid_token;
+  fragment_bundle_t post_skid_bundle;
+  address_token_t address_token_s3;
+  fragment_request_token_t fragment_request_input;
+  fragment_request_token_t fragment_request_output;
+  logic address_step;
+  logic address_use_texture;
+  logic texture_response_ready;
+  logic fragment_request_input_valid;
+  logic fragment_request_input_ready;
+  logic fragment_request_output_valid;
+  logic fragment_request_output_ready;
+  logic l1_request_inflight;
+  logic address_pipe_valid;
+  logic texture_wait_valid;
+  logic fragment_join_output_valid;
+  logic fragment_join_input_ready;
+
+  logic [31:0] texture_addr;
+  logic texture_no_texture;
+  logic l1_req_valid;
+  logic l1_cache_req_ready;
+  logic l1_resp_valid;
+  logic [31:0] l1_resp_data;
+  logic [31:0] l1_perf_total_req;
+  logic [31:0] l1_perf_hit_req;
+  logic [31:0] l1_perf_miss_req;
+  color_argb_t fragment_color_tdata;
+  logic fragment_valid_tdata;
+  logic [THREAD_ADDR_W-1:0] fb_addr_tdata;
+  logic cmp_pass_fragment_out_tdata;
+
+  assign address_pipe_valid = address_token_s3.token.valid;
+  assign texture_wait_valid = l1_request_inflight;
+  assign fragment_join_output_valid = fragment_request_output_valid;
+  assign fragment_join_input_ready = fragment_request_input_ready;
+
+  assign post_skid_bundle = fragment_bundle_t'(output_bundle_buf_tdata);
+
+  always_comb begin
+    post_skid_token = '0;
+    post_skid_token.texcoord_u = post_skid_bundle.texcoord_u;
+    post_skid_token.texcoord_v = post_skid_bundle.texcoord_v;
+    post_skid_token.addr = post_skid_bundle.addr;
+    post_skid_token.tex_id = post_skid_bundle.tex_id;
+    post_skid_token.texture_mode_u = post_skid_bundle.texture_mode_u;
+    post_skid_token.texture_mode_v = post_skid_bundle.texture_mode_v;
+    post_skid_token.texture_function = post_skid_bundle.texture_function;
+    post_skid_token.color.a = post_skid_bundle.color_a;
+    post_skid_token.color.r = post_skid_bundle.color_r;
+    post_skid_token.color.g = post_skid_bundle.color_g;
+    post_skid_token.color.b = post_skid_bundle.color_b;
+    post_skid_token.comp_z = post_skid_bundle.comp_z;
+    post_skid_token.valid = output_bundle_buf_tvalid;
+  end
+
+  assign texture_response_ready =
+      fragment_request_output_valid
+      && fragment_request_output.use_texture
+      && l1_request_inflight
+      && l1_resp_valid;
+  // The join skid buffer is the sole holding element for the address stage:
+  // upstream (address gen + token delay) only advances when it has room.
+  assign address_step = fragment_request_input_ready;
+  assign output_bundle_buf_tready = address_step;
 
   delay_pipe #(
-      .WIDTH (1),
+      .WIDTH ($bits(fragment_token_t)),
       .STAGES(3)
-  ) u_align_use_texture_to_output_d3 (
+  ) u_fragment_token_to_address_stage (
       .clk(clk),
       .rst_n(rst_n),
-      .clken(texture_pipe_advance),
-      .data_in(use_texture_s2),
-      .data_out(use_texture_s5)
+      .clken(address_step),
+      .data_in(post_skid_token),
+      .data_out(address_token_s3.token)
   );
-
-  assign {
-      delayed_color_r_tdata,
-      delayed_color_g_tdata,
-      delayed_color_b_tdata,
-      delayed_color_a_tdata
-  } = color_delay_out_tdata;
-
-    assign pixel_color_s5_tdata = {
-        delayed_color_a_tdata, delayed_color_r_tdata, delayed_color_g_tdata, delayed_color_b_tdata
-    };
-    assign texture_color_s5_tdata =
-            use_texture_s5 ? (l1_resp_valid ? l1_resp_data : 32'd0) : 32'd0;
-    assign fragment_pixel_color_tdata = color_argb_t'(pixel_color_s5_tdata);
-        assign texture_color_for_shader_s5_tdata =
-            use_texture_s5 ? texture_color_s5_tdata : pixel_color_s5_tdata;
-    assign fragment_texture_color_tdata = color_argb_t'(texture_color_for_shader_s5_tdata);
-    assign fragment_op_s5_tdata = use_texture_s5 ? texture_function_s5_tdata : REPLACE;
-    assign fragment_env_color_tdata = '0;
 
   texture_address_generator u_texture_address_generator (
       .clk(clk),
-      .clken(texture_address_clken),
-      .tex_idx(post_skid_tex_id_tdata),
-      .u_in(post_skid_texcoord_u_tdata),
-      .v_in(post_skid_texcoord_v_tdata),
-      .texture_mode_u(post_skid_texture_mode_u_tdata),
-      .texture_mode_v(post_skid_texture_mode_v_tdata),
-      .addr_out(texture_addr_tdata),
-      .no_texture(texture_no_texture_tdata),
-      .lut_addr_wr_en(1'b0),
-      .lut_size_wr_en(1'b0),
-      .lut_wr_addr('0),
-      .lut_wr_data('0)
+      .clken(address_step),
+      .tex_idx(post_skid_token.tex_id),
+      .u_in(post_skid_token.texcoord_u),
+      .v_in(post_skid_token.texcoord_v),
+      .texture_mode_u(post_skid_token.texture_mode_u),
+      .texture_mode_v(post_skid_token.texture_mode_v),
+      .addr_out(texture_addr),
+      .no_texture(texture_no_texture),
+      .lut_addr_wr_en(lut_addr_wr_en),
+      .lut_size_wr_en(lut_size_wr_en),
+      .lut_wr_addr(lut_wr_addr),
+      .lut_wr_data(lut_wr_data)
   );
+
+  // The address generator is itself a three-stage registered pipeline. Its
+  // outputs are therefore already aligned with the delayed fragment token.
+  assign address_token_s3.texture_addr = texture_addr;
+  assign address_token_s3.no_texture = texture_no_texture;
+
+  assign address_use_texture =
+      address_token_s3.token.valid
+      && address_token_s3.token.comp_z
+      && address_token_s3.token.texture_function != COLOR
+      && !address_token_s3.no_texture;
 
   texture_cache #(
       .ADDR_WIDTH(32),
@@ -1479,8 +1482,8 @@ module thread (
       .rst_n(rst_n),
       .flush(1'b0),
       .req_valid(l1_req_valid),
-      .req_ready(l1_req_ready),
-      .req_addr(texture_addr_tdata),
+      .req_ready(l1_cache_req_ready),
+      .req_addr(fragment_request_output.texture_addr),
       .resp_valid(l1_resp_valid),
       .resp_data(l1_resp_data),
       .m_axi_araddr(tex_m_axi_araddr),
@@ -1507,40 +1510,126 @@ module thread (
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      texture_pipe_valid <= '0;
+      l1_request_inflight <= 1'b0;
     end else begin
-      if (texture_pipe_advance) begin
-        texture_pipe_valid[5:1] <= texture_pipe_valid[4:0];
-        texture_pipe_valid[0]   <= output_bundle_buf_tvalid;
+      if (l1_resp_valid) begin
+        l1_request_inflight <= 1'b0;
+      end
+
+      if (l1_req_valid && l1_cache_req_ready) begin
+        l1_request_inflight <= 1'b1;
       end
     end
   end
 
+  assign fragment_request_input_valid = address_token_s3.token.valid;
+
+  always_comb begin
+    fragment_request_input = '0;
+    fragment_request_input.texture_addr = address_token_s3.texture_addr;
+    fragment_request_input.pixel_color = address_token_s3.token.color;
+    fragment_request_input.op = fragment_op_t'(address_use_texture
+                ? address_token_s3.token.texture_function
+                : COLOR);
+    fragment_request_input.addr = address_token_s3.token.addr;
+    fragment_request_input.comp_z = address_token_s3.token.comp_z;
+    fragment_request_input.use_texture = address_use_texture;
+  end
+
+  // Skid buffer sits right at the address/delay merge point. It is the sole
+  // elastic element for this stage: L1 request issuance and the shader hold
+  // both operate off its held output, decoupled from address-stage advance.
+  axis_skid_buffer #(
+      .WIDTH($bits(fragment_request_token_t))
+  ) u_fragment_request_skid_buffer (
+      .aclk(clk),
+      .aresetn(rst_n),
+      .s_axis_tdata(fragment_request_input),
+      .s_axis_tvalid(fragment_request_input_valid),
+      .s_axis_tready(fragment_request_input_ready),
+      .m_axis_tdata(fragment_request_output),
+      .m_axis_tvalid(fragment_request_output_valid),
+      .m_axis_tready(fragment_request_output_ready)
+  );
+
+  // L1 request fires off the skid's held output; stalled (not issued) while
+  // a previous request is still in flight.
+  assign l1_req_valid =
+      fragment_request_output_valid
+      && fragment_request_output.use_texture
+      && !l1_request_inflight;
+
+  // The skid only releases its head token once a non-textured fragment is
+  // ready immediately, or a textured one's L1 response has arrived - i.e.
+  // we stall here whenever a texture is required but not yet ready.
+  logic fragment_shader_input_valid;
+  assign fragment_request_output_ready =
+            !fragment_request_output.use_texture || texture_response_ready;
+  assign fragment_shader_input_valid =
+            fragment_request_output_valid && fragment_request_output_ready;
+
   fragment_shader u_fragment_shader (
       .clk(clk),
       .rst_n(rst_n),
-      .pixel_color(fragment_pixel_color_tdata),
-      .texture_color(fragment_texture_color_tdata),
-      .env_color(fragment_env_color_tdata),
-    .op(fragment_op_t'(fragment_op_s5_tdata)),
-      .valid_in(texture_pipe_valid[5] && (!use_texture_s5 || l1_resp_valid)),
+      .pixel_color(fragment_request_output.pixel_color),
+      .texture_color(color_argb_t'(l1_resp_data)),
+      .env_color('0),
+      .op(fragment_request_output.op),
+      .valid_in(fragment_shader_input_valid),
       .fragment_color(fragment_color_tdata),
       .valid_out(fragment_valid_tdata)
   );
 
   delay_pipe #(
-    .WIDTH (THREAD_ADDR_W),
+      .WIDTH (THREAD_ADDR_W),
       .STAGES(FRAGMENT_SHADER_LATENCY_STAGES)
-  ) u_align_fb_addr_to_fragment_output_d5 (
+  ) u_align_fb_addr_to_fragment_output (
       .clk(clk),
       .rst_n(rst_n),
       .clken(1'b1),
-      .data_in(delayed_addr_s5_tdata),
+      .data_in(fragment_request_output.addr),
       .data_out(fb_addr_tdata)
   );
 
-    assign out_fb_color = fragment_color_tdata;
-    assign out_fb_addr = fb_addr_tdata;
-    assign out_fb_we = fragment_valid_tdata;
+  delay_pipe #(
+      .WIDTH (1),
+      .STAGES(FRAGMENT_SHADER_LATENCY_STAGES)
+  ) u_align_compare_to_fragment_output (
+      .clk(clk),
+      .rst_n(rst_n),
+      .clken(1'b1),
+      .data_in(fragment_request_output.comp_z),
+      .data_out(cmp_pass_fragment_out_tdata)
+  );
+
+  assign out_fb_color = fragment_color_tdata;
+  assign out_fb_addr = fb_addr_tdata;
+  assign out_fb_valid = fragment_valid_tdata;
+  assign out_fb_we = out_fb_valid && cmp_pass_fragment_out_tdata;
+
+
+  // Thread emptiness counter: incremented once per token actually accepted
+  // into the main pipeline (not merely presented-but-stalled at the ingress
+  // skid), decremented once per fragment completing the shader pipeline.
+  reg [7:0] emptiness_counter;
+  logic input_bundle_fire;
+  assign input_bundle_fire = input_bundle_buf_tvalid && pipe_en_internal;
+  always_ff @(posedge clk) begin
+    if (!rst_n) begin
+      emptiness_counter <= 0;
+    end else begin
+
+      unique case ({
+        input_bundle_fire, fragment_valid_tdata
+      })
+        2'b00: emptiness_counter <= emptiness_counter;
+        2'b01: emptiness_counter <= emptiness_counter - 1;
+        2'b10: emptiness_counter <= emptiness_counter + 1;
+        2'b11: emptiness_counter <= emptiness_counter;
+      endcase
+    end
+
+    empty <= (emptiness_counter == 0);
+  end
 
 endmodule

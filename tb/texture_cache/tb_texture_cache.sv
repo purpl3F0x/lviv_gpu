@@ -54,6 +54,8 @@ module tb_texture_cache;
   logic [            15:0] rd_left;
 
   int                      err_count;
+  logic [AddrWidth-1:0]    first_axi_addr;
+  logic                    first_axi_seen;
 
   texture_cache #(
       .ADDR_WIDTH(AddrWidth),
@@ -104,9 +106,9 @@ module tb_texture_cache;
     end
   end
 
-  function automatic logic [31:0] expected_word(input logic [AddrWidth-1:0] byte_addr);
+  function automatic logic [31:0] expected_word(input logic [AddrWidth-1:0] pixel_addr);
     begin
-      expected_word = 32'h1000_0000 + (byte_addr >> 2);
+      expected_word = 32'h1000_0000 + pixel_addr;
     end
   endfunction
 
@@ -238,7 +240,7 @@ module tb_texture_cache;
               @(negedge clk);
             end
 
-            reqs[sent] = base_addr + 32'(sent * PixelBytes);
+            reqs[sent] = base_addr + 32'(sent);
             req_addr  <= reqs[sent];
             req_valid <= 1'b1;
             sent = sent + 1;
@@ -291,6 +293,8 @@ module tb_texture_cache;
       rd_addr       <= '0;
       rd_beat       <= '0;
       rd_left       <= '0;
+      first_axi_addr <= '0;
+      first_axi_seen <= 1'b0;
     end else begin
       m_axi_arready <= 1'b1;
       m_axi_rvalid  <= 1'b0;
@@ -298,6 +302,10 @@ module tb_texture_cache;
       m_axi_rresp   <= 2'b00;
 
       if (!rd_active && m_axi_arvalid && m_axi_arready) begin
+        if (!first_axi_seen) begin
+          first_axi_addr <= m_axi_araddr;
+          first_axi_seen <= 1'b1;
+        end
         rd_active <= 1'b1;
         rd_addr   <= m_axi_araddr;
         rd_beat   <= 0;
@@ -328,6 +336,8 @@ module tb_texture_cache;
     perf_re = 1'b0;
     perf_addr = '0;
     err_count = 0;
+    first_axi_seen = 1'b0;
+    first_axi_addr = '0;
 
     for (i = 0; i < MemBeats; i++) begin
       int unsigned base_word;
@@ -344,16 +354,21 @@ module tb_texture_cache;
     rst_n = 1'b1;
     repeat (2) @(negedge clk);
 
-    check_access(32'h0000_012C, "first-miss");
-    check_access(32'h0000_012C, "same-addr-hit");
-    check_access(32'h0000_0130, "same-line-hit");
-    check_access(32'h0000_112C, "different-line");
+    check_access(32'h0000_004B, "first-miss");
+    if (first_axi_addr !== (32'h0000_004B << 2 & ~(LineBytes - 1))) begin
+      $display("[ERR] first refill AXI address expected byte line base=%08h got=%08h",
+               (32'h0000_004B << 2 & ~(LineBytes - 1)), first_axi_addr);
+      err_count = err_count + 1;
+    end
+    check_access(32'h0000_004B, "same-addr-hit");
+    check_access(32'h0000_004C, "same-line-hit");
+    check_access(32'h0000_012B, "different-line");
 
     // Flush must take priority and invalidate cache state.
     @(negedge clk);
     flush <= 1'b1;
     req_valid <= 1'b1;
-    req_addr <= 32'h0000_0400;
+    req_addr <= 32'h0000_0100;
     @(posedge clk);
     if (req_ready !== 1'b0) begin
       $display("[ERR] flush-priority req_ready should be low while flush is asserted");
@@ -362,11 +377,11 @@ module tb_texture_cache;
     @(negedge clk);
     flush <= 1'b0;
     req_valid <= 1'b0;
-    check_access_min_latency(32'h0000_012C, 3, "post-flush-miss");
+    check_access_min_latency(32'h0000_004B, 3, "post-flush-miss");
 
     // Fill one line, then issue one request per cycle across that line.
-    check_access(32'h0000_0200, "burst-preload-line");
-    check_burst_one_req_per_cycle(32'h0000_0200, 16, "one-req-per-cycle-hit-burst");
+    check_access(32'h0000_0080, "burst-preload-line");
+    check_burst_one_req_per_cycle(32'h0000_0080, 64, "one-req-per-cycle-hit-burst");
 
     // Perf CSR readback checks.
     begin

@@ -3,7 +3,8 @@
 import gpu_types_pkg::*;
 
 module tb_thread;
-  localparam int ZBufDepth = (1 << PIXEL_ADDR_W);
+  localparam int THREAD_ADDR_W = PIXEL_ADDR_W_THREAD;
+  localparam int ZBufDepth = (1 << THREAD_ADDR_W);
   logic                       clk;
   logic                       rst_n;
 
@@ -12,14 +13,15 @@ module tb_thread;
   thread_data_in_t            in_data;
 
   logic    [            31:0] out_fb_color;
-  logic    [PIXEL_ADDR_W-1:0] out_fb_addr;
+  logic    [THREAD_ADDR_W-1:0] out_fb_addr;
+  logic                       out_fb_valid;
   logic                       out_fb_we;
 
   logic                       z_rd_en;
-  logic    [PIXEL_ADDR_W-1:0] z_rd_addr;
+  logic    [THREAD_ADDR_W-1:0] z_rd_addr;
   logic    [            31:0] z_rd_data;
   logic                       z_wr_en;
-  logic    [PIXEL_ADDR_W-1:0] z_wr_addr;
+  logic    [THREAD_ADDR_W-1:0] z_wr_addr;
   logic    [            31:0] z_wr_data;
   logic    [            31:0] tex_m_axi_araddr;
   logic    [             7:0] tex_m_axi_arlen;
@@ -42,7 +44,7 @@ module tb_thread;
 
   // Use the shared z-buffer module in behavioral mode for simulation.
   z_buffer_ram #(
-      .ADDR_WIDTH(PIXEL_ADDR_W),
+      .ADDR_WIDTH(THREAD_ADDR_W),
       .USE_XPM(1'b0)
   ) u_z_buffer_ram (
       .clk(clk),
@@ -67,9 +69,9 @@ module tb_thread;
 
 
 
-  logic     [PIXEL_ADDR_W-1:0] expected_wr_addr_q  [$];
+  logic     [THREAD_ADDR_W-1:0] expected_wr_addr_q  [$];
   logic     [            31:0] expected_wr_data_q  [$];
-  logic     [PIXEL_ADDR_W-1:0] expected_fb_addr_q  [$];
+  logic     [THREAD_ADDR_W-1:0] expected_fb_addr_q  [$];
   logic     [            31:0] expected_fb_color_q [$];
   logic     [            31:0] expected_z_mem[ZBufDepth];
 
@@ -90,7 +92,7 @@ module tb_thread;
   int                          expected_fb_total;
   int                          l1_req_count;
 
-  localparam int FB_BUNDLE_WIDTH = 48 + 48 + PIXEL_ADDR_W + 7 + 1 + 1 + 3 + 8 + 8 + 8 + 8 + 1;
+  localparam int FB_BUNDLE_WIDTH = 48 + 48 + THREAD_ADDR_W + 7 + 1 + 1 + 3 + 8 + 8 + 8 + 8 + 1;
 
   function automatic logic [31:0] fbits(input shortreal v);
     return $shortrealtobits(v);
@@ -184,7 +186,7 @@ module tb_thread;
                                input shortreal v0b, input shortreal v1b, input shortreal v2b,
                                input shortreal v0a, input shortreal v1a, input shortreal v2a,
                                input shortreal e0, input shortreal e1, input shortreal e2,
-                               input shortreal inv_area, input logic [PIXEL_ADDR_W-1:0] mem_addr);
+                               input shortreal inv_area, input logic [THREAD_ADDR_W-1:0] mem_addr);
     shortreal iw0, iw1, iw2;
     shortreal z, invW, w;
     shortreal pw0, pw1, pw2;
@@ -328,7 +330,7 @@ module tb_thread;
     in_data.e1 = fbits(e1);
     in_data.e2 = fbits(e2);
     in_data.inv_area = fbits(inv_area);
-    in_data.addr = mem_addr[PIXEL_ADDR_W-1:0];
+    in_data.addr = mem_addr[THREAD_ADDR_W-1:0];
 
     // Color-only mode for now: force texturing off.
     in_data.tex_id = '0;
@@ -379,9 +381,9 @@ module tb_thread;
     if (!rst_n) begin
       // no-op
     end else if (dut.output_bundle_tvalid && dut.output_bundle_s_axis_tready) begin
-      // comp_z is packed as the LSB in output_bundle_tdata.
-      if (dut.output_bundle_tdata[0] !== 1'b1) begin
-        $display("[TB][ERROR] pre-skid output bundle carried comp_z=0");
+      // comp_z is metadata and may be 0 or 1. It must be known when valid fires.
+      if (dut.output_bundle_tdata[0] === 1'bx || dut.output_bundle_tdata[0] === 1'bz) begin
+        $display("[TB][ERROR] pre-skid output bundle carried unknown comp_z");
         err_count++;
       end
     end
@@ -391,7 +393,7 @@ module tb_thread;
   always @(posedge clk) begin
     logic [47:0] exp_texcoord_u;
     logic [47:0] exp_texcoord_v;
-    logic [PIXEL_ADDR_W-1:0] exp_addr;
+    logic [THREAD_ADDR_W-1:0] exp_addr;
     logic [6:0] exp_tex_id;
     logic exp_mode_u;
     logic exp_mode_v;
@@ -421,19 +423,22 @@ module tb_thread;
           exp_comp_z
       } = dut.output_bundle_buf_tdata[FB_BUNDLE_WIDTH-1:0];
 
-      // No-texture path is forced to ADD(color, 0). RGB passes through.
-      exp_out_a = (exp_a * 8'd255 + 16'd128) >> 8;
+      // No-texture path maps to REPLACE in RTL, so color (including alpha) passes through.
+      exp_out_a = exp_a;
       exp_out_color = {exp_out_a, exp_r, exp_g, exp_b};
 
-      expected_fb_addr_q.push_back(exp_addr);
-      expected_fb_color_q.push_back(exp_out_color);
-      expected_fb_total++;
+      // Keep all tokens in flight, but only passing fragments should write FB.
+      if (exp_comp_z) begin
+        expected_fb_addr_q.push_back(exp_addr);
+        expected_fb_color_q.push_back(exp_out_color);
+        expected_fb_total++;
+      end
     end
   end
 
   // Write-side checker: verify z-buffer writes are in-order and correct.
   always @(posedge clk) begin
-    logic [PIXEL_ADDR_W-1:0] exp_addr;
+    logic [THREAD_ADDR_W-1:0] exp_addr;
     logic [31:0] exp_data;
     if (!rst_n) begin
       // no-op
@@ -473,11 +478,15 @@ module tb_thread;
 
   // Framebuffer output checker: verify full post-cache/fragment datapath outputs.
   always @(posedge clk) begin
-    logic [PIXEL_ADDR_W-1:0] exp_fb_addr;
+    logic [THREAD_ADDR_W-1:0] exp_fb_addr;
     logic [31:0] exp_fb_color;
     if (!rst_n) begin
       // no-op
     end else if (out_fb_we === 1'b1) begin
+      if (out_fb_valid !== 1'b1) begin
+        $display("[TB][ERROR] out_fb_we asserted while out_fb_valid is not high");
+        err_count++;
+      end
       if (expected_fb_addr_q.size() == 0 || expected_fb_color_q.size() == 0) begin
         $display("[TB][ERROR] Unexpected framebuffer write with empty expected queue");
         err_count++;
@@ -503,7 +512,7 @@ module tb_thread;
   always @(posedge clk) begin
     if (!rst_n) begin
       // no-op
-    end else if (dut.l1_req_valid && dut.l1_req_ready) begin
+    end else if (dut.l1_req_valid && dut.l1_cache_req_ready) begin
       l1_req_count++;
       $display("[TB][ERROR] Unexpected L1 texture request in color-only mode");
       err_count++;
@@ -530,6 +539,7 @@ module tb_thread;
       .in_data(in_data),
       .out_fb_color(out_fb_color),
       .out_fb_addr(out_fb_addr),
+      .out_fb_valid(out_fb_valid),
       .out_fb_we(out_fb_we),
       .z_rd_en(z_rd_en),
       .z_rd_addr(z_rd_addr),
@@ -547,7 +557,11 @@ module tb_thread;
         .tex_m_axi_rresp(tex_m_axi_rresp),
         .tex_m_axi_rvalid(tex_m_axi_rvalid),
         .tex_m_axi_rready(tex_m_axi_rready),
-        .tex_m_axi_rlast(tex_m_axi_rlast)
+          .tex_m_axi_rlast(tex_m_axi_rlast),
+          .lut_addr_wr_en(1'b0),
+          .lut_size_wr_en(1'b0),
+          .lut_wr_addr('0),
+          .lut_wr_data('0)
   );
 
   // Clock

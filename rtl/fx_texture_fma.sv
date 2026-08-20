@@ -4,8 +4,8 @@ module fx_texture_fma (
     input  logic               clken,
     input  logic signed [24:0] a,      // SQ2.23
     input  logic signed [17:0] b,      // SQ5.13
-    input  logic signed [47:0] c,      // 10.36 aligned addend
-    output logic signed [47:0] q       // 10.36 full-precision a*b + c
+    input  logic signed [47:0] c,      // 12.36 aligned addend
+    output logic signed [47:0] q       // 12.36 full-precision a*b + c
 );
   logic signed [24:0] b_ext;
   logic signed [49:0] prod_full_s0;

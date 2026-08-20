@@ -6,7 +6,7 @@ VVP      = vvp
 SNAPSHOT = tb_sim
 
 # Source files
-RTL_SRCS = ../../rtl/texture_address_generator.sv
+RTL_SRCS = ../../rtl/gpu_types_pkg.sv ../../rtl/texture_address_generator.sv
 TB_SRCS  = tb_texture_address_generator.sv
 
 .PHONY: all compile run waves clean

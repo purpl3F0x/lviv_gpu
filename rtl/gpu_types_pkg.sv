@@ -64,7 +64,7 @@ package gpu_types_pkg;
   // Texture u/v arrive in the narrower fixed-point format used by the thread path.
   typedef struct packed {
     logic [PIXEL_ADDR_W_THREAD-1:0] addr;
-    logic [6:0] tex_id;
+    logic [7:0] tex_id;
     texture_address_mode_t texture_mode_u;
     texture_address_mode_t texture_mode_v;
     fragment_op_t texture_function;

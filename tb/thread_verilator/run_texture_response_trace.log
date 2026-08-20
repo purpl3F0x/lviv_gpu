@@ -1,0 +1,2535 @@
+Loaded 968 triangles.
+Loaded texture_3.jpg (64x64)
+Average Raw BB Width: 29.7361
+Average Raw BB Height: 30.0535
+Average Clamped BB Width: 30.7516
+Average Clamped BB Height: 31.0311
+[UV_CMP] checked=27 mismatch=0
+[THREAD_CMP] tokens=27 expected_writes=27 hw_writes=27 write_mismatch=0
+[UV_CMP] checked=6 mismatch=0
+[THREAD_CMP] tokens=6 expected_writes=6 hw_writes=6 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=1 hw_writes=1 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=4 mismatch=0
+[THREAD_CMP] tokens=4 expected_writes=4 hw_writes=4 write_mismatch=0
+[UV_CMP] checked=272 mismatch=0
+[THREAD_CMP] tokens=272 expected_writes=272 hw_writes=272 write_mismatch=0
+[UV_CMP] checked=52 mismatch=0
+[THREAD_CMP] tokens=52 expected_writes=52 hw_writes=52 write_mismatch=0
+[UV_CMP] checked=389 mismatch=0
+[THREAD_CMP] tokens=389 expected_writes=389 hw_writes=389 write_mismatch=0
+[UV_CMP] checked=351 mismatch=0
+[THREAD_CMP] tokens=351 expected_writes=351 hw_writes=351 write_mismatch=0
+[UV_CMP] checked=200 mismatch=0
+[THREAD_CMP] tokens=200 expected_writes=200 hw_writes=200 write_mismatch=0
+[UV_CMP] checked=607 mismatch=0
+[THREAD_CMP] tokens=607 expected_writes=607 hw_writes=607 write_mismatch=0
+[UV_CMP] checked=7 mismatch=0
+[THREAD_CMP] tokens=7 expected_writes=7 hw_writes=7 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=426 mismatch=0
+[THREAD_CMP] tokens=426 expected_writes=10 hw_writes=10 write_mismatch=0
+[UV_CMP] checked=581 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=13034 color=fe002c54
+[THREAD_CMP][WRITE][EXTRA] addr=13035 color=fe002c55
+[THREAD_CMP][WRITE][EXTRA] addr=13163 color=fe002c55
+[THREAD_CMP][WRITE][MISSING] addr=13274 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=13275 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=13401 color=fe43002c
+[THREAD_CMP] tokens=581 expected_writes=81 hw_writes=81 write_mismatch=6
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=87 mismatch=0
+[THREAD_CMP] tokens=87 expected_writes=61 hw_writes=61 write_mismatch=0
+[UV_CMP] checked=473 mismatch=0
+[THREAD_CMP] tokens=473 expected_writes=11 hw_writes=11 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=56 mismatch=0
+[THREAD_CMP] tokens=56 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=28 mismatch=0
+[THREAD_CMP] tokens=28 expected_writes=28 hw_writes=28 write_mismatch=0
+[UV_CMP] checked=252 mismatch=0
+[THREAD_CMP] tokens=252 expected_writes=252 hw_writes=252 write_mismatch=0
+[UV_CMP] checked=317 mismatch=0
+[THREAD_CMP] tokens=317 expected_writes=317 hw_writes=317 write_mismatch=0
+[UV_CMP] checked=180 mismatch=0
+[THREAD_CMP] tokens=180 expected_writes=180 hw_writes=180 write_mismatch=0
+[UV_CMP] checked=49 mismatch=0
+[THREAD_CMP] tokens=49 expected_writes=49 hw_writes=49 write_mismatch=0
+[UV_CMP] checked=101 mismatch=0
+[THREAD_CMP] tokens=101 expected_writes=101 hw_writes=101 write_mismatch=0
+[UV_CMP] checked=192 mismatch=0
+[THREAD_CMP] tokens=192 expected_writes=192 hw_writes=192 write_mismatch=0
+[UV_CMP] checked=225 mismatch=0
+[THREAD_CMP] tokens=225 expected_writes=225 hw_writes=225 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=2 mismatch=0
+[THREAD_CMP] tokens=2 expected_writes=2 hw_writes=2 write_mismatch=0
+[UV_CMP] checked=126 mismatch=0
+[THREAD_CMP] tokens=126 expected_writes=126 hw_writes=126 write_mismatch=0
+[UV_CMP] checked=422 mismatch=0
+[THREAD_CMP] tokens=422 expected_writes=422 hw_writes=422 write_mismatch=0
+[UV_CMP] checked=396 mismatch=0
+[THREAD_CMP] tokens=396 expected_writes=396 hw_writes=396 write_mismatch=0
+[UV_CMP] checked=529 mismatch=0
+[THREAD_CMP] tokens=529 expected_writes=529 hw_writes=529 write_mismatch=0
+[UV_CMP] checked=349 mismatch=0
+[THREAD_CMP] tokens=349 expected_writes=349 hw_writes=349 write_mismatch=0
+[UV_CMP] checked=670 mismatch=0
+[THREAD_CMP] tokens=670 expected_writes=670 hw_writes=670 write_mismatch=0
+[UV_CMP] checked=453 mismatch=0
+[THREAD_CMP] tokens=453 expected_writes=453 hw_writes=453 write_mismatch=0
+[UV_CMP] checked=198 mismatch=0
+[THREAD_CMP] tokens=198 expected_writes=198 hw_writes=198 write_mismatch=0
+[UV_CMP] checked=160 mismatch=0
+[THREAD_CMP] tokens=160 expected_writes=160 hw_writes=160 write_mismatch=0
+[UV_CMP] checked=179 mismatch=0
+[THREAD_CMP] tokens=179 expected_writes=179 hw_writes=179 write_mismatch=0
+[UV_CMP] checked=858 mismatch=0
+[THREAD_CMP] tokens=858 expected_writes=858 hw_writes=858 write_mismatch=0
+[UV_CMP] checked=437 mismatch=0
+[THREAD_CMP] tokens=437 expected_writes=437 hw_writes=437 write_mismatch=0
+[UV_CMP] checked=686 mismatch=0
+[THREAD_CMP] tokens=686 expected_writes=686 hw_writes=686 write_mismatch=0
+[UV_CMP] checked=428 mismatch=0
+[THREAD_CMP] tokens=428 expected_writes=428 hw_writes=428 write_mismatch=0
+[UV_CMP] checked=729 mismatch=0
+[THREAD_CMP] tokens=729 expected_writes=729 hw_writes=729 write_mismatch=0
+[UV_CMP] checked=56 mismatch=0
+[THREAD_CMP] tokens=56 expected_writes=56 hw_writes=56 write_mismatch=0
+[UV_CMP] checked=456 mismatch=0
+[THREAD_CMP] tokens=456 expected_writes=456 hw_writes=456 write_mismatch=0
+[UV_CMP] checked=98 mismatch=0
+[THREAD_CMP] tokens=98 expected_writes=98 hw_writes=98 write_mismatch=0
+[UV_CMP] checked=72 mismatch=0
+[THREAD_CMP] tokens=72 expected_writes=72 hw_writes=72 write_mismatch=0
+[UV_CMP] checked=11 mismatch=0
+[THREAD_CMP] tokens=11 expected_writes=11 hw_writes=11 write_mismatch=0
+[UV_CMP] checked=29 mismatch=0
+[THREAD_CMP] tokens=29 expected_writes=29 hw_writes=29 write_mismatch=0
+[UV_CMP] checked=44 mismatch=0
+[THREAD_CMP] tokens=44 expected_writes=44 hw_writes=44 write_mismatch=0
+[UV_CMP] checked=108 mismatch=0
+[THREAD_CMP] tokens=108 expected_writes=108 hw_writes=108 write_mismatch=0
+[UV_CMP] checked=122 mismatch=0
+[THREAD_CMP] tokens=122 expected_writes=122 hw_writes=122 write_mismatch=0
+[UV_CMP] checked=117 mismatch=0
+[THREAD_CMP] tokens=117 expected_writes=117 hw_writes=117 write_mismatch=0
+[UV_CMP] checked=99 mismatch=0
+[THREAD_CMP] tokens=99 expected_writes=99 hw_writes=99 write_mismatch=0
+[UV_CMP] checked=173 mismatch=0
+[THREAD_CMP] tokens=173 expected_writes=173 hw_writes=173 write_mismatch=0
+[UV_CMP] checked=102 mismatch=0
+[THREAD_CMP] tokens=102 expected_writes=102 hw_writes=102 write_mismatch=0
+[UV_CMP] checked=26 mismatch=0
+[THREAD_CMP] tokens=26 expected_writes=26 hw_writes=26 write_mismatch=0
+[UV_CMP] checked=53 mismatch=0
+[THREAD_CMP] tokens=53 expected_writes=53 hw_writes=53 write_mismatch=0
+[UV_CMP] checked=42 mismatch=0
+[THREAD_CMP] tokens=42 expected_writes=42 hw_writes=42 write_mismatch=0
+[UV_CMP] checked=28 mismatch=0
+[THREAD_CMP] tokens=28 expected_writes=28 hw_writes=28 write_mismatch=0
+[UV_CMP] checked=48 mismatch=0
+[THREAD_CMP] tokens=48 expected_writes=46 hw_writes=46 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=67 mismatch=0
+[THREAD_CMP] tokens=67 expected_writes=60 hw_writes=60 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=974 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=7704 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=7827 color=fe8f6500
+[THREAD_CMP][WRITE][MISSING] addr=7828 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=7830 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=7831 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=7954 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=7955 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=7958 color=fe000000
+[THREAD_CMP] tokens=974 expected_writes=331 hw_writes=334 write_mismatch=47
+[UV_CMP] checked=292 mismatch=0
+[THREAD_CMP] tokens=292 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=3482 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=6911 color=fd000000
+[THREAD_CMP][WRITE][MISSING] addr=7038 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=7039 color=fd000000
+[THREAD_CMP][WRITE][EXTRA] addr=7131 color=fe0072d9
+[THREAD_CMP][WRITE][MISSING] addr=7166 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=7167 color=fd000000
+[THREAD_CMP][WRITE][EXTRA] addr=7258 color=fe0072d8
+[THREAD_CMP][WRITE][EXTRA] addr=7259 color=fe0072d9
+[THREAD_CMP] tokens=3482 expected_writes=1585 hw_writes=1567 write_mismatch=110
+[UV_CMP] checked=3387 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=4723 color=fd00e388
+[THREAD_CMP][WRITE][MISSING] addr=4724 color=fe00e489
+[THREAD_CMP][WRITE][EXTRA] addr=4915 color=fe0057a5
+[THREAD_CMP][WRITE][EXTRA] addr=4916 color=fe0057a6
+[THREAD_CMP][WRITE][MISSING] addr=5033 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=5034 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=5048 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=5049 color=fe000000
+[THREAD_CMP] tokens=3387 expected_writes=852 hw_writes=849 write_mismatch=45
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=1465 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=12266 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=12267 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=13165 color=fed7008e
+[THREAD_CMP][WRITE][EXTRA] addr=13166 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=13294 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=13295 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=13298 color=fddd0092
+[THREAD_CMP][WRITE][MISSING] addr=13299 color=fedf0093
+[THREAD_CMP] tokens=1465 expected_writes=151 hw_writes=154 write_mismatch=9
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=505 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=13951 color=fd000000
+[THREAD_CMP][WRITE][MISSING] addr=14079 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=14197 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=14206 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=14207 color=fd000000
+[THREAD_CMP][WRITE][EXTRA] addr=14325 color=fee20095
+[THREAD_CMP][WRITE][EXTRA] addr=14326 color=fee30096
+[THREAD_CMP][WRITE][MISSING] addr=14334 color=fe000000
+[THREAD_CMP] tokens=505 expected_writes=200 hw_writes=198 write_mismatch=32
+[UV_CMP] checked=28 mismatch=0
+[THREAD_CMP] tokens=28 expected_writes=28 hw_writes=28 write_mismatch=0
+[UV_CMP] checked=317 mismatch=0
+[THREAD_CMP] tokens=317 expected_writes=317 hw_writes=317 write_mismatch=0
+[UV_CMP] checked=252 mismatch=0
+[THREAD_CMP] tokens=252 expected_writes=252 hw_writes=252 write_mismatch=0
+[UV_CMP] checked=180 mismatch=0
+[THREAD_CMP] tokens=180 expected_writes=180 hw_writes=180 write_mismatch=0
+[UV_CMP] checked=101 mismatch=0
+[THREAD_CMP] tokens=101 expected_writes=101 hw_writes=101 write_mismatch=0
+[UV_CMP] checked=49 mismatch=0
+[THREAD_CMP] tokens=49 expected_writes=49 hw_writes=49 write_mismatch=0
+[UV_CMP] checked=219 mismatch=0
+[THREAD_CMP] tokens=219 expected_writes=219 hw_writes=219 write_mismatch=0
+[UV_CMP] checked=192 mismatch=0
+[THREAD_CMP] tokens=192 expected_writes=192 hw_writes=192 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=112 mismatch=0
+[THREAD_CMP] tokens=112 expected_writes=112 hw_writes=112 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=1 hw_writes=1 write_mismatch=0
+[UV_CMP] checked=396 mismatch=0
+[THREAD_CMP] tokens=396 expected_writes=396 hw_writes=396 write_mismatch=0
+[UV_CMP] checked=422 mismatch=0
+[THREAD_CMP] tokens=422 expected_writes=422 hw_writes=422 write_mismatch=0
+[UV_CMP] checked=350 mismatch=0
+[THREAD_CMP] tokens=350 expected_writes=350 hw_writes=350 write_mismatch=0
+[UV_CMP] checked=528 mismatch=0
+[THREAD_CMP] tokens=528 expected_writes=528 hw_writes=528 write_mismatch=0
+[UV_CMP] checked=453 mismatch=0
+[THREAD_CMP] tokens=453 expected_writes=453 hw_writes=453 write_mismatch=0
+[UV_CMP] checked=670 mismatch=0
+[THREAD_CMP] tokens=670 expected_writes=670 hw_writes=670 write_mismatch=0
+[UV_CMP] checked=160 mismatch=0
+[THREAD_CMP] tokens=160 expected_writes=160 hw_writes=160 write_mismatch=0
+[UV_CMP] checked=198 mismatch=0
+[THREAD_CMP] tokens=198 expected_writes=198 hw_writes=198 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=7 mismatch=0
+[THREAD_CMP] tokens=7 expected_writes=7 hw_writes=7 write_mismatch=0
+[UV_CMP] checked=858 mismatch=0
+[THREAD_CMP] tokens=858 expected_writes=858 hw_writes=858 write_mismatch=0
+[UV_CMP] checked=179 mismatch=0
+[THREAD_CMP] tokens=179 expected_writes=179 hw_writes=179 write_mismatch=0
+[UV_CMP] checked=686 mismatch=0
+[THREAD_CMP] tokens=686 expected_writes=686 hw_writes=686 write_mismatch=0
+[UV_CMP] checked=437 mismatch=0
+[THREAD_CMP] tokens=437 expected_writes=437 hw_writes=437 write_mismatch=0
+[UV_CMP] checked=729 mismatch=0
+[THREAD_CMP] tokens=729 expected_writes=729 hw_writes=729 write_mismatch=0
+[UV_CMP] checked=428 mismatch=0
+[THREAD_CMP] tokens=428 expected_writes=428 hw_writes=428 write_mismatch=0
+[UV_CMP] checked=430 mismatch=0
+[THREAD_CMP] tokens=430 expected_writes=430 hw_writes=430 write_mismatch=0
+[UV_CMP] checked=50 mismatch=0
+[THREAD_CMP] tokens=50 expected_writes=50 hw_writes=50 write_mismatch=0
+[UV_CMP] checked=72 mismatch=0
+[THREAD_CMP] tokens=72 expected_writes=72 hw_writes=72 write_mismatch=0
+[UV_CMP] checked=98 mismatch=0
+[THREAD_CMP] tokens=98 expected_writes=98 hw_writes=98 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=11 mismatch=0
+[THREAD_CMP] tokens=11 expected_writes=11 hw_writes=11 write_mismatch=0
+[UV_CMP] checked=44 mismatch=0
+[THREAD_CMP] tokens=44 expected_writes=44 hw_writes=44 write_mismatch=0
+[UV_CMP] checked=29 mismatch=0
+[THREAD_CMP] tokens=29 expected_writes=29 hw_writes=29 write_mismatch=0
+[UV_CMP] checked=122 mismatch=0
+[THREAD_CMP] tokens=122 expected_writes=122 hw_writes=122 write_mismatch=0
+[UV_CMP] checked=108 mismatch=0
+[THREAD_CMP] tokens=108 expected_writes=108 hw_writes=108 write_mismatch=0
+[UV_CMP] checked=99 mismatch=0
+[THREAD_CMP] tokens=99 expected_writes=99 hw_writes=99 write_mismatch=0
+[UV_CMP] checked=117 mismatch=0
+[THREAD_CMP] tokens=117 expected_writes=117 hw_writes=117 write_mismatch=0
+[UV_CMP] checked=102 mismatch=0
+[THREAD_CMP] tokens=102 expected_writes=102 hw_writes=102 write_mismatch=0
+[UV_CMP] checked=173 mismatch=0
+[THREAD_CMP] tokens=173 expected_writes=173 hw_writes=173 write_mismatch=0
+[UV_CMP] checked=26 mismatch=0
+[THREAD_CMP] tokens=26 expected_writes=26 hw_writes=26 write_mismatch=0
+[UV_CMP] checked=42 mismatch=0
+[THREAD_CMP] tokens=42 expected_writes=42 hw_writes=42 write_mismatch=0
+[UV_CMP] checked=53 mismatch=0
+[THREAD_CMP] tokens=53 expected_writes=53 hw_writes=53 write_mismatch=0
+[UV_CMP] checked=48 mismatch=0
+[THREAD_CMP] tokens=48 expected_writes=46 hw_writes=46 write_mismatch=0
+[UV_CMP] checked=28 mismatch=0
+[THREAD_CMP] tokens=28 expected_writes=28 hw_writes=28 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=67 mismatch=0
+[THREAD_CMP] tokens=67 expected_writes=60 hw_writes=60 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=263 mismatch=0
+[THREAD_CMP] tokens=263 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=954 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=7798 color=fefeb300
+[THREAD_CMP][WRITE][MISSING] addr=7926 color=fefeb300
+[THREAD_CMP][WRITE][MISSING] addr=7927 color=fefeb300
+[THREAD_CMP][WRITE][EXTRA] addr=8043 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=8044 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=8055 color=fefeb300
+[THREAD_CMP][WRITE][MISSING] addr=8056 color=fefeb300
+[THREAD_CMP][WRITE][EXTRA] addr=8172 color=fe000000
+[THREAD_CMP] tokens=954 expected_writes=321 hw_writes=313 write_mismatch=46
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=3387 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=4938 color=fe0082f8
+[THREAD_CMP][WRITE][MISSING] addr=4939 color=fe0082f8
+[THREAD_CMP][WRITE][EXTRA] addr=4944 color=fe0083fa
+[THREAD_CMP][WRITE][EXTRA] addr=4945 color=fe0083fa
+[THREAD_CMP][WRITE][MISSING] addr=5061 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=5062 color=fd000000
+[THREAD_CMP][WRITE][EXTRA] addr=5076 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=5077 color=fe00fb97
+[THREAD_CMP] tokens=3387 expected_writes=852 hw_writes=838 write_mismatch=50
+[UV_CMP] checked=3482 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=7075 color=fe007ff1
+[THREAD_CMP][WRITE][EXTRA] addr=7077 color=fe007ff2
+[THREAD_CMP][WRITE][MISSING] addr=7203 color=fe007ff1
+[THREAD_CMP][WRITE][MISSING] addr=7204 color=fe007ff1
+[THREAD_CMP][WRITE][EXTRA] addr=7205 color=fe007ff2
+[THREAD_CMP][WRITE][EXTRA] addr=7206 color=fe007ff2
+[THREAD_CMP][WRITE][MISSING] addr=7330 color=fd000000
+[THREAD_CMP][WRITE][MISSING] addr=7331 color=fe000000
+[THREAD_CMP] tokens=3482 expected_writes=1585 hw_writes=1561 write_mismatch=104
+[UV_CMP] checked=64 mismatch=0
+[THREAD_CMP] tokens=64 expected_writes=64 hw_writes=64 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=1465 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=12248 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=12249 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=12306 color=fed00089
+[THREAD_CMP][WRITE][MISSING] addr=12307 color=fed00089
+[THREAD_CMP][WRITE][EXTRA] addr=13148 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=13149 color=fe89005b
+[THREAD_CMP][WRITE][MISSING] addr=13327 color=fd000000
+[THREAD_CMP] tokens=1465 expected_writes=147 hw_writes=148 write_mismatch=7
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=505 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=13963 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=13969 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=14089 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=14090 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=14098 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=14099 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=14216 color=febc007c
+[THREAD_CMP][WRITE][MISSING] addr=14217 color=feb50077
+[THREAD_CMP] tokens=505 expected_writes=200 hw_writes=196 write_mismatch=32
+[UV_CMP] checked=36 mismatch=0
+[THREAD_CMP] tokens=36 expected_writes=29 hw_writes=29 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=33 mismatch=0
+[THREAD_CMP] tokens=33 expected_writes=33 hw_writes=33 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=1 hw_writes=1 write_mismatch=0
+[UV_CMP] checked=6 mismatch=0
+[THREAD_CMP] tokens=6 expected_writes=6 hw_writes=6 write_mismatch=0
+[UV_CMP] checked=4 mismatch=0
+[THREAD_CMP] tokens=4 expected_writes=4 hw_writes=4 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=52 mismatch=0
+[THREAD_CMP] tokens=52 expected_writes=52 hw_writes=52 write_mismatch=0
+[UV_CMP] checked=272 mismatch=0
+[THREAD_CMP] tokens=272 expected_writes=272 hw_writes=272 write_mismatch=0
+[UV_CMP] checked=365 mismatch=0
+[THREAD_CMP] tokens=365 expected_writes=365 hw_writes=365 write_mismatch=0
+[UV_CMP] checked=390 mismatch=0
+[THREAD_CMP] tokens=390 expected_writes=390 hw_writes=390 write_mismatch=0
+[UV_CMP] checked=633 mismatch=0
+[THREAD_CMP] tokens=633 expected_writes=633 hw_writes=633 write_mismatch=0
+[UV_CMP] checked=206 mismatch=0
+[THREAD_CMP] tokens=206 expected_writes=206 hw_writes=206 write_mismatch=0
+[UV_CMP] checked=7 mismatch=0
+[THREAD_CMP] tokens=7 expected_writes=7 hw_writes=7 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=581 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=12960 color=fefe00a7
+[THREAD_CMP][WRITE][EXTRA] addr=12961 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=12962 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=12963 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=13090 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=13092 color=fefe00a7
+[THREAD_CMP][WRITE][EXTRA] addr=13219 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=13220 color=fe000000
+[THREAD_CMP] tokens=581 expected_writes=81 hw_writes=82 write_mismatch=9
+[UV_CMP] checked=426 mismatch=0
+[THREAD_CMP] tokens=426 expected_writes=10 hw_writes=10 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=502 mismatch=0
+[THREAD_CMP] tokens=502 expected_writes=11 hw_writes=11 write_mismatch=0
+[UV_CMP] checked=107 mismatch=0
+[THREAD_CMP] tokens=107 expected_writes=71 hw_writes=71 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=56 mismatch=0
+[THREAD_CMP] tokens=56 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=4 mismatch=0
+[THREAD_CMP] tokens=4 expected_writes=4 hw_writes=4 write_mismatch=0
+[UV_CMP] checked=6 mismatch=0
+[THREAD_CMP] tokens=6 expected_writes=6 hw_writes=6 write_mismatch=0
+[UV_CMP] checked=16 mismatch=0
+[THREAD_CMP] tokens=16 expected_writes=16 hw_writes=16 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=1 hw_writes=1 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=71 mismatch=0
+[THREAD_CMP] tokens=71 expected_writes=71 hw_writes=71 write_mismatch=0
+[UV_CMP] checked=179 mismatch=0
+[THREAD_CMP] tokens=179 expected_writes=179 hw_writes=179 write_mismatch=0
+[UV_CMP] checked=219 mismatch=0
+[THREAD_CMP] tokens=219 expected_writes=219 hw_writes=219 write_mismatch=0
+[UV_CMP] checked=269 mismatch=0
+[THREAD_CMP] tokens=269 expected_writes=269 hw_writes=269 write_mismatch=0
+[UV_CMP] checked=30 mismatch=0
+[THREAD_CMP] tokens=30 expected_writes=30 hw_writes=30 write_mismatch=0
+[UV_CMP] checked=6 mismatch=0
+[THREAD_CMP] tokens=6 expected_writes=6 hw_writes=6 write_mismatch=0
+[UV_CMP] checked=6 mismatch=0
+[THREAD_CMP] tokens=6 expected_writes=6 hw_writes=6 write_mismatch=0
+[UV_CMP] checked=200 mismatch=0
+[THREAD_CMP] tokens=200 expected_writes=200 hw_writes=200 write_mismatch=0
+[UV_CMP] checked=246 mismatch=0
+[THREAD_CMP] tokens=246 expected_writes=246 hw_writes=246 write_mismatch=0
+[UV_CMP] checked=239 mismatch=0
+[THREAD_CMP] tokens=239 expected_writes=239 hw_writes=239 write_mismatch=0
+[UV_CMP] checked=158 mismatch=0
+[THREAD_CMP] tokens=158 expected_writes=158 hw_writes=158 write_mismatch=0
+[UV_CMP] checked=458 mismatch=0
+[THREAD_CMP] tokens=458 expected_writes=458 hw_writes=458 write_mismatch=0
+[UV_CMP] checked=492 mismatch=0
+[THREAD_CMP] tokens=492 expected_writes=492 hw_writes=492 write_mismatch=0
+[UV_CMP] checked=496 mismatch=0
+[THREAD_CMP] tokens=496 expected_writes=496 hw_writes=496 write_mismatch=0
+[UV_CMP] checked=708 mismatch=0
+[THREAD_CMP] tokens=708 expected_writes=708 hw_writes=708 write_mismatch=0
+[UV_CMP] checked=524 mismatch=0
+[THREAD_CMP] tokens=524 expected_writes=524 hw_writes=524 write_mismatch=0
+[UV_CMP] checked=124 mismatch=0
+[THREAD_CMP] tokens=124 expected_writes=124 hw_writes=124 write_mismatch=0
+[UV_CMP] checked=24 mismatch=0
+[THREAD_CMP] tokens=24 expected_writes=24 hw_writes=24 write_mismatch=0
+[UV_CMP] checked=210 mismatch=0
+[THREAD_CMP] tokens=210 expected_writes=210 hw_writes=210 write_mismatch=0
+[UV_CMP] checked=344 mismatch=0
+[THREAD_CMP] tokens=344 expected_writes=344 hw_writes=344 write_mismatch=0
+[UV_CMP] checked=211 mismatch=0
+[THREAD_CMP] tokens=211 expected_writes=211 hw_writes=211 write_mismatch=0
+[UV_CMP] checked=314 mismatch=0
+[THREAD_CMP] tokens=314 expected_writes=314 hw_writes=314 write_mismatch=0
+[UV_CMP] checked=506 mismatch=0
+[THREAD_CMP] tokens=506 expected_writes=506 hw_writes=506 write_mismatch=0
+[UV_CMP] checked=491 mismatch=0
+[THREAD_CMP] tokens=491 expected_writes=491 hw_writes=491 write_mismatch=0
+[UV_CMP] checked=382 mismatch=0
+[THREAD_CMP] tokens=382 expected_writes=382 hw_writes=382 write_mismatch=0
+[UV_CMP] checked=184 mismatch=0
+[THREAD_CMP] tokens=184 expected_writes=184 hw_writes=184 write_mismatch=0
+[UV_CMP] checked=149 mismatch=0
+[THREAD_CMP] tokens=149 expected_writes=149 hw_writes=149 write_mismatch=0
+[UV_CMP] checked=147 mismatch=0
+[THREAD_CMP] tokens=147 expected_writes=147 hw_writes=147 write_mismatch=0
+[UV_CMP] checked=147 mismatch=0
+[THREAD_CMP] tokens=147 expected_writes=147 hw_writes=147 write_mismatch=0
+[UV_CMP] checked=143 mismatch=0
+[THREAD_CMP] tokens=143 expected_writes=143 hw_writes=143 write_mismatch=0
+[UV_CMP] checked=127 mismatch=0
+[THREAD_CMP] tokens=127 expected_writes=127 hw_writes=127 write_mismatch=0
+[UV_CMP] checked=83 mismatch=0
+[THREAD_CMP] tokens=83 expected_writes=83 hw_writes=83 write_mismatch=0
+[UV_CMP] checked=140 mismatch=0
+[THREAD_CMP] tokens=140 expected_writes=140 hw_writes=140 write_mismatch=0
+[UV_CMP] checked=29 mismatch=0
+[THREAD_CMP] tokens=29 expected_writes=29 hw_writes=29 write_mismatch=0
+[UV_CMP] checked=80 mismatch=0
+[THREAD_CMP] tokens=80 expected_writes=80 hw_writes=80 write_mismatch=0
+[UV_CMP] checked=4 mismatch=0
+[THREAD_CMP] tokens=4 expected_writes=4 hw_writes=4 write_mismatch=0
+[UV_CMP] checked=75 mismatch=0
+[THREAD_CMP] tokens=75 expected_writes=75 hw_writes=75 write_mismatch=0
+[UV_CMP] checked=71 mismatch=0
+[THREAD_CMP] tokens=71 expected_writes=71 hw_writes=71 write_mismatch=0
+[UV_CMP] checked=105 mismatch=0
+[THREAD_CMP] tokens=105 expected_writes=102 hw_writes=102 write_mismatch=0
+[UV_CMP] checked=75 mismatch=0
+[THREAD_CMP] tokens=75 expected_writes=56 hw_writes=56 write_mismatch=0
+[UV_CMP] checked=47 mismatch=0
+[THREAD_CMP] tokens=47 expected_writes=45 hw_writes=45 write_mismatch=0
+[UV_CMP] checked=109 mismatch=0
+[THREAD_CMP] tokens=109 expected_writes=67 hw_writes=67 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=624 mismatch=0
+[THREAD_CMP] tokens=624 expected_writes=15 hw_writes=15 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=113 mismatch=0
+[THREAD_CMP] tokens=113 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=43 mismatch=0
+[THREAD_CMP] tokens=43 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=145 mismatch=0
+[THREAD_CMP] tokens=145 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=65 mismatch=0
+[THREAD_CMP] tokens=65 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=213 mismatch=0
+[THREAD_CMP] tokens=213 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=3 mismatch=0
+[THREAD_CMP] tokens=3 expected_writes=1 hw_writes=1 write_mismatch=0
+[UV_CMP] checked=267 mismatch=0
+[THREAD_CMP] tokens=267 expected_writes=11 hw_writes=11 write_mismatch=0
+[UV_CMP] checked=77 mismatch=0
+[THREAD_CMP] tokens=77 expected_writes=20 hw_writes=20 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=141 mismatch=0
+[THREAD_CMP] tokens=141 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=101 mismatch=0
+[THREAD_CMP] tokens=101 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=208 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=1973 color=fe89005b
+[THREAD_CMP][WRITE][EXTRA] addr=1974 color=fe8d005d
+[THREAD_CMP][WRITE][MISSING] addr=2094 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=2095 color=fd000000
+[THREAD_CMP][WRITE][EXTRA] addr=2101 color=fe7a0050
+[THREAD_CMP][WRITE][EXTRA] addr=2102 color=fe7f0053
+[THREAD_CMP][WRITE][MISSING] addr=2222 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=2223 color=fe000000
+[THREAD_CMP] tokens=208 expected_writes=128 hw_writes=126 write_mismatch=10
+[UV_CMP] checked=174 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=2607 color=fd000000
+[THREAD_CMP][WRITE][MISSING] addr=2608 color=fe001e39
+[THREAD_CMP][WRITE][MISSING] addr=2735 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=2736 color=fe001f3c
+[THREAD_CMP] tokens=174 expected_writes=168 hw_writes=164 write_mismatch=4
+[UV_CMP] checked=277 mismatch=0
+[THREAD_CMP] tokens=277 expected_writes=277 hw_writes=277 write_mismatch=0
+[UV_CMP] checked=263 mismatch=0
+[THREAD_CMP] tokens=263 expected_writes=263 hw_writes=263 write_mismatch=0
+[UV_CMP] checked=339 mismatch=0
+[THREAD_CMP] tokens=339 expected_writes=339 hw_writes=339 write_mismatch=0
+[UV_CMP] checked=276 mismatch=0
+[THREAD_CMP] tokens=276 expected_writes=276 hw_writes=276 write_mismatch=0
+[UV_CMP] checked=283 mismatch=0
+[THREAD_CMP] tokens=283 expected_writes=283 hw_writes=283 write_mismatch=0
+[UV_CMP] checked=191 mismatch=0
+[THREAD_CMP] tokens=191 expected_writes=191 hw_writes=191 write_mismatch=0
+[UV_CMP] checked=233 mismatch=0
+[THREAD_CMP] tokens=233 expected_writes=233 hw_writes=233 write_mismatch=0
+[UV_CMP] checked=183 mismatch=0
+[THREAD_CMP] tokens=183 expected_writes=183 hw_writes=183 write_mismatch=0
+[UV_CMP] checked=135 mismatch=0
+[THREAD_CMP] tokens=135 expected_writes=135 hw_writes=135 write_mismatch=0
+[UV_CMP] checked=99 mismatch=0
+[THREAD_CMP] tokens=99 expected_writes=99 hw_writes=99 write_mismatch=0
+[UV_CMP] checked=117 mismatch=0
+[THREAD_CMP] tokens=117 expected_writes=117 hw_writes=117 write_mismatch=0
+[UV_CMP] checked=108 mismatch=0
+[THREAD_CMP] tokens=108 expected_writes=108 hw_writes=108 write_mismatch=0
+[UV_CMP] checked=122 mismatch=0
+[THREAD_CMP] tokens=122 expected_writes=122 hw_writes=122 write_mismatch=0
+[UV_CMP] checked=106 mismatch=0
+[THREAD_CMP] tokens=106 expected_writes=106 hw_writes=106 write_mismatch=0
+[UV_CMP] checked=188 mismatch=0
+[THREAD_CMP] tokens=188 expected_writes=188 hw_writes=188 write_mismatch=0
+[UV_CMP] checked=135 mismatch=0
+[THREAD_CMP] tokens=135 expected_writes=135 hw_writes=135 write_mismatch=0
+[UV_CMP] checked=215 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=3638 color=fe00172c
+[THREAD_CMP][WRITE][EXTRA] addr=3639 color=fe001528
+[THREAD_CMP][WRITE][MISSING] addr=3761 color=fe00203d
+[THREAD_CMP][WRITE][EXTRA] addr=3766 color=fe00172c
+[THREAD_CMP][WRITE][EXTRA] addr=3767 color=fe001529
+[THREAD_CMP][WRITE][MISSING] addr=3889 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=3890 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=3894 color=fe000000
+[THREAD_CMP] tokens=215 expected_writes=136 hw_writes=135 write_mismatch=17
+[UV_CMP] checked=192 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=4530 color=fd000000
+[THREAD_CMP][WRITE][MISSING] addr=4531 color=fe00301d
+[THREAD_CMP][WRITE][MISSING] addr=4658 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=4659 color=fd002919
+[THREAD_CMP] tokens=192 expected_writes=187 hw_writes=183 write_mismatch=4
+[UV_CMP] checked=107 mismatch=0
+[THREAD_CMP] tokens=107 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=80 mismatch=0
+[THREAD_CMP] tokens=80 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=7 mismatch=0
+[THREAD_CMP] tokens=7 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=296 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=15993 color=fe001426
+[THREAD_CMP] tokens=296 expected_writes=153 hw_writes=152 write_mismatch=1
+[UV_CMP] checked=207 mismatch=0
+[THREAD_CMP] tokens=207 expected_writes=164 hw_writes=164 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=85 mismatch=0
+[THREAD_CMP] tokens=85 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=119 mismatch=0
+[THREAD_CMP] tokens=119 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=162 mismatch=0
+[THREAD_CMP] tokens=162 expected_writes=123 hw_writes=123 write_mismatch=0
+[UV_CMP] checked=17 mismatch=0
+[THREAD_CMP] tokens=17 expected_writes=10 hw_writes=10 write_mismatch=0
+[UV_CMP] checked=83 mismatch=0
+[THREAD_CMP] tokens=83 expected_writes=6 hw_writes=6 write_mismatch=0
+[UV_CMP] checked=98 mismatch=0
+[THREAD_CMP] tokens=98 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=71 mismatch=0
+[THREAD_CMP] tokens=71 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=141 mismatch=0
+[THREAD_CMP] tokens=141 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=88 mismatch=0
+[THREAD_CMP] tokens=88 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=110 mismatch=0
+[THREAD_CMP] tokens=110 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=77 mismatch=0
+[THREAD_CMP] tokens=77 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=104 mismatch=0
+[THREAD_CMP] tokens=104 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=93 mismatch=0
+[THREAD_CMP] tokens=93 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=76 mismatch=0
+[THREAD_CMP] tokens=76 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=15 mismatch=0
+[THREAD_CMP] tokens=15 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=3 mismatch=0
+[THREAD_CMP] tokens=3 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=6 mismatch=0
+[THREAD_CMP] tokens=6 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=9 mismatch=0
+[THREAD_CMP] tokens=9 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=7 mismatch=0
+[THREAD_CMP] tokens=7 expected_writes=6 hw_writes=6 write_mismatch=0
+[UV_CMP] checked=25 mismatch=0
+[THREAD_CMP] tokens=25 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=23 mismatch=0
+[THREAD_CMP] tokens=23 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=47 mismatch=0
+[THREAD_CMP] tokens=47 expected_writes=42 hw_writes=42 write_mismatch=0
+[UV_CMP] checked=49 mismatch=0
+[THREAD_CMP] tokens=49 expected_writes=37 hw_writes=37 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=18 mismatch=0
+[THREAD_CMP] tokens=18 expected_writes=10 hw_writes=10 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=8 mismatch=0
+[THREAD_CMP] tokens=8 expected_writes=8 hw_writes=8 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=24 mismatch=0
+[THREAD_CMP] tokens=24 expected_writes=24 hw_writes=24 write_mismatch=0
+[UV_CMP] checked=3 mismatch=0
+[THREAD_CMP] tokens=3 expected_writes=3 hw_writes=3 write_mismatch=0
+[UV_CMP] checked=88 mismatch=0
+[THREAD_CMP] tokens=88 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=117 mismatch=0
+[THREAD_CMP] tokens=117 expected_writes=63 hw_writes=63 write_mismatch=0
+[UV_CMP] checked=114 mismatch=0
+[THREAD_CMP] tokens=114 expected_writes=30 hw_writes=30 write_mismatch=0
+[UV_CMP] checked=92 mismatch=0
+[THREAD_CMP] tokens=92 expected_writes=70 hw_writes=70 write_mismatch=0
+[UV_CMP] checked=87 mismatch=0
+[THREAD_CMP] tokens=87 expected_writes=22 hw_writes=22 write_mismatch=0
+[UV_CMP] checked=91 mismatch=0
+[THREAD_CMP] tokens=91 expected_writes=76 hw_writes=76 write_mismatch=0
+[UV_CMP] checked=86 mismatch=0
+[THREAD_CMP] tokens=86 expected_writes=83 hw_writes=83 write_mismatch=0
+[UV_CMP] checked=71 mismatch=0
+[THREAD_CMP] tokens=71 expected_writes=71 hw_writes=71 write_mismatch=0
+[UV_CMP] checked=108 mismatch=0
+[THREAD_CMP] tokens=108 expected_writes=33 hw_writes=33 write_mismatch=0
+[UV_CMP] checked=115 mismatch=0
+[THREAD_CMP] tokens=115 expected_writes=35 hw_writes=35 write_mismatch=0
+[UV_CMP] checked=131 mismatch=0
+[THREAD_CMP] tokens=131 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=113 mismatch=0
+[THREAD_CMP] tokens=113 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=141 mismatch=0
+[THREAD_CMP] tokens=141 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=127 mismatch=0
+[THREAD_CMP] tokens=127 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=52 mismatch=0
+[THREAD_CMP] tokens=52 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=158 mismatch=0
+[THREAD_CMP] tokens=158 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=55 mismatch=0
+[THREAD_CMP] tokens=55 expected_writes=49 hw_writes=49 write_mismatch=0
+[UV_CMP] checked=86 mismatch=0
+[THREAD_CMP] tokens=86 expected_writes=86 hw_writes=86 write_mismatch=0
+[UV_CMP] checked=320 mismatch=0
+[THREAD_CMP] tokens=320 expected_writes=320 hw_writes=320 write_mismatch=0
+[UV_CMP] checked=36 mismatch=0
+[THREAD_CMP] tokens=36 expected_writes=36 hw_writes=36 write_mismatch=0
+[UV_CMP] checked=488 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=11165 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=11166 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=11294 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=11295 color=fe007cec
+[THREAD_CMP][WRITE][EXTRA] addr=11424 color=fe007cec
+[THREAD_CMP][WRITE][EXTRA] addr=11425 color=fe007ae8
+[THREAD_CMP][WRITE][EXTRA] addr=11553 color=fe007ceb
+[THREAD_CMP][WRITE][EXTRA] addr=11554 color=fe0079e7
+[THREAD_CMP] tokens=488 expected_writes=445 hw_writes=458 write_mismatch=39
+[UV_CMP] checked=161 mismatch=0
+[THREAD_CMP] tokens=161 expected_writes=161 hw_writes=161 write_mismatch=0
+[UV_CMP] checked=322 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=8984 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=9111 color=feb70079
+[THREAD_CMP][WRITE][EXTRA] addr=9239 color=febc007c
+[THREAD_CMP][WRITE][EXTRA] addr=9240 color=feba007b
+[THREAD_CMP][WRITE][EXTRA] addr=9368 color=febe007d
+[THREAD_CMP][WRITE][EXTRA] addr=9369 color=febc007c
+[THREAD_CMP][WRITE][EXTRA] addr=9496 color=fec30081
+[THREAD_CMP][WRITE][EXTRA] addr=9497 color=fec1007f
+[THREAD_CMP] tokens=322 expected_writes=246 hw_writes=252 write_mismatch=40
+[UV_CMP] checked=159 mismatch=0
+[THREAD_CMP] tokens=159 expected_writes=157 hw_writes=157 write_mismatch=0
+[UV_CMP] checked=224 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=6933 color=fe840057
+[THREAD_CMP][WRITE][MISSING] addr=7069 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=7070 color=fd004c91
+[THREAD_CMP][WRITE][EXTRA] addr=7188 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=7315 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=7316 color=fe000000
+[THREAD_CMP] tokens=224 expected_writes=220 hw_writes=222 write_mismatch=6
+[UV_CMP] checked=153 mismatch=0
+[THREAD_CMP] tokens=153 expected_writes=151 hw_writes=151 write_mismatch=0
+[UV_CMP] checked=133 mismatch=0
+[THREAD_CMP] tokens=133 expected_writes=129 hw_writes=129 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=12 mismatch=0
+[THREAD_CMP] tokens=12 expected_writes=12 hw_writes=12 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=2 mismatch=0
+[THREAD_CMP] tokens=2 expected_writes=2 hw_writes=2 write_mismatch=0
+[UV_CMP] checked=12 mismatch=0
+[THREAD_CMP] tokens=12 expected_writes=12 hw_writes=12 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=63 mismatch=0
+[THREAD_CMP] tokens=63 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=45 mismatch=0
+[THREAD_CMP] tokens=45 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=142 mismatch=0
+[THREAD_CMP] tokens=142 expected_writes=142 hw_writes=142 write_mismatch=0
+[UV_CMP] checked=215 mismatch=0
+[THREAD_CMP] tokens=215 expected_writes=215 hw_writes=215 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=1 hw_writes=1 write_mismatch=0
+[UV_CMP] checked=2 mismatch=0
+[THREAD_CMP] tokens=2 expected_writes=2 hw_writes=2 write_mismatch=0
+[UV_CMP] checked=222 mismatch=0
+[THREAD_CMP] tokens=222 expected_writes=222 hw_writes=222 write_mismatch=0
+[UV_CMP] checked=297 mismatch=0
+[THREAD_CMP] tokens=297 expected_writes=297 hw_writes=297 write_mismatch=0
+[UV_CMP] checked=262 mismatch=0
+[THREAD_CMP] tokens=262 expected_writes=262 hw_writes=262 write_mismatch=0
+[UV_CMP] checked=480 mismatch=0
+[THREAD_CMP] tokens=480 expected_writes=480 hw_writes=480 write_mismatch=0
+[UV_CMP] checked=275 mismatch=0
+[THREAD_CMP] tokens=275 expected_writes=275 hw_writes=275 write_mismatch=0
+[UV_CMP] checked=513 mismatch=0
+[THREAD_CMP] tokens=513 expected_writes=513 hw_writes=513 write_mismatch=0
+[UV_CMP] checked=283 mismatch=0
+[THREAD_CMP] tokens=283 expected_writes=283 hw_writes=283 write_mismatch=0
+[UV_CMP] checked=385 mismatch=0
+[THREAD_CMP] tokens=385 expected_writes=385 hw_writes=385 write_mismatch=0
+[UV_CMP] checked=338 mismatch=0
+[THREAD_CMP] tokens=338 expected_writes=338 hw_writes=338 write_mismatch=0
+[UV_CMP] checked=411 mismatch=0
+[THREAD_CMP] tokens=411 expected_writes=411 hw_writes=411 write_mismatch=0
+[UV_CMP] checked=275 mismatch=0
+[THREAD_CMP] tokens=275 expected_writes=275 hw_writes=275 write_mismatch=0
+[UV_CMP] checked=532 mismatch=0
+[THREAD_CMP] tokens=532 expected_writes=532 hw_writes=532 write_mismatch=0
+[UV_CMP] checked=308 mismatch=0
+[THREAD_CMP] tokens=308 expected_writes=308 hw_writes=308 write_mismatch=0
+[UV_CMP] checked=487 mismatch=0
+[THREAD_CMP] tokens=487 expected_writes=487 hw_writes=487 write_mismatch=0
+[UV_CMP] checked=306 mismatch=0
+[THREAD_CMP] tokens=306 expected_writes=306 hw_writes=306 write_mismatch=0
+[UV_CMP] checked=383 mismatch=0
+[THREAD_CMP] tokens=383 expected_writes=383 hw_writes=383 write_mismatch=0
+[UV_CMP] checked=22 mismatch=0
+[THREAD_CMP] tokens=22 expected_writes=22 hw_writes=22 write_mismatch=0
+[UV_CMP] checked=224 mismatch=0
+[THREAD_CMP] tokens=224 expected_writes=224 hw_writes=224 write_mismatch=0
+[UV_CMP] checked=255 mismatch=0
+[THREAD_CMP] tokens=255 expected_writes=255 hw_writes=255 write_mismatch=0
+[UV_CMP] checked=191 mismatch=0
+[THREAD_CMP] tokens=191 expected_writes=191 hw_writes=191 write_mismatch=0
+[UV_CMP] checked=272 mismatch=0
+[THREAD_CMP] tokens=272 expected_writes=272 hw_writes=272 write_mismatch=0
+[UV_CMP] checked=11 mismatch=0
+[THREAD_CMP] tokens=11 expected_writes=11 hw_writes=11 write_mismatch=0
+[UV_CMP] checked=22 mismatch=0
+[THREAD_CMP] tokens=22 expected_writes=22 hw_writes=22 write_mismatch=0
+[UV_CMP] checked=3 mismatch=0
+[THREAD_CMP] tokens=3 expected_writes=3 hw_writes=3 write_mismatch=0
+[UV_CMP] checked=203 mismatch=0
+[THREAD_CMP] tokens=203 expected_writes=203 hw_writes=203 write_mismatch=0
+[UV_CMP] checked=145 mismatch=0
+[THREAD_CMP] tokens=145 expected_writes=145 hw_writes=145 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=354 mismatch=0
+[THREAD_CMP] tokens=354 expected_writes=354 hw_writes=354 write_mismatch=0
+[UV_CMP] checked=395 mismatch=0
+[THREAD_CMP] tokens=395 expected_writes=395 hw_writes=395 write_mismatch=0
+[UV_CMP] checked=374 mismatch=0
+[THREAD_CMP] tokens=374 expected_writes=374 hw_writes=374 write_mismatch=0
+[UV_CMP] checked=391 mismatch=0
+[THREAD_CMP] tokens=391 expected_writes=391 hw_writes=391 write_mismatch=0
+[UV_CMP] checked=403 mismatch=0
+[THREAD_CMP] tokens=403 expected_writes=403 hw_writes=403 write_mismatch=0
+[UV_CMP] checked=391 mismatch=0
+[THREAD_CMP] tokens=391 expected_writes=391 hw_writes=391 write_mismatch=0
+[UV_CMP] checked=403 mismatch=0
+[THREAD_CMP] tokens=403 expected_writes=403 hw_writes=403 write_mismatch=0
+[UV_CMP] checked=385 mismatch=0
+[THREAD_CMP] tokens=385 expected_writes=385 hw_writes=385 write_mismatch=0
+[UV_CMP] checked=321 mismatch=0
+[THREAD_CMP] tokens=321 expected_writes=321 hw_writes=321 write_mismatch=0
+[UV_CMP] checked=323 mismatch=0
+[THREAD_CMP] tokens=323 expected_writes=323 hw_writes=323 write_mismatch=0
+[UV_CMP] checked=164 mismatch=0
+[THREAD_CMP] tokens=164 expected_writes=164 hw_writes=164 write_mismatch=0
+[UV_CMP] checked=76 mismatch=0
+[THREAD_CMP] tokens=76 expected_writes=76 hw_writes=76 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=9 mismatch=0
+[THREAD_CMP] tokens=9 expected_writes=9 hw_writes=9 write_mismatch=0
+[UV_CMP] checked=261 mismatch=0
+[THREAD_CMP] tokens=261 expected_writes=261 hw_writes=261 write_mismatch=0
+[UV_CMP] checked=248 mismatch=0
+[THREAD_CMP] tokens=248 expected_writes=248 hw_writes=248 write_mismatch=0
+[UV_CMP] checked=1296 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=12077 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=12203 color=fe490030
+[THREAD_CMP] tokens=1296 expected_writes=1293 hw_writes=1295 write_mismatch=2
+[UV_CMP] checked=565 mismatch=0
+[THREAD_CMP] tokens=565 expected_writes=565 hw_writes=565 write_mismatch=0
+[UV_CMP] checked=373 mismatch=0
+[THREAD_CMP] tokens=373 expected_writes=373 hw_writes=373 write_mismatch=0
+[UV_CMP] checked=1225 mismatch=0
+[THREAD_CMP] tokens=1225 expected_writes=1225 hw_writes=1225 write_mismatch=0
+[UV_CMP] checked=162 mismatch=0
+[THREAD_CMP] tokens=162 expected_writes=162 hw_writes=162 write_mismatch=0
+[UV_CMP] checked=464 mismatch=0
+[THREAD_CMP] tokens=464 expected_writes=464 hw_writes=464 write_mismatch=0
+[UV_CMP] checked=386 mismatch=0
+[THREAD_CMP] tokens=386 expected_writes=386 hw_writes=386 write_mismatch=0
+[UV_CMP] checked=653 mismatch=0
+[THREAD_CMP] tokens=653 expected_writes=653 hw_writes=653 write_mismatch=0
+[UV_CMP] checked=893 mismatch=0
+[THREAD_CMP] tokens=893 expected_writes=893 hw_writes=893 write_mismatch=0
+[UV_CMP] checked=302 mismatch=0
+[THREAD_CMP] tokens=302 expected_writes=302 hw_writes=302 write_mismatch=0
+[UV_CMP] checked=313 mismatch=0
+[THREAD_CMP] tokens=313 expected_writes=313 hw_writes=313 write_mismatch=0
+[UV_CMP] checked=206 mismatch=0
+[THREAD_CMP] tokens=206 expected_writes=206 hw_writes=206 write_mismatch=0
+[UV_CMP] checked=105 mismatch=0
+[THREAD_CMP] tokens=105 expected_writes=105 hw_writes=105 write_mismatch=0
+[UV_CMP] checked=62 mismatch=0
+[THREAD_CMP] tokens=62 expected_writes=62 hw_writes=62 write_mismatch=0
+[UV_CMP] checked=176 mismatch=0
+[THREAD_CMP] tokens=176 expected_writes=176 hw_writes=176 write_mismatch=0
+[UV_CMP] checked=104 mismatch=0
+[THREAD_CMP] tokens=104 expected_writes=104 hw_writes=104 write_mismatch=0
+[UV_CMP] checked=217 mismatch=0
+[THREAD_CMP] tokens=217 expected_writes=217 hw_writes=217 write_mismatch=0
+[UV_CMP] checked=155 mismatch=0
+[THREAD_CMP] tokens=155 expected_writes=155 hw_writes=155 write_mismatch=0
+[UV_CMP] checked=62 mismatch=0
+[THREAD_CMP] tokens=62 expected_writes=62 hw_writes=62 write_mismatch=0
+[UV_CMP] checked=63 mismatch=0
+[THREAD_CMP] tokens=63 expected_writes=63 hw_writes=63 write_mismatch=0
+[UV_CMP] checked=164 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=12076 color=fe4f0034
+[THREAD_CMP][WRITE][EXTRA] addr=12328 color=fe46002e
+[THREAD_CMP] tokens=164 expected_writes=131 hw_writes=133 write_mismatch=2
+[UV_CMP] checked=237 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=11940 color=fd670044
+[THREAD_CMP][WRITE][EXTRA] addr=11942 color=fe640042
+[THREAD_CMP][WRITE][MISSING] addr=12068 color=fe5f003e
+[THREAD_CMP][WRITE][MISSING] addr=12069 color=fe5e003e
+[THREAD_CMP][WRITE][EXTRA] addr=12071 color=fe5a003b
+[THREAD_CMP][WRITE][EXTRA] addr=12072 color=fe58003a
+[THREAD_CMP][WRITE][MISSING] addr=12195 color=fe59003a
+[THREAD_CMP][WRITE][MISSING] addr=12196 color=fd560038
+[THREAD_CMP] tokens=237 expected_writes=229 hw_writes=229 write_mismatch=12
+[UV_CMP] checked=169 mismatch=0
+[THREAD_CMP] tokens=169 expected_writes=169 hw_writes=169 write_mismatch=0
+[UV_CMP] checked=141 mismatch=0
+[THREAD_CMP] tokens=141 expected_writes=141 hw_writes=141 write_mismatch=0
+[UV_CMP] checked=54 mismatch=0
+[THREAD_CMP] tokens=54 expected_writes=54 hw_writes=54 write_mismatch=0
+[UV_CMP] checked=6 mismatch=0
+[THREAD_CMP] tokens=6 expected_writes=6 hw_writes=6 write_mismatch=0
+[UV_CMP] checked=14 mismatch=0
+[THREAD_CMP] tokens=14 expected_writes=14 hw_writes=14 write_mismatch=0
+[UV_CMP] checked=67 mismatch=0
+[THREAD_CMP] tokens=67 expected_writes=67 hw_writes=67 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=53 mismatch=0
+[THREAD_CMP] tokens=53 expected_writes=53 hw_writes=53 write_mismatch=0
+[UV_CMP] checked=36 mismatch=0
+[THREAD_CMP] tokens=36 expected_writes=36 hw_writes=36 write_mismatch=0
+[UV_CMP] checked=58 mismatch=0
+[THREAD_CMP] tokens=58 expected_writes=54 hw_writes=54 write_mismatch=0
+[UV_CMP] checked=2 mismatch=0
+[THREAD_CMP] tokens=2 expected_writes=2 hw_writes=2 write_mismatch=0
+[UV_CMP] checked=15 mismatch=0
+[THREAD_CMP] tokens=15 expected_writes=15 hw_writes=15 write_mismatch=0
+[UV_CMP] checked=18 mismatch=0
+[THREAD_CMP] tokens=18 expected_writes=18 hw_writes=18 write_mismatch=0
+[UV_CMP] checked=54 mismatch=0
+[THREAD_CMP] tokens=54 expected_writes=54 hw_writes=54 write_mismatch=0
+[UV_CMP] checked=56 mismatch=0
+[THREAD_CMP] tokens=56 expected_writes=51 hw_writes=51 write_mismatch=0
+[UV_CMP] checked=53 mismatch=0
+[THREAD_CMP] tokens=53 expected_writes=23 hw_writes=23 write_mismatch=0
+[UV_CMP] checked=26 mismatch=0
+[THREAD_CMP] tokens=26 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=80 mismatch=0
+[THREAD_CMP] tokens=80 expected_writes=61 hw_writes=61 write_mismatch=0
+[UV_CMP] checked=60 mismatch=0
+[THREAD_CMP] tokens=60 expected_writes=15 hw_writes=15 write_mismatch=0
+[UV_CMP] checked=95 mismatch=0
+[THREAD_CMP] tokens=95 expected_writes=72 hw_writes=72 write_mismatch=0
+[UV_CMP] checked=96 mismatch=0
+[THREAD_CMP] tokens=96 expected_writes=9 hw_writes=9 write_mismatch=0
+[UV_CMP] checked=40 mismatch=0
+[THREAD_CMP] tokens=40 expected_writes=37 hw_writes=37 write_mismatch=0
+[UV_CMP] checked=42 mismatch=0
+[THREAD_CMP] tokens=42 expected_writes=20 hw_writes=20 write_mismatch=0
+[UV_CMP] checked=79 mismatch=0
+[THREAD_CMP] tokens=79 expected_writes=75 hw_writes=75 write_mismatch=0
+[UV_CMP] checked=33 mismatch=0
+[THREAD_CMP] tokens=33 expected_writes=22 hw_writes=22 write_mismatch=0
+[UV_CMP] checked=39 mismatch=0
+[THREAD_CMP] tokens=39 expected_writes=39 hw_writes=39 write_mismatch=0
+[UV_CMP] checked=48 mismatch=0
+[THREAD_CMP] tokens=48 expected_writes=22 hw_writes=22 write_mismatch=0
+[UV_CMP] checked=51 mismatch=0
+[THREAD_CMP] tokens=51 expected_writes=41 hw_writes=41 write_mismatch=0
+[UV_CMP] checked=31 mismatch=0
+[THREAD_CMP] tokens=31 expected_writes=15 hw_writes=15 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=12 mismatch=0
+[THREAD_CMP] tokens=12 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=107 mismatch=0
+[THREAD_CMP] tokens=107 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=89 mismatch=0
+[THREAD_CMP] tokens=89 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=11 mismatch=0
+[THREAD_CMP] tokens=11 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=189 mismatch=0
+[THREAD_CMP] tokens=189 expected_writes=189 hw_writes=189 write_mismatch=0
+[UV_CMP] checked=131 mismatch=0
+[THREAD_CMP] tokens=131 expected_writes=131 hw_writes=131 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=295 mismatch=0
+[THREAD_CMP] tokens=295 expected_writes=295 hw_writes=295 write_mismatch=0
+[UV_CMP] checked=212 mismatch=0
+[THREAD_CMP] tokens=212 expected_writes=212 hw_writes=212 write_mismatch=0
+[UV_CMP] checked=480 mismatch=0
+[THREAD_CMP] tokens=480 expected_writes=480 hw_writes=480 write_mismatch=0
+[UV_CMP] checked=262 mismatch=0
+[THREAD_CMP] tokens=262 expected_writes=262 hw_writes=262 write_mismatch=0
+[UV_CMP] checked=513 mismatch=0
+[THREAD_CMP] tokens=513 expected_writes=513 hw_writes=513 write_mismatch=0
+[UV_CMP] checked=275 mismatch=0
+[THREAD_CMP] tokens=275 expected_writes=275 hw_writes=275 write_mismatch=0
+[UV_CMP] checked=385 mismatch=0
+[THREAD_CMP] tokens=385 expected_writes=385 hw_writes=385 write_mismatch=0
+[UV_CMP] checked=283 mismatch=0
+[THREAD_CMP] tokens=283 expected_writes=283 hw_writes=283 write_mismatch=0
+[UV_CMP] checked=411 mismatch=0
+[THREAD_CMP] tokens=411 expected_writes=411 hw_writes=411 write_mismatch=0
+[UV_CMP] checked=338 mismatch=0
+[THREAD_CMP] tokens=338 expected_writes=338 hw_writes=338 write_mismatch=0
+[UV_CMP] checked=532 mismatch=0
+[THREAD_CMP] tokens=532 expected_writes=532 hw_writes=532 write_mismatch=0
+[UV_CMP] checked=275 mismatch=0
+[THREAD_CMP] tokens=275 expected_writes=275 hw_writes=275 write_mismatch=0
+[UV_CMP] checked=487 mismatch=0
+[THREAD_CMP] tokens=487 expected_writes=487 hw_writes=487 write_mismatch=0
+[UV_CMP] checked=308 mismatch=0
+[THREAD_CMP] tokens=308 expected_writes=308 hw_writes=308 write_mismatch=0
+[UV_CMP] checked=383 mismatch=0
+[THREAD_CMP] tokens=383 expected_writes=383 hw_writes=383 write_mismatch=0
+[UV_CMP] checked=306 mismatch=0
+[THREAD_CMP] tokens=306 expected_writes=306 hw_writes=306 write_mismatch=0
+[UV_CMP] checked=22 mismatch=0
+[THREAD_CMP] tokens=22 expected_writes=22 hw_writes=22 write_mismatch=0
+[UV_CMP] checked=255 mismatch=0
+[THREAD_CMP] tokens=255 expected_writes=255 hw_writes=255 write_mismatch=0
+[UV_CMP] checked=224 mismatch=0
+[THREAD_CMP] tokens=224 expected_writes=224 hw_writes=224 write_mismatch=0
+[UV_CMP] checked=272 mismatch=0
+[THREAD_CMP] tokens=272 expected_writes=272 hw_writes=272 write_mismatch=0
+[UV_CMP] checked=191 mismatch=0
+[THREAD_CMP] tokens=191 expected_writes=191 hw_writes=191 write_mismatch=0
+[UV_CMP] checked=18 mismatch=0
+[THREAD_CMP] tokens=18 expected_writes=18 hw_writes=18 write_mismatch=0
+[UV_CMP] checked=11 mismatch=0
+[THREAD_CMP] tokens=11 expected_writes=11 hw_writes=11 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=110 mismatch=0
+[THREAD_CMP] tokens=110 expected_writes=110 hw_writes=110 write_mismatch=0
+[UV_CMP] checked=203 mismatch=0
+[THREAD_CMP] tokens=203 expected_writes=203 hw_writes=203 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=354 mismatch=0
+[THREAD_CMP] tokens=354 expected_writes=354 hw_writes=354 write_mismatch=0
+[UV_CMP] checked=395 mismatch=0
+[THREAD_CMP] tokens=395 expected_writes=395 hw_writes=395 write_mismatch=0
+[UV_CMP] checked=374 mismatch=0
+[THREAD_CMP] tokens=374 expected_writes=374 hw_writes=374 write_mismatch=0
+[UV_CMP] checked=391 mismatch=0
+[THREAD_CMP] tokens=391 expected_writes=391 hw_writes=391 write_mismatch=0
+[UV_CMP] checked=403 mismatch=0
+[THREAD_CMP] tokens=403 expected_writes=403 hw_writes=403 write_mismatch=0
+[UV_CMP] checked=391 mismatch=0
+[THREAD_CMP] tokens=391 expected_writes=391 hw_writes=391 write_mismatch=0
+[UV_CMP] checked=403 mismatch=0
+[THREAD_CMP] tokens=403 expected_writes=403 hw_writes=403 write_mismatch=0
+[UV_CMP] checked=385 mismatch=0
+[THREAD_CMP] tokens=385 expected_writes=385 hw_writes=385 write_mismatch=0
+[UV_CMP] checked=321 mismatch=0
+[THREAD_CMP] tokens=321 expected_writes=321 hw_writes=321 write_mismatch=0
+[UV_CMP] checked=152 mismatch=0
+[THREAD_CMP] tokens=152 expected_writes=152 hw_writes=152 write_mismatch=0
+[UV_CMP] checked=310 mismatch=0
+[THREAD_CMP] tokens=310 expected_writes=310 hw_writes=310 write_mismatch=0
+[UV_CMP] checked=76 mismatch=0
+[THREAD_CMP] tokens=76 expected_writes=76 hw_writes=76 write_mismatch=0
+[UV_CMP] checked=11 mismatch=0
+[THREAD_CMP] tokens=11 expected_writes=11 hw_writes=11 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=6 mismatch=0
+[THREAD_CMP] tokens=6 expected_writes=6 hw_writes=6 write_mismatch=0
+[UV_CMP] checked=234 mismatch=0
+[THREAD_CMP] tokens=234 expected_writes=234 hw_writes=234 write_mismatch=0
+[UV_CMP] checked=261 mismatch=0
+[THREAD_CMP] tokens=261 expected_writes=261 hw_writes=261 write_mismatch=0
+[UV_CMP] checked=565 mismatch=0
+[THREAD_CMP] tokens=565 expected_writes=565 hw_writes=565 write_mismatch=0
+[UV_CMP] checked=1296 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=12115 color=fe7e0053
+[THREAD_CMP][WRITE][EXTRA] addr=12245 color=fe7f0053
+[THREAD_CMP] tokens=1296 expected_writes=1293 hw_writes=1295 write_mismatch=2
+[UV_CMP] checked=1225 mismatch=0
+[THREAD_CMP] tokens=1225 expected_writes=1225 hw_writes=1225 write_mismatch=0
+[UV_CMP] checked=373 mismatch=0
+[THREAD_CMP] tokens=373 expected_writes=373 hw_writes=373 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=464 mismatch=0
+[THREAD_CMP] tokens=464 expected_writes=464 hw_writes=464 write_mismatch=0
+[UV_CMP] checked=162 mismatch=0
+[THREAD_CMP] tokens=162 expected_writes=162 hw_writes=162 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=653 mismatch=0
+[THREAD_CMP] tokens=653 expected_writes=653 hw_writes=653 write_mismatch=0
+[UV_CMP] checked=386 mismatch=0
+[THREAD_CMP] tokens=386 expected_writes=386 hw_writes=386 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=39 mismatch=0
+[THREAD_CMP] tokens=39 expected_writes=39 hw_writes=39 write_mismatch=0
+[UV_CMP] checked=302 mismatch=0
+[THREAD_CMP] tokens=302 expected_writes=302 hw_writes=302 write_mismatch=0
+[UV_CMP] checked=893 mismatch=0
+[THREAD_CMP] tokens=893 expected_writes=893 hw_writes=893 write_mismatch=0
+[UV_CMP] checked=42 mismatch=0
+[THREAD_CMP] tokens=42 expected_writes=42 hw_writes=42 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=206 mismatch=0
+[THREAD_CMP] tokens=206 expected_writes=206 hw_writes=206 write_mismatch=0
+[UV_CMP] checked=313 mismatch=0
+[THREAD_CMP] tokens=313 expected_writes=313 hw_writes=313 write_mismatch=0
+[UV_CMP] checked=36 mismatch=0
+[THREAD_CMP] tokens=36 expected_writes=36 hw_writes=36 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=62 mismatch=0
+[THREAD_CMP] tokens=62 expected_writes=62 hw_writes=62 write_mismatch=0
+[UV_CMP] checked=105 mismatch=0
+[THREAD_CMP] tokens=105 expected_writes=105 hw_writes=105 write_mismatch=0
+[UV_CMP] checked=104 mismatch=0
+[THREAD_CMP] tokens=104 expected_writes=104 hw_writes=104 write_mismatch=0
+[UV_CMP] checked=176 mismatch=0
+[THREAD_CMP] tokens=176 expected_writes=176 hw_writes=176 write_mismatch=0
+[UV_CMP] checked=155 mismatch=0
+[THREAD_CMP] tokens=155 expected_writes=155 hw_writes=155 write_mismatch=0
+[UV_CMP] checked=217 mismatch=0
+[THREAD_CMP] tokens=217 expected_writes=217 hw_writes=217 write_mismatch=0
+[UV_CMP] checked=63 mismatch=0
+[THREAD_CMP] tokens=63 expected_writes=63 hw_writes=63 write_mismatch=0
+[UV_CMP] checked=62 mismatch=0
+[THREAD_CMP] tokens=62 expected_writes=62 hw_writes=62 write_mismatch=0
+[UV_CMP] checked=237 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=11992 color=fe980064
+[THREAD_CMP][WRITE][EXTRA] addr=11994 color=fe9c0067
+[THREAD_CMP][WRITE][MISSING] addr=12119 color=fd910060
+[THREAD_CMP][WRITE][EXTRA] addr=12121 color=fe950062
+[THREAD_CMP][WRITE][EXTRA] addr=12122 color=fe970064
+[THREAD_CMP][WRITE][EXTRA] addr=12250 color=fe920060
+[THREAD_CMP][WRITE][EXTRA] addr=12251 color=fe940062
+[THREAD_CMP][WRITE][EXTRA] addr=12378 color=fe8d005d
+[THREAD_CMP] tokens=237 expected_writes=229 hw_writes=233 write_mismatch=8
+[UV_CMP] checked=164 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=12118 color=fe8d005d
+[THREAD_CMP][WRITE][EXTRA] addr=12376 color=fe820056
+[THREAD_CMP] tokens=164 expected_writes=130 hw_writes=132 write_mismatch=2
+[UV_CMP] checked=141 mismatch=0
+[THREAD_CMP] tokens=141 expected_writes=141 hw_writes=141 write_mismatch=0
+[UV_CMP] checked=169 mismatch=0
+[THREAD_CMP] tokens=169 expected_writes=169 hw_writes=169 write_mismatch=0
+[UV_CMP] checked=4 mismatch=0
+[THREAD_CMP] tokens=4 expected_writes=4 hw_writes=4 write_mismatch=0
+[UV_CMP] checked=43 mismatch=0
+[THREAD_CMP] tokens=43 expected_writes=43 hw_writes=43 write_mismatch=0
+[UV_CMP] checked=63 mismatch=0
+[THREAD_CMP] tokens=63 expected_writes=63 hw_writes=63 write_mismatch=0
+[UV_CMP] checked=10 mismatch=0
+[THREAD_CMP] tokens=10 expected_writes=10 hw_writes=10 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=53 mismatch=0
+[THREAD_CMP] tokens=53 expected_writes=53 hw_writes=53 write_mismatch=0
+[UV_CMP] checked=58 mismatch=0
+[THREAD_CMP] tokens=58 expected_writes=54 hw_writes=54 write_mismatch=0
+[UV_CMP] checked=36 mismatch=0
+[THREAD_CMP] tokens=36 expected_writes=36 hw_writes=36 write_mismatch=0
+[UV_CMP] checked=2 mismatch=0
+[THREAD_CMP] tokens=2 expected_writes=2 hw_writes=2 write_mismatch=0
+[UV_CMP] checked=18 mismatch=0
+[THREAD_CMP] tokens=18 expected_writes=18 hw_writes=18 write_mismatch=0
+[UV_CMP] checked=15 mismatch=0
+[THREAD_CMP] tokens=15 expected_writes=15 hw_writes=15 write_mismatch=0
+[UV_CMP] checked=55 mismatch=0
+[THREAD_CMP] tokens=55 expected_writes=50 hw_writes=50 write_mismatch=0
+[UV_CMP] checked=48 mismatch=0
+[THREAD_CMP] tokens=48 expected_writes=48 hw_writes=48 write_mismatch=0
+[UV_CMP] checked=21 mismatch=0
+[THREAD_CMP] tokens=21 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=48 mismatch=0
+[THREAD_CMP] tokens=48 expected_writes=19 hw_writes=19 write_mismatch=0
+[UV_CMP] checked=60 mismatch=0
+[THREAD_CMP] tokens=60 expected_writes=15 hw_writes=15 write_mismatch=0
+[UV_CMP] checked=80 mismatch=0
+[THREAD_CMP] tokens=80 expected_writes=61 hw_writes=61 write_mismatch=0
+[UV_CMP] checked=96 mismatch=0
+[THREAD_CMP] tokens=96 expected_writes=9 hw_writes=9 write_mismatch=0
+[UV_CMP] checked=95 mismatch=0
+[THREAD_CMP] tokens=95 expected_writes=72 hw_writes=72 write_mismatch=0
+[UV_CMP] checked=42 mismatch=0
+[THREAD_CMP] tokens=42 expected_writes=20 hw_writes=20 write_mismatch=0
+[UV_CMP] checked=40 mismatch=0
+[THREAD_CMP] tokens=40 expected_writes=37 hw_writes=37 write_mismatch=0
+[UV_CMP] checked=33 mismatch=0
+[THREAD_CMP] tokens=33 expected_writes=22 hw_writes=22 write_mismatch=0
+[UV_CMP] checked=79 mismatch=0
+[THREAD_CMP] tokens=79 expected_writes=75 hw_writes=75 write_mismatch=0
+[UV_CMP] checked=48 mismatch=0
+[THREAD_CMP] tokens=48 expected_writes=22 hw_writes=22 write_mismatch=0
+[UV_CMP] checked=39 mismatch=0
+[THREAD_CMP] tokens=39 expected_writes=39 hw_writes=39 write_mismatch=0
+[UV_CMP] checked=31 mismatch=0
+[THREAD_CMP] tokens=31 expected_writes=15 hw_writes=15 write_mismatch=0
+[UV_CMP] checked=51 mismatch=0
+[THREAD_CMP] tokens=51 expected_writes=41 hw_writes=41 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=12 mismatch=0
+[THREAD_CMP] tokens=12 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=4 mismatch=0
+[THREAD_CMP] tokens=4 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=84 mismatch=0
+[THREAD_CMP] tokens=84 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=98 mismatch=0
+[THREAD_CMP] tokens=98 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=7 mismatch=0
+[THREAD_CMP] tokens=7 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=205 mismatch=0
+[THREAD_CMP] tokens=205 expected_writes=205 hw_writes=205 write_mismatch=0
+[UV_CMP] checked=82 mismatch=0
+[THREAD_CMP] tokens=82 expected_writes=82 hw_writes=82 write_mismatch=0
+[UV_CMP] checked=271 mismatch=0
+[THREAD_CMP] tokens=271 expected_writes=271 hw_writes=271 write_mismatch=0
+[UV_CMP] checked=220 mismatch=0
+[THREAD_CMP] tokens=220 expected_writes=220 hw_writes=220 write_mismatch=0
+[UV_CMP] checked=8 mismatch=0
+[THREAD_CMP] tokens=8 expected_writes=8 hw_writes=8 write_mismatch=0
+[UV_CMP] checked=40 mismatch=0
+[THREAD_CMP] tokens=40 expected_writes=40 hw_writes=40 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=10 mismatch=0
+[THREAD_CMP] tokens=10 expected_writes=10 hw_writes=10 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=246 mismatch=0
+[THREAD_CMP] tokens=246 expected_writes=246 hw_writes=246 write_mismatch=0
+[UV_CMP] checked=203 mismatch=0
+[THREAD_CMP] tokens=203 expected_writes=203 hw_writes=203 write_mismatch=0
+[UV_CMP] checked=274 mismatch=0
+[THREAD_CMP] tokens=274 expected_writes=274 hw_writes=274 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=470 mismatch=0
+[THREAD_CMP] tokens=470 expected_writes=470 hw_writes=470 write_mismatch=0
+[UV_CMP] checked=171 mismatch=0
+[THREAD_CMP] tokens=171 expected_writes=171 hw_writes=171 write_mismatch=0
+[UV_CMP] checked=496 mismatch=0
+[THREAD_CMP] tokens=496 expected_writes=496 hw_writes=496 write_mismatch=0
+[UV_CMP] checked=492 mismatch=0
+[THREAD_CMP] tokens=492 expected_writes=492 hw_writes=492 write_mismatch=0
+[UV_CMP] checked=524 mismatch=0
+[THREAD_CMP] tokens=524 expected_writes=524 hw_writes=524 write_mismatch=0
+[UV_CMP] checked=708 mismatch=0
+[THREAD_CMP] tokens=708 expected_writes=708 hw_writes=708 write_mismatch=0
+[UV_CMP] checked=24 mismatch=0
+[THREAD_CMP] tokens=24 expected_writes=24 hw_writes=24 write_mismatch=0
+[UV_CMP] checked=124 mismatch=0
+[THREAD_CMP] tokens=124 expected_writes=124 hw_writes=124 write_mismatch=0
+[UV_CMP] checked=210 mismatch=0
+[THREAD_CMP] tokens=210 expected_writes=210 hw_writes=210 write_mismatch=0
+[UV_CMP] checked=211 mismatch=0
+[THREAD_CMP] tokens=211 expected_writes=211 hw_writes=211 write_mismatch=0
+[UV_CMP] checked=344 mismatch=0
+[THREAD_CMP] tokens=344 expected_writes=344 hw_writes=344 write_mismatch=0
+[UV_CMP] checked=506 mismatch=0
+[THREAD_CMP] tokens=506 expected_writes=506 hw_writes=506 write_mismatch=0
+[UV_CMP] checked=314 mismatch=0
+[THREAD_CMP] tokens=314 expected_writes=314 hw_writes=314 write_mismatch=0
+[UV_CMP] checked=382 mismatch=0
+[THREAD_CMP] tokens=382 expected_writes=382 hw_writes=382 write_mismatch=0
+[UV_CMP] checked=494 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=10266 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=10395 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=10522 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=10523 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=10649 color=fe0057a5
+[THREAD_CMP][WRITE][MISSING] addr=10650 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=10777 color=fe0056a4
+[THREAD_CMP][WRITE][MISSING] addr=10778 color=fe000000
+[THREAD_CMP] tokens=494 expected_writes=494 hw_writes=485 write_mismatch=9
+[UV_CMP] checked=198 mismatch=0
+[THREAD_CMP] tokens=198 expected_writes=198 hw_writes=198 write_mismatch=0
+[UV_CMP] checked=149 mismatch=0
+[THREAD_CMP] tokens=149 expected_writes=149 hw_writes=149 write_mismatch=0
+[UV_CMP] checked=160 mismatch=0
+[THREAD_CMP] tokens=160 expected_writes=160 hw_writes=160 write_mismatch=0
+[UV_CMP] checked=143 mismatch=0
+[THREAD_CMP] tokens=143 expected_writes=143 hw_writes=143 write_mismatch=0
+[UV_CMP] checked=147 mismatch=0
+[THREAD_CMP] tokens=147 expected_writes=147 hw_writes=147 write_mismatch=0
+[UV_CMP] checked=83 mismatch=0
+[THREAD_CMP] tokens=83 expected_writes=83 hw_writes=83 write_mismatch=0
+[UV_CMP] checked=127 mismatch=0
+[THREAD_CMP] tokens=127 expected_writes=127 hw_writes=127 write_mismatch=0
+[UV_CMP] checked=33 mismatch=0
+[THREAD_CMP] tokens=33 expected_writes=33 hw_writes=33 write_mismatch=0
+[UV_CMP] checked=144 mismatch=0
+[THREAD_CMP] tokens=144 expected_writes=144 hw_writes=144 write_mismatch=0
+[UV_CMP] checked=5 mismatch=0
+[THREAD_CMP] tokens=5 expected_writes=5 hw_writes=5 write_mismatch=0
+[UV_CMP] checked=86 mismatch=0
+[THREAD_CMP] tokens=86 expected_writes=86 hw_writes=86 write_mismatch=0
+[UV_CMP] checked=71 mismatch=0
+[THREAD_CMP] tokens=71 expected_writes=71 hw_writes=71 write_mismatch=0
+[UV_CMP] checked=75 mismatch=0
+[THREAD_CMP] tokens=75 expected_writes=75 hw_writes=75 write_mismatch=0
+[UV_CMP] checked=75 mismatch=0
+[THREAD_CMP] tokens=75 expected_writes=56 hw_writes=56 write_mismatch=0
+[UV_CMP] checked=105 mismatch=0
+[THREAD_CMP] tokens=105 expected_writes=102 hw_writes=102 write_mismatch=0
+[UV_CMP] checked=114 mismatch=0
+[THREAD_CMP] tokens=114 expected_writes=67 hw_writes=67 write_mismatch=0
+[UV_CMP] checked=52 mismatch=0
+[THREAD_CMP] tokens=52 expected_writes=49 hw_writes=49 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=624 mismatch=0
+[THREAD_CMP] tokens=624 expected_writes=15 hw_writes=15 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=43 mismatch=0
+[THREAD_CMP] tokens=43 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=113 mismatch=0
+[THREAD_CMP] tokens=113 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=145 mismatch=0
+[THREAD_CMP] tokens=145 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=213 mismatch=0
+[THREAD_CMP] tokens=213 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=65 mismatch=0
+[THREAD_CMP] tokens=65 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=3 mismatch=0
+[THREAD_CMP] tokens=3 expected_writes=1 hw_writes=1 write_mismatch=0
+[UV_CMP] checked=82 mismatch=0
+[THREAD_CMP] tokens=82 expected_writes=20 hw_writes=20 write_mismatch=0
+[UV_CMP] checked=276 mismatch=0
+[THREAD_CMP] tokens=276 expected_writes=11 hw_writes=11 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=101 mismatch=0
+[THREAD_CMP] tokens=101 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=141 mismatch=0
+[THREAD_CMP] tokens=141 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=174 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=2532 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=2766 color=fe0067c3
+[THREAD_CMP][WRITE][EXTRA] addr=2767 color=fe000000
+[THREAD_CMP] tokens=174 expected_writes=168 hw_writes=169 write_mismatch=3
+[UV_CMP] checked=208 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=2008 color=fedd0092
+[THREAD_CMP][WRITE][MISSING] addr=2009 color=fedc0091
+[THREAD_CMP][WRITE][EXTRA] addr=2127 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=2128 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=2135 color=fed8008e
+[THREAD_CMP][WRITE][EXTRA] addr=2255 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=2256 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=2259 color=fe000000
+[THREAD_CMP] tokens=208 expected_writes=128 hw_writes=126 write_mismatch=12
+[UV_CMP] checked=259 mismatch=0
+[THREAD_CMP] tokens=259 expected_writes=259 hw_writes=259 write_mismatch=0
+[UV_CMP] checked=274 mismatch=0
+[THREAD_CMP] tokens=274 expected_writes=274 hw_writes=274 write_mismatch=0
+[UV_CMP] checked=276 mismatch=0
+[THREAD_CMP] tokens=276 expected_writes=276 hw_writes=276 write_mismatch=0
+[UV_CMP] checked=327 mismatch=0
+[THREAD_CMP] tokens=327 expected_writes=327 hw_writes=327 write_mismatch=0
+[UV_CMP] checked=191 mismatch=0
+[THREAD_CMP] tokens=191 expected_writes=191 hw_writes=191 write_mismatch=0
+[UV_CMP] checked=283 mismatch=0
+[THREAD_CMP] tokens=283 expected_writes=283 hw_writes=283 write_mismatch=0
+[UV_CMP] checked=183 mismatch=0
+[THREAD_CMP] tokens=183 expected_writes=183 hw_writes=183 write_mismatch=0
+[UV_CMP] checked=233 mismatch=0
+[THREAD_CMP] tokens=233 expected_writes=233 hw_writes=233 write_mismatch=0
+[UV_CMP] checked=99 mismatch=0
+[THREAD_CMP] tokens=99 expected_writes=99 hw_writes=99 write_mismatch=0
+[UV_CMP] checked=135 mismatch=0
+[THREAD_CMP] tokens=135 expected_writes=135 hw_writes=135 write_mismatch=0
+[UV_CMP] checked=108 mismatch=0
+[THREAD_CMP] tokens=108 expected_writes=108 hw_writes=108 write_mismatch=0
+[UV_CMP] checked=117 mismatch=0
+[THREAD_CMP] tokens=117 expected_writes=117 hw_writes=117 write_mismatch=0
+[UV_CMP] checked=106 mismatch=0
+[THREAD_CMP] tokens=106 expected_writes=106 hw_writes=106 write_mismatch=0
+[UV_CMP] checked=122 mismatch=0
+[THREAD_CMP] tokens=122 expected_writes=122 hw_writes=122 write_mismatch=0
+[UV_CMP] checked=135 mismatch=0
+[THREAD_CMP] tokens=135 expected_writes=135 hw_writes=135 write_mismatch=0
+[UV_CMP] checked=188 mismatch=0
+[THREAD_CMP] tokens=188 expected_writes=188 hw_writes=188 write_mismatch=0
+[UV_CMP] checked=192 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=4447 color=fe001c36
+[THREAD_CMP][WRITE][MISSING] addr=4448 color=fd001a32
+[THREAD_CMP][WRITE][EXTRA] addr=4683 color=fe005835
+[THREAD_CMP][WRITE][EXTRA] addr=4684 color=fe000000
+[THREAD_CMP] tokens=192 expected_writes=187 hw_writes=187 write_mismatch=4
+[UV_CMP] checked=215 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=3669 color=fe004888
+[THREAD_CMP][WRITE][MISSING] addr=3670 color=fe004787
+[THREAD_CMP][WRITE][MISSING] addr=3796 color=fe004582
+[THREAD_CMP][WRITE][MISSING] addr=3797 color=fe004481
+[THREAD_CMP][WRITE][MISSING] addr=3922 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=3923 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=4044 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=4048 color=fe000000
+[THREAD_CMP] tokens=215 expected_writes=136 hw_writes=129 write_mismatch=15
+[UV_CMP] checked=80 mismatch=0
+[THREAD_CMP] tokens=80 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=107 mismatch=0
+[THREAD_CMP] tokens=107 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=7 mismatch=0
+[THREAD_CMP] tokens=7 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=207 mismatch=0
+[THREAD_CMP] tokens=207 expected_writes=164 hw_writes=164 write_mismatch=0
+[UV_CMP] checked=300 mismatch=0
+[THREAD_CMP] tokens=300 expected_writes=153 hw_writes=153 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=119 mismatch=0
+[THREAD_CMP] tokens=119 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=85 mismatch=0
+[THREAD_CMP] tokens=85 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=17 mismatch=0
+[THREAD_CMP] tokens=17 expected_writes=10 hw_writes=10 write_mismatch=0
+[UV_CMP] checked=162 mismatch=0
+[THREAD_CMP] tokens=162 expected_writes=123 hw_writes=123 write_mismatch=0
+[UV_CMP] checked=98 mismatch=0
+[THREAD_CMP] tokens=98 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=83 mismatch=0
+[THREAD_CMP] tokens=83 expected_writes=6 hw_writes=6 write_mismatch=0
+[UV_CMP] checked=141 mismatch=0
+[THREAD_CMP] tokens=141 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=71 mismatch=0
+[THREAD_CMP] tokens=71 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=88 mismatch=0
+[THREAD_CMP] tokens=88 expected_writes=1 hw_writes=1 write_mismatch=0
+[UV_CMP] checked=77 mismatch=0
+[THREAD_CMP] tokens=77 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=110 mismatch=0
+[THREAD_CMP] tokens=110 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=93 mismatch=0
+[THREAD_CMP] tokens=93 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=104 mismatch=0
+[THREAD_CMP] tokens=104 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=76 mismatch=0
+[THREAD_CMP] tokens=76 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=15 mismatch=0
+[THREAD_CMP] tokens=15 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=3 mismatch=0
+[THREAD_CMP] tokens=3 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=9 mismatch=0
+[THREAD_CMP] tokens=9 expected_writes=3 hw_writes=3 write_mismatch=0
+[UV_CMP] checked=6 mismatch=0
+[THREAD_CMP] tokens=6 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=7 mismatch=0
+[THREAD_CMP] tokens=7 expected_writes=6 hw_writes=6 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=23 mismatch=0
+[THREAD_CMP] tokens=23 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=25 mismatch=0
+[THREAD_CMP] tokens=25 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=49 mismatch=0
+[THREAD_CMP] tokens=49 expected_writes=37 hw_writes=37 write_mismatch=0
+[UV_CMP] checked=47 mismatch=0
+[THREAD_CMP] tokens=47 expected_writes=42 hw_writes=42 write_mismatch=0
+[UV_CMP] checked=18 mismatch=0
+[THREAD_CMP] tokens=18 expected_writes=10 hw_writes=10 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=8 mismatch=0
+[THREAD_CMP] tokens=8 expected_writes=8 hw_writes=8 write_mismatch=0
+[UV_CMP] checked=3 mismatch=0
+[THREAD_CMP] tokens=3 expected_writes=2 hw_writes=2 write_mismatch=0
+[UV_CMP] checked=24 mismatch=0
+[THREAD_CMP] tokens=24 expected_writes=24 hw_writes=24 write_mismatch=0
+[UV_CMP] checked=117 mismatch=0
+[THREAD_CMP] tokens=117 expected_writes=63 hw_writes=63 write_mismatch=0
+[UV_CMP] checked=88 mismatch=0
+[THREAD_CMP] tokens=88 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=92 mismatch=0
+[THREAD_CMP] tokens=92 expected_writes=70 hw_writes=70 write_mismatch=0
+[UV_CMP] checked=114 mismatch=0
+[THREAD_CMP] tokens=114 expected_writes=30 hw_writes=30 write_mismatch=0
+[UV_CMP] checked=91 mismatch=0
+[THREAD_CMP] tokens=91 expected_writes=76 hw_writes=76 write_mismatch=0
+[UV_CMP] checked=87 mismatch=0
+[THREAD_CMP] tokens=87 expected_writes=22 hw_writes=22 write_mismatch=0
+[UV_CMP] checked=71 mismatch=0
+[THREAD_CMP] tokens=71 expected_writes=71 hw_writes=71 write_mismatch=0
+[UV_CMP] checked=86 mismatch=0
+[THREAD_CMP] tokens=86 expected_writes=83 hw_writes=83 write_mismatch=0
+[UV_CMP] checked=115 mismatch=0
+[THREAD_CMP] tokens=115 expected_writes=35 hw_writes=35 write_mismatch=0
+[UV_CMP] checked=108 mismatch=0
+[THREAD_CMP] tokens=108 expected_writes=33 hw_writes=33 write_mismatch=0
+[UV_CMP] checked=113 mismatch=0
+[THREAD_CMP] tokens=113 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=131 mismatch=0
+[THREAD_CMP] tokens=131 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=127 mismatch=0
+[THREAD_CMP] tokens=127 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=141 mismatch=0
+[THREAD_CMP] tokens=141 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=158 mismatch=0
+[THREAD_CMP] tokens=158 expected_writes=5 hw_writes=5 write_mismatch=0
+[UV_CMP] checked=52 mismatch=0
+[THREAD_CMP] tokens=52 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=86 mismatch=0
+[THREAD_CMP] tokens=86 expected_writes=86 hw_writes=86 write_mismatch=0
+[UV_CMP] checked=55 mismatch=0
+[THREAD_CMP] tokens=55 expected_writes=49 hw_writes=49 write_mismatch=0
+[UV_CMP] checked=36 mismatch=0
+[THREAD_CMP] tokens=36 expected_writes=36 hw_writes=36 write_mismatch=0
+[UV_CMP] checked=320 mismatch=0
+[THREAD_CMP] tokens=320 expected_writes=320 hw_writes=320 write_mismatch=0
+[UV_CMP] checked=161 mismatch=0
+[THREAD_CMP] tokens=161 expected_writes=161 hw_writes=161 write_mismatch=0
+[UV_CMP] checked=488 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=11232 color=fd000000
+[THREAD_CMP][WRITE][MISSING] addr=11233 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=11235 color=feb30076
+[THREAD_CMP][WRITE][EXTRA] addr=11236 color=feb10075
+[THREAD_CMP][WRITE][MISSING] addr=11359 color=fe0063bc
+[THREAD_CMP][WRITE][MISSING] addr=11360 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=11363 color=feb40077
+[THREAD_CMP][WRITE][EXTRA] addr=11364 color=feb20075
+[THREAD_CMP] tokens=488 expected_writes=445 hw_writes=445 write_mismatch=52
+[UV_CMP] checked=159 mismatch=0
+[THREAD_CMP] tokens=159 expected_writes=157 hw_writes=157 write_mismatch=0
+[UV_CMP] checked=322 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=8810 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=8811 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=8935 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=8936 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=9062 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=9063 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=9065 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=9066 color=fe000000
+[THREAD_CMP] tokens=322 expected_writes=246 hw_writes=242 write_mismatch=50
+[UV_CMP] checked=153 mismatch=0
+[THREAD_CMP] tokens=153 expected_writes=151 hw_writes=151 write_mismatch=0
+[UV_CMP] checked=224 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=7017 color=fe4a0031
+[THREAD_CMP][WRITE][EXTRA] addr=7019 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=7274 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=7402 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=7403 color=fe000000
+[THREAD_CMP] tokens=224 expected_writes=220 hw_writes=217 write_mismatch=5
+[UV_CMP] checked=133 mismatch=0
+[THREAD_CMP] tokens=133 expected_writes=129 hw_writes=129 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=12 mismatch=0
+[THREAD_CMP] tokens=12 expected_writes=12 hw_writes=12 write_mismatch=0
+[UV_CMP] checked=12 mismatch=0
+[THREAD_CMP] tokens=12 expected_writes=12 hw_writes=12 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=1 hw_writes=1 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=45 mismatch=0
+[THREAD_CMP] tokens=45 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=63 mismatch=0
+[THREAD_CMP] tokens=63 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=10 mismatch=0
+[THREAD_CMP] tokens=10 expected_writes=10 hw_writes=10 write_mismatch=0
+[UV_CMP] checked=7 mismatch=0
+[THREAD_CMP] tokens=7 expected_writes=7 hw_writes=7 write_mismatch=0
+[UV_CMP] checked=28 mismatch=0
+[THREAD_CMP] tokens=28 expected_writes=28 hw_writes=28 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=2 mismatch=0
+[THREAD_CMP] tokens=2 expected_writes=2 hw_writes=2 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=41 mismatch=0
+[THREAD_CMP] tokens=41 expected_writes=41 hw_writes=41 write_mismatch=0
+[UV_CMP] checked=21 mismatch=0
+[THREAD_CMP] tokens=21 expected_writes=21 hw_writes=21 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=116 mismatch=0
+[THREAD_CMP] tokens=116 expected_writes=116 hw_writes=116 write_mismatch=0
+[UV_CMP] checked=18 mismatch=0
+[THREAD_CMP] tokens=18 expected_writes=18 hw_writes=18 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=676 mismatch=0
+[THREAD_CMP] tokens=676 expected_writes=676 hw_writes=676 write_mismatch=0
+[UV_CMP] checked=293 mismatch=0
+[THREAD_CMP] tokens=293 expected_writes=293 hw_writes=293 write_mismatch=0
+[UV_CMP] checked=644 mismatch=0
+[THREAD_CMP] tokens=644 expected_writes=644 hw_writes=644 write_mismatch=0
+[UV_CMP] checked=477 mismatch=0
+[THREAD_CMP] tokens=477 expected_writes=477 hw_writes=477 write_mismatch=0
+[UV_CMP] checked=125 mismatch=0
+[THREAD_CMP] tokens=125 expected_writes=125 hw_writes=125 write_mismatch=0
+[UV_CMP] checked=8 mismatch=0
+[THREAD_CMP] tokens=8 expected_writes=8 hw_writes=8 write_mismatch=0
+[UV_CMP] checked=14 mismatch=0
+[THREAD_CMP] tokens=14 expected_writes=14 hw_writes=14 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=1 hw_writes=1 write_mismatch=0
+[UV_CMP] checked=6 mismatch=0
+[THREAD_CMP] tokens=6 expected_writes=6 hw_writes=6 write_mismatch=0
+[UV_CMP] checked=899 mismatch=0
+[THREAD_CMP] tokens=899 expected_writes=899 hw_writes=899 write_mismatch=0
+[UV_CMP] checked=340 mismatch=0
+[THREAD_CMP] tokens=340 expected_writes=340 hw_writes=340 write_mismatch=0
+[UV_CMP] checked=443 mismatch=0
+[THREAD_CMP] tokens=443 expected_writes=443 hw_writes=443 write_mismatch=0
+[UV_CMP] checked=295 mismatch=0
+[THREAD_CMP] tokens=295 expected_writes=295 hw_writes=295 write_mismatch=0
+[UV_CMP] checked=322 mismatch=0
+[THREAD_CMP] tokens=322 expected_writes=322 hw_writes=322 write_mismatch=0
+[UV_CMP] checked=493 mismatch=0
+[THREAD_CMP] tokens=493 expected_writes=493 hw_writes=493 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=3 mismatch=0
+[THREAD_CMP] tokens=3 expected_writes=3 hw_writes=3 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=60 mismatch=0
+[THREAD_CMP] tokens=60 expected_writes=60 hw_writes=60 write_mismatch=0
+[UV_CMP] checked=11 mismatch=0
+[THREAD_CMP] tokens=11 expected_writes=11 hw_writes=11 write_mismatch=0
+[UV_CMP] checked=27 mismatch=0
+[THREAD_CMP] tokens=27 expected_writes=27 hw_writes=27 write_mismatch=0
+[UV_CMP] checked=88 mismatch=0
+[THREAD_CMP] tokens=88 expected_writes=88 hw_writes=88 write_mismatch=0
+[UV_CMP] checked=78 mismatch=0
+[THREAD_CMP] tokens=78 expected_writes=78 hw_writes=78 write_mismatch=0
+[UV_CMP] checked=21 mismatch=0
+[THREAD_CMP] tokens=21 expected_writes=21 hw_writes=21 write_mismatch=0
+[UV_CMP] checked=55 mismatch=0
+[THREAD_CMP] tokens=55 expected_writes=55 hw_writes=55 write_mismatch=0
+[UV_CMP] checked=58 mismatch=0
+[THREAD_CMP] tokens=58 expected_writes=58 hw_writes=58 write_mismatch=0
+[UV_CMP] checked=43 mismatch=0
+[THREAD_CMP] tokens=43 expected_writes=43 hw_writes=43 write_mismatch=0
+[UV_CMP] checked=68 mismatch=0
+[THREAD_CMP] tokens=68 expected_writes=68 hw_writes=68 write_mismatch=0
+[UV_CMP] checked=56 mismatch=0
+[THREAD_CMP] tokens=56 expected_writes=56 hw_writes=56 write_mismatch=0
+[UV_CMP] checked=33 mismatch=0
+[THREAD_CMP] tokens=33 expected_writes=33 hw_writes=33 write_mismatch=0
+[UV_CMP] checked=35 mismatch=0
+[THREAD_CMP] tokens=35 expected_writes=35 hw_writes=35 write_mismatch=0
+[UV_CMP] checked=253 mismatch=0
+[THREAD_CMP] tokens=253 expected_writes=253 hw_writes=253 write_mismatch=0
+[UV_CMP] checked=114 mismatch=0
+[THREAD_CMP] tokens=114 expected_writes=114 hw_writes=114 write_mismatch=0
+[UV_CMP] checked=311 mismatch=0
+[THREAD_CMP] tokens=311 expected_writes=311 hw_writes=311 write_mismatch=0
+[UV_CMP] checked=16 mismatch=0
+[THREAD_CMP] tokens=16 expected_writes=16 hw_writes=16 write_mismatch=0
+[UV_CMP] checked=299 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=1266 color=fd000000
+[THREAD_CMP][WRITE][MISSING] addr=1267 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=1269 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=1270 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=1278 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=1279 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=1385 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=1386 color=fd000000
+[THREAD_CMP] tokens=299 expected_writes=214 hw_writes=210 write_mismatch=18
+[UV_CMP] checked=116 mismatch=0
+[THREAD_CMP] tokens=116 expected_writes=108 hw_writes=108 write_mismatch=0
+[UV_CMP] checked=99 mismatch=0
+[THREAD_CMP] tokens=99 expected_writes=47 hw_writes=47 write_mismatch=0
+[UV_CMP] checked=160 mismatch=0
+[THREAD_CMP] tokens=160 expected_writes=149 hw_writes=149 write_mismatch=0
+[UV_CMP] checked=95 mismatch=0
+[THREAD_CMP] tokens=95 expected_writes=71 hw_writes=71 write_mismatch=0
+[UV_CMP] checked=203 mismatch=0
+[THREAD_CMP] tokens=203 expected_writes=203 hw_writes=203 write_mismatch=0
+[UV_CMP] checked=491 mismatch=0
+[THREAD_CMP] tokens=491 expected_writes=491 hw_writes=491 write_mismatch=0
+[UV_CMP] checked=582 mismatch=0
+[THREAD_CMP] tokens=582 expected_writes=582 hw_writes=582 write_mismatch=0
+[UV_CMP] checked=399 mismatch=0
+[THREAD_CMP] tokens=399 expected_writes=399 hw_writes=399 write_mismatch=0
+[UV_CMP] checked=306 mismatch=0
+[THREAD_CMP] tokens=306 expected_writes=306 hw_writes=306 write_mismatch=0
+[UV_CMP] checked=142 mismatch=0
+[THREAD_CMP] tokens=142 expected_writes=142 hw_writes=142 write_mismatch=0
+[UV_CMP] checked=140 mismatch=0
+[THREAD_CMP] tokens=140 expected_writes=140 hw_writes=140 write_mismatch=0
+[UV_CMP] checked=55 mismatch=0
+[THREAD_CMP] tokens=55 expected_writes=55 hw_writes=55 write_mismatch=0
+[UV_CMP] checked=273 mismatch=0
+[THREAD_CMP] tokens=273 expected_writes=273 hw_writes=273 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=12 mismatch=0
+[THREAD_CMP] tokens=12 expected_writes=9 hw_writes=9 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=39 mismatch=0
+[THREAD_CMP] tokens=39 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=8 mismatch=0
+[THREAD_CMP] tokens=8 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=7 mismatch=0
+[THREAD_CMP] tokens=7 expected_writes=1 hw_writes=1 write_mismatch=0
+[UV_CMP] checked=147 mismatch=0
+[THREAD_CMP] tokens=147 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=178 mismatch=0
+[THREAD_CMP] tokens=178 expected_writes=68 hw_writes=68 write_mismatch=0
+[UV_CMP] checked=252 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=4041 color=fe260019
+[THREAD_CMP][WRITE][EXTRA] addr=4044 color=fe260019
+[THREAD_CMP][WRITE][EXTRA] addr=4045 color=fe260019
+[THREAD_CMP][WRITE][MISSING] addr=4167 color=fe260019
+[THREAD_CMP][WRITE][MISSING] addr=4168 color=fd250018
+[THREAD_CMP][WRITE][EXTRA] addr=4172 color=fe260019
+[THREAD_CMP][WRITE][EXTRA] addr=4173 color=fe260019
+[THREAD_CMP][WRITE][MISSING] addr=4295 color=fe260019
+[THREAD_CMP] tokens=252 expected_writes=193 hw_writes=190 write_mismatch=23
+[UV_CMP] checked=294 mismatch=0
+[THREAD_CMP][WRITE][EXTRA] addr=5321 color=fe260019
+[THREAD_CMP][WRITE][EXTRA] addr=5322 color=fe260019
+[THREAD_CMP][WRITE][MISSING] addr=5443 color=fe260019
+[THREAD_CMP][WRITE][MISSING] addr=5444 color=fd250018
+[THREAD_CMP][WRITE][EXTRA] addr=5450 color=fe260019
+[THREAD_CMP][WRITE][EXTRA] addr=5451 color=fe260019
+[THREAD_CMP][WRITE][MISSING] addr=5571 color=fe260019
+[THREAD_CMP][WRITE][MISSING] addr=5572 color=fe260019
+[THREAD_CMP] tokens=294 expected_writes=166 hw_writes=164 write_mismatch=12
+[UV_CMP] checked=364 mismatch=0
+[THREAD_CMP] tokens=364 expected_writes=77 hw_writes=77 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=15 mismatch=0
+[THREAD_CMP] tokens=15 expected_writes=8 hw_writes=8 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=293 mismatch=0
+[THREAD_CMP] tokens=293 expected_writes=293 hw_writes=293 write_mismatch=0
+[UV_CMP] checked=676 mismatch=0
+[THREAD_CMP] tokens=676 expected_writes=676 hw_writes=676 write_mismatch=0
+[UV_CMP] checked=477 mismatch=0
+[THREAD_CMP] tokens=477 expected_writes=477 hw_writes=477 write_mismatch=0
+[UV_CMP] checked=644 mismatch=0
+[THREAD_CMP] tokens=644 expected_writes=644 hw_writes=644 write_mismatch=0
+[UV_CMP] checked=125 mismatch=0
+[THREAD_CMP] tokens=125 expected_writes=125 hw_writes=125 write_mismatch=0
+[UV_CMP] checked=14 mismatch=0
+[THREAD_CMP] tokens=14 expected_writes=14 hw_writes=14 write_mismatch=0
+[UV_CMP] checked=8 mismatch=0
+[THREAD_CMP] tokens=8 expected_writes=8 hw_writes=8 write_mismatch=0
+[UV_CMP] checked=6 mismatch=0
+[THREAD_CMP] tokens=6 expected_writes=6 hw_writes=6 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=1 hw_writes=1 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=340 mismatch=0
+[THREAD_CMP] tokens=340 expected_writes=340 hw_writes=340 write_mismatch=0
+[UV_CMP] checked=899 mismatch=0
+[THREAD_CMP] tokens=899 expected_writes=899 hw_writes=899 write_mismatch=0
+[UV_CMP] checked=295 mismatch=0
+[THREAD_CMP] tokens=295 expected_writes=295 hw_writes=295 write_mismatch=0
+[UV_CMP] checked=443 mismatch=0
+[THREAD_CMP] tokens=443 expected_writes=443 hw_writes=443 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=31 mismatch=0
+[THREAD_CMP] tokens=31 expected_writes=31 hw_writes=31 write_mismatch=0
+[UV_CMP] checked=493 mismatch=0
+[THREAD_CMP] tokens=493 expected_writes=493 hw_writes=493 write_mismatch=0
+[UV_CMP] checked=322 mismatch=0
+[THREAD_CMP] tokens=322 expected_writes=322 hw_writes=322 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=36 mismatch=0
+[THREAD_CMP] tokens=36 expected_writes=36 hw_writes=36 write_mismatch=0
+[UV_CMP] checked=3 mismatch=0
+[THREAD_CMP] tokens=3 expected_writes=3 hw_writes=3 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=60 mismatch=0
+[THREAD_CMP] tokens=60 expected_writes=60 hw_writes=60 write_mismatch=0
+[UV_CMP] checked=13 mismatch=0
+[THREAD_CMP] tokens=13 expected_writes=13 hw_writes=13 write_mismatch=0
+[UV_CMP] checked=27 mismatch=0
+[THREAD_CMP] tokens=27 expected_writes=27 hw_writes=27 write_mismatch=0
+[UV_CMP] checked=11 mismatch=0
+[THREAD_CMP] tokens=11 expected_writes=11 hw_writes=11 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=1 hw_writes=1 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=78 mismatch=0
+[THREAD_CMP] tokens=78 expected_writes=78 hw_writes=78 write_mismatch=0
+[UV_CMP] checked=88 mismatch=0
+[THREAD_CMP] tokens=88 expected_writes=88 hw_writes=88 write_mismatch=0
+[UV_CMP] checked=7 mismatch=0
+[THREAD_CMP] tokens=7 expected_writes=7 hw_writes=7 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=55 mismatch=0
+[THREAD_CMP] tokens=55 expected_writes=55 hw_writes=55 write_mismatch=0
+[UV_CMP] checked=21 mismatch=0
+[THREAD_CMP] tokens=21 expected_writes=21 hw_writes=21 write_mismatch=0
+[UV_CMP] checked=4 mismatch=0
+[THREAD_CMP] tokens=4 expected_writes=4 hw_writes=4 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=43 mismatch=0
+[THREAD_CMP] tokens=43 expected_writes=43 hw_writes=43 write_mismatch=0
+[UV_CMP] checked=58 mismatch=0
+[THREAD_CMP] tokens=58 expected_writes=58 hw_writes=58 write_mismatch=0
+[UV_CMP] checked=56 mismatch=0
+[THREAD_CMP] tokens=56 expected_writes=56 hw_writes=56 write_mismatch=0
+[UV_CMP] checked=68 mismatch=0
+[THREAD_CMP] tokens=68 expected_writes=68 hw_writes=68 write_mismatch=0
+[UV_CMP] checked=35 mismatch=0
+[THREAD_CMP] tokens=35 expected_writes=35 hw_writes=35 write_mismatch=0
+[UV_CMP] checked=33 mismatch=0
+[THREAD_CMP] tokens=33 expected_writes=33 hw_writes=33 write_mismatch=0
+[UV_CMP] checked=114 mismatch=0
+[THREAD_CMP] tokens=114 expected_writes=114 hw_writes=114 write_mismatch=0
+[UV_CMP] checked=253 mismatch=0
+[THREAD_CMP] tokens=253 expected_writes=253 hw_writes=253 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=16 mismatch=0
+[THREAD_CMP] tokens=16 expected_writes=16 hw_writes=16 write_mismatch=0
+[UV_CMP] checked=311 mismatch=0
+[THREAD_CMP] tokens=311 expected_writes=311 hw_writes=311 write_mismatch=0
+[UV_CMP] checked=23 mismatch=0
+[THREAD_CMP] tokens=23 expected_writes=23 hw_writes=23 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=116 mismatch=0
+[THREAD_CMP] tokens=116 expected_writes=108 hw_writes=108 write_mismatch=0
+[UV_CMP] checked=299 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=1160 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=1161 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=1163 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=1164 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=1285 color=fe000000
+[THREAD_CMP][WRITE][MISSING] addr=1286 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=1300 color=fe000000
+[THREAD_CMP][WRITE][EXTRA] addr=1301 color=fe000000
+[THREAD_CMP] tokens=299 expected_writes=214 hw_writes=210 write_mismatch=12
+[UV_CMP] checked=13 mismatch=0
+[THREAD_CMP] tokens=13 expected_writes=13 hw_writes=13 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=160 mismatch=0
+[THREAD_CMP] tokens=160 expected_writes=149 hw_writes=149 write_mismatch=0
+[UV_CMP] checked=99 mismatch=0
+[THREAD_CMP] tokens=99 expected_writes=47 hw_writes=47 write_mismatch=0
+[UV_CMP] checked=203 mismatch=0
+[THREAD_CMP] tokens=203 expected_writes=203 hw_writes=203 write_mismatch=0
+[UV_CMP] checked=95 mismatch=0
+[THREAD_CMP] tokens=95 expected_writes=71 hw_writes=71 write_mismatch=0
+[UV_CMP] checked=582 mismatch=0
+[THREAD_CMP] tokens=582 expected_writes=582 hw_writes=582 write_mismatch=0
+[UV_CMP] checked=491 mismatch=0
+[THREAD_CMP] tokens=491 expected_writes=491 hw_writes=491 write_mismatch=0
+[UV_CMP] checked=306 mismatch=0
+[THREAD_CMP] tokens=306 expected_writes=306 hw_writes=306 write_mismatch=0
+[UV_CMP] checked=399 mismatch=0
+[THREAD_CMP] tokens=399 expected_writes=399 hw_writes=399 write_mismatch=0
+[UV_CMP] checked=140 mismatch=0
+[THREAD_CMP] tokens=140 expected_writes=140 hw_writes=140 write_mismatch=0
+[UV_CMP] checked=142 mismatch=0
+[THREAD_CMP] tokens=142 expected_writes=142 hw_writes=142 write_mismatch=0
+[UV_CMP] checked=273 mismatch=0
+[THREAD_CMP] tokens=273 expected_writes=273 hw_writes=273 write_mismatch=0
+[UV_CMP] checked=55 mismatch=0
+[THREAD_CMP] tokens=55 expected_writes=55 hw_writes=55 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=12 mismatch=0
+[THREAD_CMP] tokens=12 expected_writes=9 hw_writes=9 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=39 mismatch=0
+[THREAD_CMP] tokens=39 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=7 mismatch=0
+[THREAD_CMP] tokens=7 expected_writes=1 hw_writes=1 write_mismatch=0
+[UV_CMP] checked=8 mismatch=0
+[THREAD_CMP] tokens=8 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=147 mismatch=0
+[THREAD_CMP] tokens=147 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=252 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=4033 color=fe7c0051
+[THREAD_CMP][WRITE][MISSING] addr=4034 color=fe76004d
+[THREAD_CMP][WRITE][EXTRA] addr=4150 color=feb9007a
+[THREAD_CMP][WRITE][EXTRA] addr=4151 color=feb30076
+[THREAD_CMP][WRITE][MISSING] addr=4160 color=fe7e0053
+[THREAD_CMP][WRITE][MISSING] addr=4161 color=fe78004f
+[THREAD_CMP][WRITE][EXTRA] addr=4278 color=feb50077
+[THREAD_CMP][WRITE][EXTRA] addr=4279 color=feb00074
+[THREAD_CMP] tokens=252 expected_writes=193 hw_writes=191 write_mismatch=26
+[UV_CMP] checked=178 mismatch=0
+[THREAD_CMP] tokens=178 expected_writes=68 hw_writes=68 write_mismatch=0
+[UV_CMP] checked=294 mismatch=0
+[THREAD_CMP][WRITE][MISSING] addr=5312 color=fe330021
+[THREAD_CMP][WRITE][MISSING] addr=5313 color=fe29001b
+[THREAD_CMP][WRITE][EXTRA] addr=5434 color=fe690045
+[THREAD_CMP][WRITE][EXTRA] addr=5435 color=fe5f003e
+[THREAD_CMP][WRITE][MISSING] addr=5439 color=fe350023
+[THREAD_CMP][WRITE][MISSING] addr=5440 color=fe2a001c
+[THREAD_CMP][WRITE][EXTRA] addr=5562 color=fe60003f
+[THREAD_CMP][WRITE][EXTRA] addr=5563 color=fe560038
+[THREAD_CMP] tokens=294 expected_writes=166 hw_writes=164 write_mismatch=16
+[UV_CMP] checked=364 mismatch=0
+[THREAD_CMP] tokens=364 expected_writes=77 hw_writes=77 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=12 mismatch=0
+[THREAD_CMP] tokens=12 expected_writes=5 hw_writes=5 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=21 mismatch=0
+[THREAD_CMP] tokens=21 expected_writes=21 hw_writes=21 write_mismatch=0
+[UV_CMP] checked=41 mismatch=0
+[THREAD_CMP] tokens=41 expected_writes=41 hw_writes=41 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=18 mismatch=0
+[THREAD_CMP] tokens=18 expected_writes=18 hw_writes=18 write_mismatch=0
+[UV_CMP] checked=119 mismatch=0
+[THREAD_CMP] tokens=119 expected_writes=119 hw_writes=119 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=105 mismatch=0
+[THREAD_CMP] tokens=105 expected_writes=105 hw_writes=105 write_mismatch=0
+[UV_CMP] checked=108 mismatch=0
+[THREAD_CMP] tokens=108 expected_writes=108 hw_writes=108 write_mismatch=0
+[UV_CMP] checked=87 mismatch=0
+[THREAD_CMP] tokens=87 expected_writes=87 hw_writes=87 write_mismatch=0
+[UV_CMP] checked=45 mismatch=0
+[THREAD_CMP] tokens=45 expected_writes=45 hw_writes=45 write_mismatch=0
+[UV_CMP] checked=187 mismatch=0
+[THREAD_CMP] tokens=187 expected_writes=187 hw_writes=187 write_mismatch=0
+[UV_CMP] checked=234 mismatch=0
+[THREAD_CMP] tokens=234 expected_writes=234 hw_writes=234 write_mismatch=0
+[UV_CMP] checked=532 mismatch=0
+[THREAD_CMP] tokens=532 expected_writes=532 hw_writes=532 write_mismatch=0
+[UV_CMP] checked=300 mismatch=0
+[THREAD_CMP] tokens=300 expected_writes=300 hw_writes=300 write_mismatch=0
+[UV_CMP] checked=80 mismatch=0
+[THREAD_CMP] tokens=80 expected_writes=80 hw_writes=80 write_mismatch=0
+[UV_CMP] checked=487 mismatch=0
+[THREAD_CMP] tokens=487 expected_writes=487 hw_writes=487 write_mismatch=0
+[UV_CMP] checked=80 mismatch=0
+[THREAD_CMP] tokens=80 expected_writes=80 hw_writes=80 write_mismatch=0
+[UV_CMP] checked=215 mismatch=0
+[THREAD_CMP] tokens=215 expected_writes=215 hw_writes=215 write_mismatch=0
+[UV_CMP] checked=261 mismatch=0
+[THREAD_CMP] tokens=261 expected_writes=261 hw_writes=261 write_mismatch=0
+[UV_CMP] checked=118 mismatch=0
+[THREAD_CMP] tokens=118 expected_writes=118 hw_writes=118 write_mismatch=0
+[UV_CMP] checked=539 mismatch=0
+[THREAD_CMP] tokens=539 expected_writes=539 hw_writes=539 write_mismatch=0
+[UV_CMP] checked=372 mismatch=0
+[THREAD_CMP] tokens=372 expected_writes=372 hw_writes=372 write_mismatch=0
+[UV_CMP] checked=203 mismatch=0
+[THREAD_CMP] tokens=203 expected_writes=203 hw_writes=203 write_mismatch=0
+[UV_CMP] checked=684 mismatch=0
+[THREAD_CMP] tokens=684 expected_writes=684 hw_writes=684 write_mismatch=0
+[UV_CMP] checked=180 mismatch=0
+[THREAD_CMP] tokens=180 expected_writes=180 hw_writes=180 write_mismatch=0
+[UV_CMP] checked=474 mismatch=0
+[THREAD_CMP] tokens=474 expected_writes=474 hw_writes=474 write_mismatch=0
+[UV_CMP] checked=605 mismatch=0
+[THREAD_CMP] tokens=605 expected_writes=605 hw_writes=605 write_mismatch=0
+[UV_CMP] checked=84 mismatch=0
+[THREAD_CMP] tokens=84 expected_writes=84 hw_writes=84 write_mismatch=0
+[UV_CMP] checked=302 mismatch=0
+[THREAD_CMP] tokens=302 expected_writes=302 hw_writes=302 write_mismatch=0
+[UV_CMP] checked=125 mismatch=0
+[THREAD_CMP] tokens=125 expected_writes=125 hw_writes=125 write_mismatch=0
+[UV_CMP] checked=54 mismatch=0
+[THREAD_CMP] tokens=54 expected_writes=54 hw_writes=54 write_mismatch=0
+[UV_CMP] checked=12 mismatch=0
+[THREAD_CMP] tokens=12 expected_writes=12 hw_writes=12 write_mismatch=0
+[UV_CMP] checked=82 mismatch=0
+[THREAD_CMP] tokens=82 expected_writes=82 hw_writes=82 write_mismatch=0
+[UV_CMP] checked=31 mismatch=0
+[THREAD_CMP] tokens=31 expected_writes=31 hw_writes=31 write_mismatch=0
+[UV_CMP] checked=53 mismatch=0
+[THREAD_CMP] tokens=53 expected_writes=53 hw_writes=53 write_mismatch=0
+[UV_CMP] checked=57 mismatch=0
+[THREAD_CMP] tokens=57 expected_writes=57 hw_writes=57 write_mismatch=0
+[UV_CMP] checked=29 mismatch=0
+[THREAD_CMP] tokens=29 expected_writes=29 hw_writes=29 write_mismatch=0
+[UV_CMP] checked=31 mismatch=0
+[THREAD_CMP] tokens=31 expected_writes=31 hw_writes=31 write_mismatch=0
+[UV_CMP] checked=41 mismatch=0
+[THREAD_CMP][WRITE][COLOR] addr=8952 expected=fe00fb97 got=fe000000
+[THREAD_CMP] tokens=41 expected_writes=41 hw_writes=41 write_mismatch=1
+[UV_CMP] checked=42 mismatch=0
+[THREAD_CMP] tokens=42 expected_writes=42 hw_writes=42 write_mismatch=0
+[UV_CMP] checked=47 mismatch=0
+[THREAD_CMP] tokens=47 expected_writes=47 hw_writes=47 write_mismatch=0
+[UV_CMP] checked=38 mismatch=0
+[THREAD_CMP] tokens=38 expected_writes=38 hw_writes=38 write_mismatch=0
+[UV_CMP] checked=15 mismatch=0
+[THREAD_CMP] tokens=15 expected_writes=15 hw_writes=15 write_mismatch=0
+[UV_CMP] checked=4 mismatch=0
+[THREAD_CMP] tokens=4 expected_writes=3 hw_writes=3 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=207 mismatch=0
+[THREAD_CMP] tokens=207 expected_writes=170 hw_writes=170 write_mismatch=0
+[UV_CMP] checked=124 mismatch=0
+[THREAD_CMP] tokens=124 expected_writes=123 hw_writes=123 write_mismatch=0
+[UV_CMP] checked=87 mismatch=0
+[THREAD_CMP] tokens=87 expected_writes=87 hw_writes=87 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=5 mismatch=0
+[THREAD_CMP] tokens=5 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=108 mismatch=0
+[THREAD_CMP] tokens=108 expected_writes=108 hw_writes=108 write_mismatch=0
+[UV_CMP] checked=105 mismatch=0
+[THREAD_CMP] tokens=105 expected_writes=105 hw_writes=105 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=5 mismatch=0
+[THREAD_CMP] tokens=5 expected_writes=5 hw_writes=5 write_mismatch=0
+[UV_CMP] checked=45 mismatch=0
+[THREAD_CMP] tokens=45 expected_writes=45 hw_writes=45 write_mismatch=0
+[UV_CMP] checked=87 mismatch=0
+[THREAD_CMP] tokens=87 expected_writes=87 hw_writes=87 write_mismatch=0
+[UV_CMP] checked=234 mismatch=0
+[THREAD_CMP] tokens=234 expected_writes=234 hw_writes=234 write_mismatch=0
+[UV_CMP] checked=187 mismatch=0
+[THREAD_CMP] tokens=187 expected_writes=187 hw_writes=187 write_mismatch=0
+[UV_CMP] checked=300 mismatch=0
+[THREAD_CMP] tokens=300 expected_writes=300 hw_writes=300 write_mismatch=0
+[UV_CMP] checked=532 mismatch=0
+[THREAD_CMP] tokens=532 expected_writes=532 hw_writes=532 write_mismatch=0
+[UV_CMP] checked=487 mismatch=0
+[THREAD_CMP] tokens=487 expected_writes=487 hw_writes=487 write_mismatch=0
+[UV_CMP] checked=80 mismatch=0
+[THREAD_CMP] tokens=80 expected_writes=80 hw_writes=80 write_mismatch=0
+[UV_CMP] checked=215 mismatch=0
+[THREAD_CMP] tokens=215 expected_writes=215 hw_writes=215 write_mismatch=0
+[UV_CMP] checked=80 mismatch=0
+[THREAD_CMP] tokens=80 expected_writes=80 hw_writes=80 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=11 mismatch=0
+[THREAD_CMP] tokens=11 expected_writes=11 hw_writes=11 write_mismatch=0
+[UV_CMP] checked=118 mismatch=0
+[THREAD_CMP] tokens=118 expected_writes=118 hw_writes=118 write_mismatch=0
+[UV_CMP] checked=261 mismatch=0
+[THREAD_CMP] tokens=261 expected_writes=261 hw_writes=261 write_mismatch=0
+[UV_CMP] checked=372 mismatch=0
+[THREAD_CMP] tokens=372 expected_writes=372 hw_writes=372 write_mismatch=0
+[UV_CMP] checked=539 mismatch=0
+[THREAD_CMP] tokens=539 expected_writes=539 hw_writes=539 write_mismatch=0
+[UV_CMP] checked=684 mismatch=0
+[THREAD_CMP] tokens=684 expected_writes=684 hw_writes=684 write_mismatch=0
+[UV_CMP] checked=203 mismatch=0
+[THREAD_CMP] tokens=203 expected_writes=203 hw_writes=203 write_mismatch=0
+[UV_CMP] checked=474 mismatch=0
+[THREAD_CMP] tokens=474 expected_writes=474 hw_writes=474 write_mismatch=0
+[UV_CMP] checked=180 mismatch=0
+[THREAD_CMP] tokens=180 expected_writes=180 hw_writes=180 write_mismatch=0
+[UV_CMP] checked=84 mismatch=0
+[THREAD_CMP] tokens=84 expected_writes=84 hw_writes=84 write_mismatch=0
+[UV_CMP] checked=605 mismatch=0
+[THREAD_CMP] tokens=605 expected_writes=605 hw_writes=605 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=24 mismatch=0
+[THREAD_CMP] tokens=24 expected_writes=24 hw_writes=24 write_mismatch=0
+[UV_CMP] checked=125 mismatch=0
+[THREAD_CMP] tokens=125 expected_writes=125 hw_writes=125 write_mismatch=0
+[UV_CMP] checked=302 mismatch=0
+[THREAD_CMP] tokens=302 expected_writes=302 hw_writes=302 write_mismatch=0
+[UV_CMP] checked=22 mismatch=0
+[THREAD_CMP] tokens=22 expected_writes=22 hw_writes=22 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=12 mismatch=0
+[THREAD_CMP] tokens=12 expected_writes=12 hw_writes=12 write_mismatch=0
+[UV_CMP] checked=54 mismatch=0
+[THREAD_CMP] tokens=54 expected_writes=54 hw_writes=54 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=1 mismatch=0
+[THREAD_CMP] tokens=1 expected_writes=1 hw_writes=1 write_mismatch=0
+[UV_CMP] checked=31 mismatch=0
+[THREAD_CMP] tokens=31 expected_writes=31 hw_writes=31 write_mismatch=0
+[UV_CMP] checked=82 mismatch=0
+[THREAD_CMP] tokens=82 expected_writes=82 hw_writes=82 write_mismatch=0
+[UV_CMP] checked=57 mismatch=0
+[THREAD_CMP] tokens=57 expected_writes=57 hw_writes=57 write_mismatch=0
+[UV_CMP] checked=53 mismatch=0
+[THREAD_CMP] tokens=53 expected_writes=53 hw_writes=53 write_mismatch=0
+[UV_CMP] checked=31 mismatch=0
+[THREAD_CMP] tokens=31 expected_writes=31 hw_writes=31 write_mismatch=0
+[UV_CMP] checked=29 mismatch=0
+[THREAD_CMP] tokens=29 expected_writes=29 hw_writes=29 write_mismatch=0
+[UV_CMP] checked=4 mismatch=0
+[THREAD_CMP] tokens=4 expected_writes=4 hw_writes=4 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=42 mismatch=0
+[THREAD_CMP] tokens=42 expected_writes=42 hw_writes=42 write_mismatch=0
+[UV_CMP] checked=41 mismatch=0
+[THREAD_CMP] tokens=41 expected_writes=41 hw_writes=41 write_mismatch=0
+[UV_CMP] checked=7 mismatch=0
+[THREAD_CMP] tokens=7 expected_writes=7 hw_writes=7 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=38 mismatch=0
+[THREAD_CMP] tokens=38 expected_writes=38 hw_writes=38 write_mismatch=0
+[UV_CMP] checked=47 mismatch=0
+[THREAD_CMP] tokens=47 expected_writes=47 hw_writes=47 write_mismatch=0
+[UV_CMP] checked=4 mismatch=0
+[THREAD_CMP] tokens=4 expected_writes=3 hw_writes=3 write_mismatch=0
+[UV_CMP] checked=15 mismatch=0
+[THREAD_CMP] tokens=15 expected_writes=15 hw_writes=15 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=124 mismatch=0
+[THREAD_CMP] tokens=124 expected_writes=123 hw_writes=123 write_mismatch=0
+[UV_CMP] checked=207 mismatch=0
+[THREAD_CMP] tokens=207 expected_writes=170 hw_writes=170 write_mismatch=0
+[UV_CMP] checked=18 mismatch=0
+[THREAD_CMP] tokens=18 expected_writes=17 hw_writes=17 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=87 mismatch=0
+[THREAD_CMP] tokens=87 expected_writes=87 hw_writes=87 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[UV_CMP] checked=5 mismatch=0
+[THREAD_CMP] tokens=5 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+[THREAD_CMP] tokens=0 expected_writes=0 hw_writes=0 write_mismatch=0
+Render time: 7187.7 ms
+Pixel draw count: 1137784

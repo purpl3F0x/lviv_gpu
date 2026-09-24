@@ -1,341 +1,235 @@
-#import "@preview/cetz:0.3.2": canvas, draw
+#import "@preview/fletcher:0.5.8" as fletcher: diagram, edge, node
+#import "@preview/splash:0.5.0": gruvbox
 
-#set page(width: auto, height: auto, margin: 1cm)
+#set page(width: auto, height: auto, margin: 1.5cm)
 #set text(font: "DejaVu Sans Mono", size: 10pt)
 #show math.equation: set text(weight: "bold")
-#show math.equation: set text(font: "DejaVu Sans Mono")
+// #show math.equation: set text(font: "DejaVu Sans Mono")
 
-#canvas(length: 0.58cm, {
-  let block(x, y, w, h, fill, title, formula, name: none) = {
-    draw.rect(
-      (x - w / 2, y - h / 2),
-      (x + w / 2, y + h / 2),
-      fill: fill,
-      stroke: (thickness: 1.5pt, paint: black),
-      radius: 0.2,
-      name: name,
-    )
-    draw.content(
-      (x, y),
-      align(center)[
-        #text(size: 12pt, weight: "bold")[#title]
-        #if formula != none and formula != [] and formula != "" [
-          \ #v(0.2em) #text(size: 8pt)[#formula]
-        ]
-      ],
-    )
-  }
+#let colors = (
+  orange: rgb("44aa99"),
+  yellow: gruvbox.at("bright-yellow"),
+  green: gruvbox.at("bright-aqua"),
+  purple: gruvbox.at("bright-purple"),
+  blue: gruvbox.at("bright-blue"),
+  red: gruvbox.at("bright-red").lighten(20%),
+)
 
-  // ─── Layout design: ZIG-ZAG snake ────────────────────────────────────────
-  //
-  //  Row 0 (Y= 6): Z track         →→ [Z Interp] → [Depth Test]
-  //  Row 1 (Y=-2): W/t track  →→→→→→→→→→→→→→→→→→→→→→ [fx_conv]
-  //                                                          ↓ t-bus (X=45)
-  //  Loop-back  ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
-  //  ↓ (X=12.5)
-  //  Row 2 (Y=-8):  [Tex Interp] →→ [Tex Gate] →→ [Tex Addr]
-  //  Row 3 (Y=-14): [Col Interp] →→ [Col Gate]
-  //                                                     ↓
-  //  Row 4 (Y=-11):                              [Shading] → [Blending]
-  // ─────────────────────────────────────────────────────────────────────────
+#let node_dim = (w: 110pt, h: 60pt)
 
-  // 1. INPUT STUBS
-  draw.content((0.0, 2.0), anchor: "east", text(size: 14pt, weight: "bold")[Edge $e_i$, $1/"area"$])
-  draw.content((0.0, -2.0), anchor: "east", text(size: 14pt, weight: "bold")[Vertex $w_i = 1/W_i$])
-  draw.content((0.0, 6.8), anchor: "east", text(size: 14pt, weight: "bold")[Vertex $z_i$])
-  draw.content((0.0, 8.5), anchor: "east", text(size: 14pt, weight: "bold")[Z-Buffer Addr])
-  draw.content((0.0, -12.0), anchor: "east", text(size: 14pt, weight: "bold")[Vertex $(u_i, v_i)$])
-  draw.content((0.0, -18.0), anchor: "east", text(size: 14pt, weight: "bold")[Vertex Color $C_i$])
+#align(center)[
+  #text([Lviv GPU Raster Thread Top-Level Pipeline Diagram], size: 2em, weight: "bold", spacing: 0.5em)
+  #v(1em)
 
-  // 2. PROCESSING BLOCKS
-  // Z track (Y=6)
-  block(15.0, 6.0, 6.0, 3.5, blue.lighten(40%), [Z \ Interpolation], [$Z = sum z_i dot i w_i$], name: "z_interp")
-  block(25.0, 6.0, 6.0, 3.5, red.lighten(40%), [Depth Test], [$Z <= Z_("current")$], name: "depth_test")
+  #line(length: 600pt, stroke: 2pt + black)
+]
 
-  // iw + W/t track (Y=2 and Y=-2)
-  block(4.0, 2.0, 6.0, 3.5, yellow.lighten(40%), [iw \ Calculation], [$i w_i = e_i dot 1/"area"$], name: "iw_calc")
-  block(
-    15.0,
-    -2.0,
-    7.0,
-    3.5,
-    blue.lighten(40%),
-    [1/W \ Interpolation],
-    [$1/W = sum w_i dot i w_i$],
-    name: "inv_w_interp",
-  )
-  block(23.0, -2.0, 6.0, 3.5, purple.lighten(40%), [Reciprocal \ Unit], [$W = 1 / (1/W)$], name: "recip_w")
-  block(32.0, -2.0, 7.0, 3.5, yellow.lighten(40%), [t Weights \ Calc], [$t_i = W dot w_i dot i w_i$], name: "t_calc")
-  block(
-    41.0,
-    -2.0,
-    7.0,
-    3.5,
-    yellow.lighten(40%),
-    [Fixed-Point \ Conv],
-    [$t_(i,"fx") = "fx2.23"(t_i)$],
-    name: "fx_conv",
-  )
+#v(5em)
 
-  // Tex row (Y=-11): starts at LEFT, goes RIGHT — zig-zag snake turn
-  block(
-    7.0,
-    -11.0,
-    7.0,
-    3.5,
-    teal.lighten(40%),
-    [Texture\ Interpolator],
-    [$U, V = sum (u_i, v_i) dot t_i$],
-    name: "tex_interp",
-  )
-  block(16.0, -11.0, 5.0, 3.5, gray.lighten(50%), [Reject Gate], [if $Z > Z_("current")$], name: "tex_gate")
-  block(24.0, -11.0, 7.0, 3.5, teal.lighten(40%), [Texture LUT &\ Addr. Swizzling], none, name: "tex_addr_gen")
+#diagram(
+  node-stroke: 1.5pt + black,
+  node-corner-radius: 1pt,
+  edge-corner-radius: 2pt,
+  edge-stroke: 1.6pt + black,
+  mark-scale: 50%,
+  spacing: (32pt, 22pt),
 
-  // Color row (Y=-17): also starts LEFT, goes RIGHT
-  block(7.0, -17.0, 7.0, 3.5, orange.lighten(40%), [Color \ Interpolator], [$C = sum C_i dot t_i$], name: "col_interp")
-  block(16.0, -17.0, 5.0, 3.5, gray.lighten(50%), [Reject Gate], [if $Z > Z_("current")$], name: "col_gate")
+  // -------------------------------------------------------------
+  // COLUMN 0: INPUT STUBS
+  // -------------------------------------------------------------
+  node((0, 0.5), align(right)[*Vertex $(u_i, v_i)$*], stroke: none, name: <vert_u_v>),
+  node((0, 1.2), align(right)[*Z-Buffer Addr*], stroke: none, name: <z_addr>),
+  node((0, 1.9), align(right)[*Vertex $z_i$*], stroke: none, name: <vert_zi>),
+  node((0, 3.0), align(right)[*Edge $e_i$, $1/"area"$*], stroke: none, name: <edge_ei>),
+  node((0, 4.1), align(right)[*Vertex $w_i = 1/W_i$*], stroke: none, name: <vert_wi>),
+  node((0, 4.8), align(right)[*Vertex Color $C_i$*], stroke: none, name: <vert_ci>),
 
-  // Shading + Blending (Y=-14, right of tex addr gen)
-  block(32.0, -14.0, 6.0, 3.5, purple.lighten(40%), [Shading\ Unit], none, name: "shading_unit")
-  block(40.0, -14.0, 6.0, 3.5, orange.lighten(40%), [Color\ Blending], none, name: "color_blender")
+  // -------------------------------------------------------------
+  // COLUMN 1: iw CALCULATION (Weight Generation -> Yellow)
+  // -------------------------------------------------------------
+  node(
+    (1, 3.0),
+    align(center + horizon)[*iw Calculation*\ #v(0.2em)#text[$i w_i = e_i dot 1/"area"$]],
+    fill: colors.yellow,
+    width: node_dim.w,
+    height: node_dim.h,
+    name: <iw_calc>,
+  ),
 
-  // 3. WIRES
+  // -------------------------------------------------------------
+  // COLUMN 2: 1/W & Z INTERPOLATION (Interpolators -> Blue)
+  // -------------------------------------------------------------
+  node(
+    (2, 2.0),
+    align(center + horizon)[*Z Interpolation*\ #v(0.2em)#text[$Z = sum z_i dot i w_i$]],
+    fill: colors.blue,
+    width: node_dim.w,
+    height: node_dim.h,
+    name: <z_interp>,
+  ),
+  node(
+    (2, 4.0),
+    align(center + horizon)[*1/W Interpolation*\ #v(0.2em)#text[$1/W = sum w_i dot i w_i$]],
+    fill: colors.blue,
+    width: node_dim.w,
+    height: node_dim.h,
+    name: <inv_w_interp>,
+  ),
 
-  // Edge → iw_calc
-  draw.line(
-    (0.0, 2.0),
-    "iw_calc.west",
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
+  // -------------------------------------------------------------
+  // COLUMN 3: DEPTH TEST (Red) & RECIPROCAL W (Weight Gen -> Yellow)
+  // -------------------------------------------------------------
+  node(
+    (3, 2.0),
+    align(center + horizon)[*Depth Test*\ #v(0.2em)#text[$Z <= Z_("current")$]],
+    fill: colors.red,
+    width: node_dim.w,
+    height: node_dim.h,
+    name: <depth_test>,
+  ),
+  node(
+    (3, 4.0),
+    align(center + horizon)[*Reciprocal Unit*\ #v(0.2em)#text[$W = 1 / (1/W)$]],
+    fill: colors.purple,
+    width: node_dim.w,
+    height: node_dim.h,
+    name: <recip_w>,
+  ),
 
-  // Vertex w_i → inv_w_interp
-  draw.line(
-    (0.0, -2.0),
-    "inv_w_interp.west",
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
+  // Z-Buffer external interface
+  node((3, 0.7), align(center)[*Z-Buffer*], stroke: none, name: <z_buf>),
 
-  // iw bus: X=9.5, drop from Y=5.2 to Y=1.0
-  let iw-bus-x = 9.5
-  draw.line("iw_calc.east", (iw-bus-x, 2.0), stroke: (thickness: 2pt, paint: black))
-  draw.line((iw-bus-x, 5.2), (iw-bus-x, 1.0), stroke: (thickness: 2pt, paint: black))
+  // -------------------------------------------------------------
+  // COLUMN 4: t WEIGHTS CALCULATION (Weight Gen -> Yellow)
+  // -------------------------------------------------------------
+  node(
+    (4, 3.0),
+    align(center + horizon)[*t Weights Calc*\ #v(0.2em)#text[$t_i = W dot w_i dot i w_i$]],
+    fill: colors.yellow,
+    width: node_dim.w,
+    height: node_dim.h,
+    name: <t_calc>,
+  ),
 
-  // iw bus → Z Interpolator
-  draw.line(
-    (iw-bus-x, 5.2),
-    (horizontal: "z_interp.west", vertical: (0, 5.2)),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
+  // -------------------------------------------------------------
+  // COLUMN 5: FIXED-POINT CONVERSION (Weight Gen -> Yellow)
+  // -------------------------------------------------------------
+  node(
+    (5, 3.0),
+    align(center + horizon)[*Fixed-Point Conv*\ #v(0.2em)#text[$t_(i,"fx") = "fx2.23"(t_i)$]],
+    fill: colors.yellow,
+    width: node_dim.w,
+    height: node_dim.h,
+    name: <fx_conv>,
+  ),
 
-  // iw bus → 1/W Interpolator (second input: down then right into west side)
-  draw.line(
-    (iw-bus-x, 1.0),
-    (iw-bus-x, -1.2),
-    (horizontal: "inv_w_interp.west", vertical: (0, -1.2)),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
+  // -------------------------------------------------------------
+  // COLUMN 6: TEXTURE & COLOR INTERPOLATION (Interpolators -> Blue)
+  // -------------------------------------------------------------
+  node(
+    (6, 2),
+    align(center + horizon)[*Texture\ Interpolator*\ #v(0.2em)#text[$U, V = sum (u_i, v_i) dot t_i$]],
+    fill: colors.blue,
+    width: node_dim.w,
+    height: node_dim.h,
+    name: <tex_interp>,
+  ),
+  node(
+    (6, 4),
+    align(center + horizon)[*Color\ Interpolator*\ #v(0.2em) #[$C = sum C_i dot t_i$]],
+    fill: colors.blue,
+    width: node_dim.w,
+    height: node_dim.h,
+    name: <col_interp>,
+  ),
 
-  // inv_w_interp → recip_w → t_calc → fx_conv (main L→R chain, row 1)
-  draw.line(
-    "inv_w_interp.east",
-    "recip_w.west",
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
-  draw.line(
-    "recip_w.east",
-    "t_calc.west",
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
-  draw.line(
-    "t_calc.east",
-    "fx_conv.west",
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
+  // -------------------------------------------------------------
+  // COLUMN 7: TEXTURE ADDRESS GENERATOR & L1 CACHE (Texture -> Green)
+  // -------------------------------------------------------------
+  node(
+    (7, 2),
+    align(center + horizon)[*Texture LUT &*\ *Addr. Swizzling*],
+    fill: colors.green,
+    width: node_dim.w,
+    height: node_dim.h,
+    name: <tex_addr_gen>,
+  ),
+  node((7, 0.7), align(center)[*L1 Cache*], stroke: none, name: <l1_cache>),
+  edge(<tex_addr_gen>, <l1_cache>, "<=>", mark-scale: 160%),
 
-  // iw bus → t_calc (bypass above main row, separate top entry)
-  draw.line(
-    (iw-bus-x, 1.0),
-    (32.0, 1.0),
-    (horizontal: (32.0, 1.0), vertical: "t_calc.north"),
-    "t_calc.north",
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
+  // -------------------------------------------------------------
+  // COLUMN 8: SHADING UNIT (Shading -> Purple)
+  // -------------------------------------------------------------
+  node(
+    (8, 3),
+    align(center + horizon)[*Shading Unit*],
+    fill: colors.purple,
+    width: node_dim.w,
+    height: node_dim.h,
+    name: <shading_unit>,
+  ),
 
-  // Vertex z_i → Z Interpolator
-  draw.line(
-    (0.0, 6.8),
-    (horizontal: "z_interp.west", vertical: (0, 6.8)),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
+  // -------------------------------------------------------------
+  // COLUMN 9: COLOR BLENDING & TILE BUFFER (Output/ROP -> Orange)
+  // -------------------------------------------------------------
+  node(
+    (9, 3),
+    align(center + horizon)[*Color Blending*],
+    fill: colors.orange,
+    width: node_dim.w,
+    height: node_dim.h,
+    name: <color_blender>,
+  ),
+  node((9, 4.0), align(center)[*Tile Buffer Read*], stroke: none, name: <tile_buf_read>),
+  node((10, 3), align(center)[*Tile Buffer Write*], stroke: none, name: <tile_buf_write>, width: 100pt),
+  node((10, 2), align(center)[*Depth Test\ (Controls WE)*], stroke: none, name: <comp_out>, width: 100pt),
 
-  // Z-Buffer Addr → Depth Test (elbow from top-left)
-  draw.line(
-    (0.0, 8.5),
-    (19.0, 8.5),
-    (19.0, 7.2),
-    (22.0, 7.2),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
+  // =============================================================
+  // EDGES / WIRES
+  // =============================================================
 
-  // Z Interpolator → Depth Test
-  draw.line(
-    "z_interp.east",
-    "depth_test.west",
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
+  edge(<edge_ei>, <iw_calc>, "->"),
+  edge((rel: (0, -0.1), to: <iw_calc.east>), (1.5, 2.9), (1.5, 2.1), (rel: (0, 0.1), to: <z_interp.west>), "->"),
+  edge((rel: (0, 0.1), to: <iw_calc.east>), (1.5, 3.1), (1.5, 3.9), (rel: (0, -0.1), to: <inv_w_interp.west>), "->"),
+  edge(<iw_calc.east>, (2.5, 3.0), (2.5, 2.9), (rel: (0, -0.1), to: <t_calc.west>), "->"),
 
-  // Z-Buffer bidirectional arrow from top
-  draw.line(
-    (25.0, 10.5),
-    "depth_test.north",
-    stroke: (thickness: 2pt, paint: black),
-    mark: (start: ">", end: ">", fill: black, size: 0.5),
-  )
-  draw.content((25.0, 10.7), anchor: "south", text(size: 10pt, weight: "bold")[Z-Buffer])
+  edge(<vert_zi>, (rel: (0.1, -0.1), to: <z_interp.west>), "->"),
+  edge(<vert_wi>, (rel: (0.1, 0.1), to: <inv_w_interp.west>), "->"),
+  edge(<inv_w_interp.east>, <recip_w>, "->"),
 
-  // ── ZIG-ZAG: t-bus → snakes LEFT back to interpolators ──────────────────
-  // fx_conv.east (X=44.5) → t-bus-x=46 → drops to Y=-8.5
-  let t-bus-x = 46.0
-  draw.line("fx_conv.east", (t-bus-x, -2.0), (t-bus-x, -8.5), stroke: (thickness: 2pt, paint: black))
+  edge((rel: (-0.1, 0.1), to: <z_interp.east>), (rel: (0.1, 0.1), to: <depth_test.west>), "->"),
+  edge(<z_addr>, (2.5, 1.2), (2.5, 1.9), (rel: (0.1, -0.1), to: <depth_test.west>), "->"),
+  edge(<z_buf>, <depth_test>, "<=>", mark-scale: 160%),
 
-  // Loop-back arrow: goes LEFT from t-bus to X=2.5 (left of tex_interp.west at 3.5)
-  draw.line((t-bus-x, -8.5), (2.5, -8.5), stroke: (thickness: 2pt, paint: black))
+  edge(<recip_w.east>, (3.5, 4.0), (3.5, 3.1), (rel: (0.1, 0.1), to: <t_calc.west>), "->"),
+  edge(<t_calc.east>, <fx_conv>, "->"),
 
-  // Loop-back → Texture Interpolator upper-west port (Y=-10.0)
-  draw.line(
-    (2.5, -8.5),
-    (2.5, -10.0),
-    (horizontal: "tex_interp.west", vertical: (0, -10.0)),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
+  edge((rel: (0, -0.1), to: <fx_conv.east>), (5.5, 2.9), (5.5, 2.1), (rel: (0.1, 0.1), to: <tex_interp.west>), "->"),
+  edge((rel: (0, 0.1), to: <fx_conv.east>), (5.5, 3.1), (5.5, 3.9), (rel: (0.1, -0.1), to: <col_interp.west>), "->"),
 
-  // Loop-back continues down → Color Interpolator upper-west port (Y=-16.0)
-  draw.line(
-    (2.5, -8.5),
-    (2.5, -16.0),
-    (horizontal: "col_interp.west", vertical: (0, -16.0)),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
+  edge(<vert_u_v>, (5.5, 0.5), (5.5, 1.9), (rel: (0.1, -0.1), to: <tex_interp.west>), "->"),
+  edge(<vert_ci>, (5.5, 4.8), (5.5, 4.1), (rel: (0.1, 0.1), to: <col_interp.west>), "->"),
 
-  // Vertex (u,v) → Texture Interpolator lower-west port (Y=-12.0, straight horizontal)
-  draw.line(
-    (0.0, -12.0),
-    (horizontal: "tex_interp.west", vertical: (0, -12.0)),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
+  edge((rel: (0, 0.1), to: <tex_interp>), (rel: (0, 0.1), to: <tex_addr_gen>), "->"),
 
-  // Vertex Color → Color Interpolator lower-west port (Y=-18.0, straight horizontal)
-  draw.line(
-    (0.0, -18.0),
-    (horizontal: "col_interp.west", vertical: (0, -18.0)),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
+  edge(<tex_addr_gen>, (7.5, 2), (7.5, 2.9), (rel: (0, -0.1), to: <shading_unit>), "->"),
+  edge(<col_interp>, (7.5, 4), (7.5, 3.1), (rel: (0, 0.1), to: <shading_unit>), "->"),
 
-  // tex_interp → tex_gate → tex_addr_gen (R→ row 2)
-  draw.line(
-    "tex_interp.east",
-    "tex_gate.west",
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
-  draw.line(
-    "tex_gate.east",
-    "tex_addr_gen.west",
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
+  edge(<depth_test>, (4.5, 2), (4.5, 0.2), crossing: true),
+  edge((4.5, 0.2), (4.5, 0), (7, 0)),
+  edge(
+    (6.5, 0),
+    (6.5, 1.9),
+    (rel: (0, -0.1), to: <tex_addr_gen.west>),
+    "->",
+    label: align(center)[Enables\ Cache fetch],
+    label-side: center,
+    label-pos: 0.2,
+    label-fill: white,
+  ),
+  edge((7, 0), (8, 0), (8, 2), (10, 2), "->"),
 
-  // col_interp → col_gate (L→R, row 3)
-  draw.line(
-    "col_interp.east",
-    "col_gate.west",
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
-
-  // Z-result ctrl bus: exits depth_test right and drops to the right of fx_conv
-  let ctrl-bus-x = 47.0
-  draw.line("depth_test.east", (ctrl-bus-x, 6.0), stroke: (thickness: 2pt, paint: black))
-  draw.line((ctrl-bus-x, 6.0), (ctrl-bus-x, -9), stroke: (thickness: 2pt, paint: black))
-  draw.line((ctrl-bus-x, -9), (12, -9), stroke: (thickness: 2pt, paint: black))
-  draw.line((12, -9), (12, -16), stroke: (thickness: 2pt, paint: black))
-  draw.line(
-    (12, -16),
-    (horizontal: "col_gate.west", vertical: (0, -16)),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
-  draw.line(
-    (12, -10),
-    (horizontal: "tex_gate.west", vertical: (0, -10)),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
-
-  // L1 Cache ↕ tex_addr_gen (from below)
-  draw.line(
-    (24.0, -12.75),
-    (horizontal: "tex_addr_gen.south", vertical: (30.0, -15)),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (start: ">", end: ">", fill: black, size: 0.5),
-  )
-  draw.content((24.0, -15.2), anchor: "north", text(size: 11pt, weight: "bold")[L1 Cache])
-
-  // tex_addr_gen → shading_unit (right then down into north)
-  draw.line("tex_addr_gen.east", (28.05, -11.0), (28.05, -13.55), stroke: (thickness: 2pt, paint: black))
-  draw.line(
-    (28.0, -13.5),
-    (29.0, -13.5),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
-
-  // col_gate → shading_unit (right then up into south)
-  draw.line("col_gate.east", (28.05, -17.0), (28.05, -14.45), stroke: (thickness: 2pt, paint: black))
-  draw.line(
-    (28.0, -14.5),
-    (29.0, -14.5),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
-
-  // shading → blending
-  draw.line(
-    "shading_unit.east",
-    "color_blender.west",
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
-
-  // Tile Buffer Read/Write
-  draw.line(
-    (40.0, -11.0),
-    (horizontal: "color_blender.south", vertical: (0, -12.3)),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
-  draw.content((36.8, -10.4), anchor: "west", text(size: 11pt, weight: "bold")[Tile Buffer Read])
-
-  draw.line(
-    (horizontal: "color_blender.east", vertical: (0, -14)),
-    (45.0, -14),
-    stroke: (thickness: 2pt, paint: black),
-    mark: (end: ">", fill: black, size: 0.5),
-  )
-  draw.content((45.2, -14), anchor: "west", text(size: 11pt, weight: "bold")[Tile Buffer Write])
-})
+  edge(<shading_unit>, <color_blender>, "->"),
+  edge(<tile_buf_read>, <color_blender>, "->"),
+  edge(<color_blender>, <tile_buf_write>, "->"),
+)

@@ -9,6 +9,7 @@
 
 import gpu_types_pkg::*;
 
+(*use_dsp = "yes"*)
 module fragment_shader (
     input logic clk,
     input logic rst_n,

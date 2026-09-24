@@ -38,9 +38,9 @@ module texture_bram_asym #(
     if (enaB) begin
       readB <= ram[addrB];
     end
-  end
 
-  assign doB = readB;
+    doB <= readB;
+  end
 
   always_ff @(posedge clka) begin : ramwrite
     int i;
@@ -126,6 +126,7 @@ endmodule
 
 module texture_cache #(
     parameter int ADDR_WIDTH           = 32,
+  parameter int AXI_ADDR_WIDTH       = ((ADDR_WIDTH + 7) / 8) * 8,
     parameter int PIXEL_BITS           = 32,
     parameter int CACHE_LINES          = 32,
     parameter int LINE_PIXELS_X        = 8,
@@ -144,7 +145,7 @@ module texture_cache #(
     output logic                  resp_valid,
     output logic [PIXEL_BITS-1:0] resp_data,
 
-    output logic [ADDR_WIDTH-1:0] m_axi_araddr,
+    output logic [AXI_ADDR_WIDTH-1:0] m_axi_araddr,
     output logic [           7:0] m_axi_arlen,
     output logic [           2:0] m_axi_arsize,
     output logic [           1:0] m_axi_arburst,
@@ -171,7 +172,7 @@ module texture_cache #(
   // -----------------------------------------------------------------------------
   // Texture cache top
   // - Fully associative tags + shared asymmetric BRAM payload store
-  // - 2-stage hit path (accept/lookup -> BRAM read -> response)
+  // - 4-stage hit path: consume request -> compare tags -> BRAM read -> data out
   // - Miss path stalls new accepts and refills one line over AXI
   // -----------------------------------------------------------------------------
 
@@ -191,6 +192,13 @@ module texture_cache #(
   localparam int PlruBits = CACHE_LINES - 1;
   localparam int TotalWords = CACHE_LINES * LinePixels;
   localparam int TotalBeats = TotalWords / (AXI_DATA_WIDTH / PIXEL_BITS);
+  localparam int AxiAddrPadBits = AXI_ADDR_WIDTH - ADDR_WIDTH;
+
+  initial begin
+    if (AXI_ADDR_WIDTH < ADDR_WIDTH || (AXI_ADDR_WIDTH % 8) != 0) begin
+      $fatal(1, "AXI_ADDR_WIDTH must be an 8-bit multiple >= ADDR_WIDTH");
+    end
+  end
 
   typedef enum logic [1:0] {
     REFILL_IDLE,
@@ -201,11 +209,18 @@ module texture_cache #(
 
   logic          [      PlruBits-1:0] plru_tree;
 
+  logic                               request_stage_valid;
+  logic          [       TagBits-1:0] request_stage_tag;
+  logic          [PixelIndexBits-1:0] request_stage_pixel_index;
+  logic          [    ADDR_WIDTH-1:0] request_stage_line_base_addr;
   logic                               stage0_valid;
-  logic          [    ADDR_WIDTH-1:0] stage0_addr;
+  logic          [       TagBits-1:0] stage0_tag;
+  logic          [PixelIndexBits-1:0] stage0_pixel_index;
+  logic          [    ADDR_WIDTH-1:0] stage0_line_base_addr;
   logic                               stage0_hit_found;
   logic          [       WayBits-1:0] stage0_hit_way;
   logic                               stage1_valid;
+  logic                               stage2_valid;
 
   refill_state_t                      refill_state;
   logic          [       WayBits-1:0] refill_way;
@@ -213,17 +228,11 @@ module texture_cache #(
   logic          [       TagBits-1:0] refill_tag;
   logic          [PixelIndexBits-1:0] refill_pixel_index;
   logic          [      BeatBits-1:0] refill_beat;
-  logic          [    PIXEL_BITS-1:0] refill_hit_word;
-  logic          [    PIXEL_BITS-1:0] refill_hit_word_next;
-
-  logic                               miss_resp_valid;
-  logic          [    PIXEL_BITS-1:0] miss_resp_data;
 
   logic                               tag_lookup_hit_found;
   logic          [       WayBits-1:0] tag_lookup_hit_way;
   logic          [  BramReadBits-1:0] cache_read_addr;
   logic                               cache_read_en;
-  logic          [    PIXEL_BITS-1:0] cache_read_data;
   logic                               tag_clear_en;
   logic          [       WayBits-1:0] tag_clear_way;
   logic                               tag_fill_en;
@@ -231,6 +240,8 @@ module texture_cache #(
   logic          [    ADDR_WIDTH-1:0] req_byte_addr;
   logic                               axi_rresp_error;
   logic                               req_accepted;
+  logic                               lookup_fire;
+  logic                               stage0_miss_active;
   logic          [              31:0] perf_total_req_q;
   logic          [              31:0] perf_hit_req_q;
   logic          [              31:0] perf_miss_req_q;
@@ -301,39 +312,30 @@ module texture_cache #(
   // - Track refill word for requested pixel index during AXI refill
   // ---------------------------------------------------------------------------
   always_comb begin
-    cache_read_addr = '0;
+    cache_read_addr = {stage0_hit_way, stage0_pixel_index};
     cache_read_en   = 1'b0;
 
     if (stage0_valid && stage0_hit_found) begin
-      cache_read_en   = 1'b1;
-      cache_read_addr = {stage0_hit_way, addr_pixel_index(stage0_addr)};
+      cache_read_en = 1'b1;
     end
 
-    refill_hit_word_next = refill_hit_word;
-
-    if (m_axi_rvalid && (m_axi_rresp == 2'b00)) begin
-      if (refill_pixel_index[PixelIndexBits-1:2] == refill_beat[BeatBits-1:0]) begin
-        case (refill_pixel_index[1:0])
-          2'd0: refill_hit_word_next = m_axi_rdata[31:0];
-          2'd1: refill_hit_word_next = m_axi_rdata[63:32];
-          2'd2: refill_hit_word_next = m_axi_rdata[95:64];
-          2'd3: refill_hit_word_next = m_axi_rdata[127:96];
-          default: refill_hit_word_next = m_axi_rdata[31:0];
-        endcase
-      end
+    if (refill_state == REFILL_RESP) begin
+      cache_read_en   = !axi_rresp_error;
+      cache_read_addr = {refill_way, refill_pixel_index};
     end
   end
 
   // External interface wiring and top-level flow-control.
-  assign req_ready = !flush && (refill_state == REFILL_IDLE) && (!stage0_valid || stage0_hit_found);
-  assign m_axi_araddr = refill_base_addr;
+  assign stage0_miss_active = stage0_valid && !stage0_hit_found;
+  assign req_ready = !flush && (refill_state == REFILL_IDLE) && !stage0_miss_active;
+  assign lookup_fire = request_stage_valid && (refill_state == REFILL_IDLE) && !stage0_miss_active;
+  assign m_axi_araddr = {{AxiAddrPadBits{1'b0}}, refill_base_addr};
   assign m_axi_arlen = 8'(BeatsPerLine - 1);
   assign m_axi_arsize = 3'($clog2(AxiBytes));
   assign m_axi_arburst = 2'b01;
   assign m_axi_arvalid = (refill_state == REFILL_AR);
   assign m_axi_rready = (refill_state == REFILL_R);
-  assign resp_valid = stage1_valid || miss_resp_valid;
-  assign resp_data = miss_resp_valid ? miss_resp_data : cache_read_data;
+  assign resp_valid = stage2_valid;
   assign perf_total_req = ENABLE_PERF_COUNTERS ? perf_total_req_q : '0;
   assign perf_hit_req = ENABLE_PERF_COUNTERS ? perf_hit_req_q : '0;
   assign perf_miss_req = ENABLE_PERF_COUNTERS ? perf_miss_req_q : '0;
@@ -349,8 +351,8 @@ module texture_cache #(
       .clk(clk),
       .rst_n(rst_n),
       .flush(flush),
-      .lookup_en(req_valid && req_ready),
-      .lookup_tag(addr_tag(req_byte_addr)),
+      .lookup_en(request_stage_valid),
+      .lookup_tag(request_stage_tag),
       .lookup_hit_found(tag_lookup_hit_found),
       .lookup_hit_way(tag_lookup_hit_way),
       .clear_en(tag_clear_en),
@@ -377,7 +379,7 @@ module texture_cache #(
       .clkb (clk),
       .enaB (cache_read_en),
       .addrB(cache_read_addr),
-      .doB  (cache_read_data)
+      .doB  (resp_data)
   );
 
   // ---------------------------------------------------------------------------
@@ -388,21 +390,25 @@ module texture_cache #(
   // ---------------------------------------------------------------------------
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
+      request_stage_valid <= 1'b0;
+      request_stage_tag   <= '0;
+      request_stage_pixel_index <= '0;
+      request_stage_line_base_addr <= '0;
       stage0_valid       <= 1'b0;
-      stage0_addr        <= '0;
+      stage0_tag         <= '0;
+      stage0_pixel_index <= '0;
+      stage0_line_base_addr <= '0;
       stage0_hit_found   <= 1'b0;
       stage0_hit_way     <= '0;
       stage1_valid       <= 1'b0;
+      stage2_valid       <= 1'b0;
       refill_state       <= REFILL_IDLE;
       refill_way         <= '0;
       refill_base_addr   <= '0;
       refill_tag         <= '0;
       refill_pixel_index <= '0;
       refill_beat        <= '0;
-      refill_hit_word    <= '0;
       axi_rresp_error    <= 1'b0;
-      miss_resp_valid    <= 1'b0;
-      miss_resp_data     <= '0;
       plru_tree          <= '0;
       perf_total_req_q   <= '0;
       perf_hit_req_q     <= '0;
@@ -416,7 +422,7 @@ module texture_cache #(
       tag_fill_way       <= '0;
     end else begin
       stage1_valid    <= cache_read_en;
-      miss_resp_valid <= 1'b0;
+      stage2_valid    <= stage1_valid;
       tag_clear_en    <= 1'b0;
       tag_clear_way   <= '0;
       tag_fill_en     <= 1'b0;
@@ -424,25 +430,29 @@ module texture_cache #(
       perf_rvalid_q   <= 1'b0;
 
       if (flush) begin
+        request_stage_valid <= 1'b0;
+        request_stage_tag   <= '0;
+        request_stage_pixel_index <= '0;
+        request_stage_line_base_addr <= '0;
         stage0_valid       <= 1'b0;
-        stage0_addr        <= '0;
+        stage0_tag         <= '0;
+        stage0_pixel_index <= '0;
+        stage0_line_base_addr <= '0;
         stage0_hit_found   <= 1'b0;
         stage0_hit_way     <= '0;
         stage1_valid       <= 1'b0;
+        stage2_valid       <= 1'b0;
         refill_state       <= REFILL_IDLE;
         refill_way         <= '0;
         refill_base_addr   <= '0;
         refill_tag         <= '0;
         refill_pixel_index <= '0;
         refill_beat        <= '0;
-        refill_hit_word    <= '0;
         axi_rresp_error    <= 1'b0;
-        miss_resp_valid    <= 1'b0;
-        miss_resp_data     <= '0;
         plru_tree          <= '0;
       end else begin
         if (ENABLE_PERF_COUNTERS) begin
-          if (req_accepted) begin
+          if (lookup_fire) begin
             perf_total_req_q <= perf_total_req_q + 1'b1;
             if (tag_lookup_hit_found) begin
               perf_hit_req_q <= perf_hit_req_q + 1'b1;
@@ -472,17 +482,25 @@ module texture_cache #(
           end
         end
 
-        if (req_valid && req_ready) begin
-          // Stage0 captures accepted request + tag lookup result.
+        if (req_accepted) begin
+          request_stage_valid <= 1'b1;
+          request_stage_tag   <= addr_tag(req_byte_addr);
+          request_stage_pixel_index <= addr_pixel_index(req_byte_addr);
+          request_stage_line_base_addr <= {req_byte_addr[ADDR_WIDTH-1:LineOffsetBits], {LineOffsetBits{1'b0}}};
+        end else if (lookup_fire) begin
+          request_stage_valid <= 1'b0;
+        end
+
+        if (lookup_fire) begin
+          // Stage0 captures lookup result; BRAM read happens in the next stage.
           stage0_valid     <= 1'b1;
-          stage0_addr      <= req_byte_addr;
+          stage0_tag       <= request_stage_tag;
+          stage0_pixel_index <= request_stage_pixel_index;
+          stage0_line_base_addr <= request_stage_line_base_addr;
           stage0_hit_found <= tag_lookup_hit_found;
           stage0_hit_way   <= tag_lookup_hit_way;
         end else begin
           stage0_valid     <= 1'b0;
-          stage0_addr      <= '0;
-          stage0_hit_found <= 1'b0;
-          stage0_hit_way   <= '0;
         end
 
         if (stage0_valid && stage0_hit_found) begin
@@ -494,11 +512,10 @@ module texture_cache #(
           // Start miss refill using captured stage0 address/tag context.
           refill_state <= REFILL_AR;
           refill_way <= select_victim(plru_tree);
-          refill_base_addr <= {stage0_addr[ADDR_WIDTH-1:LineOffsetBits], {LineOffsetBits{1'b0}}};
-          refill_tag <= addr_tag(stage0_addr);
-          refill_pixel_index <= addr_pixel_index(stage0_addr);
+          refill_base_addr <= stage0_line_base_addr;
+          refill_tag <= stage0_tag;
+          refill_pixel_index <= stage0_pixel_index;
           refill_beat <= '0;
-          refill_hit_word <= '0;
           axi_rresp_error <= 1'b0;
           tag_clear_en <= 1'b1;
           tag_clear_way <= select_victim(plru_tree);
@@ -520,9 +537,6 @@ module texture_cache #(
                 axi_rresp_error <= 1'b1;
               end
 
-              // Capture requested pixel when its beat arrives.
-              refill_hit_word <= refill_hit_word_next;
-
               if (m_axi_rlast) begin
                 if (!axi_rresp_error && (m_axi_rresp == 2'b00)) begin
                   tag_fill_en <= 1'b1;
@@ -537,8 +551,6 @@ module texture_cache #(
           end
 
           REFILL_RESP: begin
-            miss_resp_data <= axi_rresp_error ? '0 : refill_hit_word;
-            miss_resp_valid <= 1'b1;
             refill_state <= REFILL_IDLE;
           end
         endcase

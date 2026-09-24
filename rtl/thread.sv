@@ -58,7 +58,7 @@ module thread (
   logic [INBUNDLEWIDTH-1:0] input_bundle_buf_tdata;
   logic input_bundle_buf_tvalid;
   logic input_bundle_m_axis_tready;
-  logic pipe_en_internal;
+  (* max_fanout = 250 *) logic pipe_en_internal;
   thread_data_in_t thread_data_buf;
 
   // Reject triangles with e0 < 0 or e1 < 0 or e2 < 0
@@ -1320,7 +1320,8 @@ module thread (
 
 
 
-  localparam int FRAGMENT_SHADER_LATENCY_STAGES = 5;
+    localparam int FRAGMENT_SHADER_LATENCY_STAGES = 5;
+    localparam int L1_TEXTURE_HIT_LATENCY_STAGES  = 3;
 
   typedef struct packed {
     logic [47:0] texcoord_u;
@@ -1365,19 +1366,27 @@ module thread (
     logic use_texture;
   } fragment_request_token_t;
 
+    typedef struct packed {
+        fragment_request_token_t token;
+        logic valid;
+    } fragment_request_pipe_t;
+
   fragment_token_t post_skid_token;
   fragment_bundle_t post_skid_bundle;
   address_token_t address_token_s3;
   fragment_request_token_t fragment_request_input;
   fragment_request_token_t fragment_request_output;
+    fragment_request_pipe_t fragment_request_delay_input;
+    fragment_request_pipe_t fragment_request_delay_output;
   logic address_step;
   logic address_use_texture;
-  logic texture_response_ready;
+    logic texture_response_ready;
   logic fragment_request_input_valid;
   logic fragment_request_input_ready;
   logic fragment_request_output_valid;
   logic fragment_request_output_ready;
-  logic l1_request_inflight;
+    logic fragment_request_fire;
+    logic delayed_texture_wait;
   logic address_pipe_valid;
   logic texture_wait_valid;
   logic fragment_join_output_valid;
@@ -1398,7 +1407,7 @@ module thread (
   logic cmp_pass_fragment_out_tdata;
 
   assign address_pipe_valid = address_token_s3.token.valid;
-  assign texture_wait_valid = l1_request_inflight;
+    assign texture_wait_valid = delayed_texture_wait || !l1_cache_req_ready;
   assign fragment_join_output_valid = fragment_request_output_valid;
   assign fragment_join_input_ready = fragment_request_input_ready;
 
@@ -1422,12 +1431,11 @@ module thread (
   end
 
   assign texture_response_ready =
-      fragment_request_output_valid
-      && fragment_request_output.use_texture
-      && l1_request_inflight
+      fragment_request_delay_output.valid
+      && fragment_request_delay_output.token.use_texture
       && l1_resp_valid;
-  // The join skid buffer is the sole holding element for the address stage:
-  // upstream (address gen + token delay) only advances when it has room.
+    // Backpressure from the fragment request skid is the holding point for the
+    // address stage; delayed accepted requests continue toward cache responses.
   assign address_step = fragment_request_input_ready;
   assign output_bundle_buf_tready = address_step;
 
@@ -1470,7 +1478,7 @@ module thread (
       && !address_token_s3.no_texture;
 
   texture_cache #(
-      .ADDR_WIDTH(32),
+      .ADDR_WIDTH(27),
       .PIXEL_BITS(32),
       .CACHE_LINES(32),
       .LINE_PIXELS_X(8),
@@ -1483,7 +1491,7 @@ module thread (
       .flush(1'b0),
       .req_valid(l1_req_valid),
       .req_ready(l1_cache_req_ready),
-      .req_addr(fragment_request_output.texture_addr),
+      .req_addr(fragment_request_output.texture_addr[26:0]),
       .resp_valid(l1_resp_valid),
       .resp_data(l1_resp_data),
       .m_axi_araddr(tex_m_axi_araddr),
@@ -1508,20 +1516,6 @@ module thread (
       .perf_rvalid()
   );
 
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      l1_request_inflight <= 1'b0;
-    end else begin
-      if (l1_resp_valid) begin
-        l1_request_inflight <= 1'b0;
-      end
-
-      if (l1_req_valid && l1_cache_req_ready) begin
-        l1_request_inflight <= 1'b1;
-      end
-    end
-  end
-
   assign fragment_request_input_valid = address_token_s3.token.valid;
 
   always_comb begin
@@ -1536,9 +1530,9 @@ module thread (
     fragment_request_input.use_texture = address_use_texture;
   end
 
-  // Skid buffer sits right at the address/delay merge point. It is the sole
-  // elastic element for this stage: L1 request issuance and the shader hold
-  // both operate off its held output, decoupled from address-stage advance.
+    // Skid buffer sits right at the address/delay merge point. Cache backpressure
+    // releases the held token only when a textured request is accepted, while the
+    // delayed metadata pipe aligns accepted tokens to in-order cache responses.
   axis_skid_buffer #(
       .WIDTH($bits(fragment_request_token_t))
   ) u_fragment_request_skid_buffer (
@@ -1552,29 +1546,53 @@ module thread (
       .m_axis_tready(fragment_request_output_ready)
   );
 
-  // L1 request fires off the skid's held output; stalled (not issued) while
-  // a previous request is still in flight.
+  assign delayed_texture_wait =
+      fragment_request_delay_output.valid
+      && fragment_request_delay_output.token.use_texture
+      && !l1_resp_valid;
+
+  assign fragment_request_output_ready =
+      !delayed_texture_wait
+      && l1_cache_req_ready;
+
+  assign fragment_request_fire = fragment_request_output_valid && fragment_request_output_ready;
+
+  always_comb begin
+    fragment_request_delay_input = '0;
+    fragment_request_delay_input.token = fragment_request_output;
+    fragment_request_delay_input.valid = fragment_request_fire;
+  end
+
+  delay_pipe #(
+      .WIDTH ($bits(fragment_request_pipe_t)),
+      .STAGES(L1_TEXTURE_HIT_LATENCY_STAGES)
+  ) u_fragment_request_to_l1_response_stage (
+      .clk(clk),
+      .rst_n(rst_n),
+      .clken(!delayed_texture_wait),
+      .data_in(fragment_request_delay_input),
+      .data_out(fragment_request_delay_output)
+  );
+
+  // L1 requests fire from the skid's held output. Hit streams can issue one
+  // request per cycle; misses deassert cache ready and stall new issues.
   assign l1_req_valid =
       fragment_request_output_valid
       && fragment_request_output.use_texture
-      && !l1_request_inflight;
+      && !delayed_texture_wait;
 
-  // The skid only releases its head token once a non-textured fragment is
-  // ready immediately, or a textured one's L1 response has arrived - i.e.
-  // we stall here whenever a texture is required but not yet ready.
   logic fragment_shader_input_valid;
-  assign fragment_request_output_ready =
-            !fragment_request_output.use_texture || texture_response_ready;
   assign fragment_shader_input_valid =
-            fragment_request_output_valid && fragment_request_output_ready;
+            fragment_request_delay_output.valid
+            && (!fragment_request_delay_output.token.use_texture || texture_response_ready);
 
   fragment_shader u_fragment_shader (
       .clk(clk),
       .rst_n(rst_n),
-      .pixel_color(fragment_request_output.pixel_color),
+      .pixel_color(fragment_request_delay_output.token.pixel_color),
       .texture_color(color_argb_t'(l1_resp_data)),
       .env_color('0),
-      .op(fragment_request_output.op),
+      .op(fragment_request_delay_output.token.op),
       .valid_in(fragment_shader_input_valid),
       .fragment_color(fragment_color_tdata),
       .valid_out(fragment_valid_tdata)
@@ -1587,7 +1605,7 @@ module thread (
       .clk(clk),
       .rst_n(rst_n),
       .clken(1'b1),
-      .data_in(fragment_request_output.addr),
+      .data_in(fragment_request_delay_output.token.addr),
       .data_out(fb_addr_tdata)
   );
 
@@ -1598,7 +1616,7 @@ module thread (
       .clk(clk),
       .rst_n(rst_n),
       .clken(1'b1),
-      .data_in(fragment_request_output.comp_z),
+      .data_in(fragment_request_delay_output.token.comp_z),
       .data_out(cmp_pass_fragment_out_tdata)
   );
 
@@ -1613,7 +1631,7 @@ module thread (
   // skid), decremented once per fragment completing the shader pipeline.
   reg [7:0] emptiness_counter;
   logic input_bundle_fire;
-  assign input_bundle_fire = input_bundle_buf_tvalid && pipe_en_internal;
+  assign input_bundle_fire = skid_valid_in && ready_out;
   always_ff @(posedge clk) begin
     if (!rst_n) begin
       emptiness_counter <= 0;
@@ -1629,7 +1647,7 @@ module thread (
       endcase
     end
 
-    empty <= (emptiness_counter == 0);
+    empty <= (emptiness_counter == 0) && !input_bundle_fire;
   end
 
 endmodule

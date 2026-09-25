@@ -44,8 +44,7 @@ module tb_thread;
 
   // Use the shared z-buffer module in behavioral mode for simulation.
   z_buffer_ram #(
-      .ADDR_WIDTH(THREAD_ADDR_W),
-      .USE_XPM(1'b0)
+      .ADDR_WIDTH(THREAD_ADDR_W)
   ) u_z_buffer_ram (
       .clk(clk),
       .rst_n(1'b1),
@@ -333,8 +332,8 @@ module tb_thread;
     in_data.addr = mem_addr[THREAD_ADDR_W-1:0];
 
     // Color-only mode for now: force texturing off.
-    in_data.tex_id = '0;
-    in_data.texture_function = fragment_op_t'(ADD);
+    in_data.tex_id = 8'h80;
+    in_data.texture_function = fragment_op_t'(COLOR);
 
     if (in_data.e0[31] || in_data.e1[31] || in_data.e2[31]) begin
       gen_reject_count++;

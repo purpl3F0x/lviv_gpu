@@ -111,7 +111,6 @@ module tb_thread_cache;
 
   z_buffer_ram #(
       .ADDR_WIDTH(PIXEL_ADDR_W_THREAD),
-      .USE_XPM(1'b0),
       .RESET_Z_VALUE(ZDefault)
   ) u_z_buffer_ram (
       .clk(clk),

@@ -24,11 +24,11 @@ SUPPORTED_OPS = {
 
 
 DEFAULT_LATENCIES = {
-    "fp_add": 8,
-    "fp_sub": 8,
-    "fp_mul": 5,
-    "fp_fma": 9,
-    "fp_recip": 22,
+    "fp_add": 11,
+    "fp_sub": 11,
+    "fp_mul": 8,
+    "fp_fma": 19,
+    "fp_recip": 28,
     "fp_cmp": 1,
     "mux": 1,
     "mem_read": 1,
@@ -54,8 +54,10 @@ _FX_OP_WIDTHS = {
 }
 
 # Leaf-signal type → bit width.
+# Match the handwritten module: per-thread addresses are sized by
+# THREAD_ADDR_W, not a hard-coded constant.
 _LEAF_TYPE_WIDTHS = {
-    "addr_t": 14,
+    "addr_t": "THREAD_ADDR_W",
     "uint8_t": 8,
     "fx_color": 33,
     "fx_texture": 18,
@@ -100,6 +102,7 @@ class HardwareDAG:
         self.ops = {}
         self.op_inputs = {}
         self.dependencies = []
+        self.dependency_lead_cycles = {}
         self.node_names = {}
         self.expression_cache = {}
         self.counters = {k: 0 for k in SUPPORTED_OPS}
@@ -315,12 +318,15 @@ class HardwareDAG:
         self.expression_cache[cache_key] = node_id
         return node_id
 
-    def add_memory_read_operation(self, addr, expr, after=None):
+    def add_memory_read_operation(self, addr, expr, after=None, lead_cycles=0):
         valid_expr = self._merge_valid_expr(
             self.global_valid_expr,
             self._input_valid_expr(addr),
         )
-        cache_key = ("mem_read", expr, valid_expr)
+        if lead_cycles < 0:
+            raise ValueError("Memory read lead_cycles must be non-negative")
+
+        cache_key = ("mem_read", expr, valid_expr, lead_cycles)
         if cache_key in self.expression_cache:
             return self.expression_cache[cache_key]
 
@@ -330,6 +336,7 @@ class HardwareDAG:
         # specific signal-producing operation without changing read semantics.
         if isinstance(after, (Signal, PredicateSignal)) and after.hw_id:
             inputs.append(after)
+            self.dependency_lead_cycles[(after.hw_id, node_id)] = lead_cycles
         self._add_edges(node_id, tuple(inputs), tuple(self.control_dependencies))
         self.expression_cache[cache_key] = node_id
         return node_id
@@ -396,7 +403,11 @@ class HardwareDAG:
             ready_time = 0
             for pred in preds:
                 pred_info = self.ops[pred]
-                ready_time = max(ready_time, start_times[pred] + pred_info.latency)
+                lead_cycles = self.dependency_lead_cycles.get((pred, node), 0)
+                ready_time = max(
+                    ready_time,
+                    start_times[pred] + pred_info.latency - lead_cycles,
+                )
             start_times[node] = ready_time
 
         sorted_ops = sorted(order, key=lambda nid: (start_times[nid], nid))
@@ -507,6 +518,8 @@ class HardwareDAG:
         # type conversions like uint8→Q8.8) and is used verbatim as the wire.
         if getattr(sig, "sv_ref", None):
             return sig.sv_ref
+        if getattr(sig, "type", "") == "addr_t":
+            return "thread_data_buf.addr[THREAD_ADDR_W-1:0]"
         return f"thread_data_buf.{self._leaf_struct_field(sig)}"
 
     def _leaf_valid_ref(self, sig):
@@ -561,10 +574,20 @@ class HardwareDAG:
             "color_b": "color_b",
             "color_a": "color_a",
             "comp_z": "comp_z",
+            "addr": "addr",
+            "tex_id": "tex_id",
+            "texture_mode_u": "texture_mode_u",
+            "texture_mode_v": "texture_mode_v",
+            "texture_function": "texture_function",
         }
         selected_output_order = (
             "texcoord_u",
             "texcoord_v",
+            "addr",
+            "tex_id",
+            "texture_mode_u",
+            "texture_mode_v",
+            "texture_function",
             "color_r",
             "color_g",
             "color_b",
@@ -577,21 +600,58 @@ class HardwareDAG:
             if out_name is not None and out_name not in selected_node_by_name:
                 selected_node_by_name[out_name] = node
 
-        selected_outputs = [
-            (selected_node_by_name[name], name)
-            for name in selected_output_order
-            if name in selected_node_by_name
-        ]
+        selected_outputs = []
+        for name in selected_output_order:
+            if name in selected_node_by_name:
+                selected_outputs.append((selected_node_by_name[name], name, None))
+            elif name == "addr":
+                selected_outputs.append(
+                    (
+                        None,
+                        name,
+                        (
+                            "THREAD_ADDR_W",
+                            "thread_data_buf.addr[THREAD_ADDR_W-1:0]",
+                            0,
+                        ),
+                    )
+                )
+            elif name == "tex_id":
+                selected_outputs.append((None, name, (8, "thread_data_buf.tex_id", 0)))
+            elif name == "texture_mode_u":
+                selected_outputs.append(
+                    (None, name, (1, "thread_data_buf.texture_mode_u", 0))
+                )
+            elif name == "texture_mode_v":
+                selected_outputs.append(
+                    (None, name, (1, "thread_data_buf.texture_mode_v", 0))
+                )
+            elif name == "texture_function":
+                selected_outputs.append(
+                    (None, name, (3, "thread_data_buf.texture_function", 0))
+                )
 
         if selected_outputs:
-            for node, out_name in selected_outputs:
-                src_wire = wire_name_by_node[node]
-                width = self._op_out_width(self.ops[node].op_type)
-                if width == 1:
-                    lines.append(f"logic {out_name}_tdata;")
+            for item in selected_outputs:
+                node, out_name, meta = item
+                if node is not None:
+                    src_wire = wire_name_by_node[node]
+                    width = self._op_out_width(self.ops[node].op_type)
+                    if width == 1:
+                        lines.append(f"logic {out_name}_tdata;")
+                    else:
+                        lines.append(f"logic [{width-1}:0] {out_name}_tdata;")
+                    lines.append(f"assign {out_name}_tdata = {src_wire};")
                 else:
-                    lines.append(f"logic [{width-1}:0] {out_name}_tdata;")
-                lines.append(f"assign {out_name}_tdata = {src_wire};")
+                    width, src_ref, stage = meta
+                    if width == 1:
+                        lines.append(f"logic {out_name}_tdata;")
+                    else:
+                        if isinstance(width, str):
+                            lines.append(f"logic [{width}-1:0] {out_name}_tdata;")
+                        else:
+                            lines.append(f"logic [{width-1}:0] {out_name}_tdata;")
+                    lines.append(f"assign {out_name}_tdata = {src_ref};")
         else:
             lines.append("// None")
         lines.append("")
@@ -679,6 +739,11 @@ class HardwareDAG:
         }
 
         def _declare_buffer_signal(name, width):
+            if isinstance(width, str):
+                if name not in align_decls_seen:
+                    align_decls_seen.add(name)
+                    align_decls.append(f"logic [{width}-1:0] {name};")
+                return
             if width == 1:
                 if name not in align_decls_seen:
                     align_decls_seen.add(name)
@@ -690,8 +755,9 @@ class HardwareDAG:
 
         def _emit_delay_align(src_ref, dst_ref, width, stages):
             _declare_buffer_signal(dst_ref, width)
+            width_expr = width if isinstance(width, str) else str(width)
             align_skeletons.append(
-                f"delay_pipe #(.WIDTH({width}), .STAGES({stages})) u_{dst_ref}_data_delay (.clk(clk), .rst_n(rst_n), .clken(pipe_en_internal), .data_in({src_ref}), .data_out({dst_ref}));"
+                f"delay_pipe #(.WIDTH({width_expr}), .STAGES({stages})) u_{dst_ref}_data_delay (.clk(clk), .rst_n(rst_n), .clken(pipe_en_internal), .data_in({src_ref}), .data_out({dst_ref}));"
             )
 
         # Track alignment delays to find max alignment depth
@@ -948,7 +1014,7 @@ class HardwareDAG:
                     lines.append(f"assign {out_wire} = ({s}) ? ({t}) : ({f});")
                 elif info.op_type == "mem_read":
                     addr = input_ref_by_edge[(node, 0)]
-                    lines.append(f"assign z_rd_en = {node}_fire;")
+                    lines.append(f"assign z_rd_en = {node}_fire && pipe_en_internal;")
                     lines.append(f"assign z_rd_addr = {addr};")
                     lines.append(f"assign {out_wire} = z_rd_data;")
                 else:
@@ -973,7 +1039,7 @@ class HardwareDAG:
                     else:
                         lines.append(f"assign {out_wire}[0] = 1'b1;")
                         wr_en_expr = f"{node}_fire"
-                    lines.append(f"assign z_wr_en = {wr_en_expr};")
+                    lines.append(f"assign z_wr_en = {wr_en_expr} && pipe_en_internal;")
                     lines.append(f"assign z_wr_addr = {addr};")
                     lines.append(f"assign z_wr_data = {data};")
             elif info.op_type == "fp_cmp":
@@ -1065,19 +1131,29 @@ class HardwareDAG:
 
         # ---- Output skid buffer ----
         lines.append("// ---- Output skid buffer ----")
-        # Collect selected output names and widths in order
+        # Collect selected output names and widths in order. Metadata fields are
+        # ingress token values and therefore must be treated as stage 0 sources,
+        # so they receive the same final-stage delay as the handwritten RTL.
         out_fields = []
-        for node, out_name in selected_outputs:
-            width = self._op_out_width(self.ops[node].op_type)
-            if self.ops[node].op_type == "fp_cmp":
+        for item in selected_outputs:
+            node, out_name, meta = item
+            if node is not None:
+                width = self._op_out_width(self.ops[node].op_type)
                 stage = start_times[node] + self.ops[node].latency
+                out_fields.append((out_name, width, stage, f"{out_name}_tdata"))
             else:
-                stage = start_times[node] + self.ops[node].latency
-            out_fields.append((out_name, width, stage))
+                width, _, stage = meta
+                if isinstance(width, str):
+                    width_value = width
+                else:
+                    width_value = width
+                out_fields.append((out_name, width_value, stage, f"{out_name}_tdata"))
 
         if out_fields:
-            final_out_stage = max(stage for _, _, stage in out_fields)
-            bits_terms = " + ".join(f"$bits({name}_tdata)" for name, _, _ in out_fields)
+            final_out_stage = max(stage for _, _, stage, _ in out_fields)
+            bits_terms = " + ".join(
+                f"$bits({name}_tdata)" for name, _, _, _ in out_fields
+            )
             lines.append(f"localparam int OUTBUNDLEWIDTH = {bits_terms};")
             lines.append("logic [OUTBUNDLEWIDTH-1:0] output_bundle_tdata;")
             lines.append("logic output_bundle_tvalid;")
@@ -1087,22 +1163,25 @@ class HardwareDAG:
             lines.append("logic output_bundle_buf_tready;")
             lines.append("")
             bundle_data_refs = []
-            for out_name, width, stage in out_fields:
+            for out_name, width, stage, src_ref in out_fields:
                 delay_to_final = final_out_stage - stage
                 if delay_to_final > 0:
                     aligned_name = f"{out_name}_bundle_tdata"
                     if width == 1:
                         lines.append(f"logic {aligned_name};")
                     else:
-                        lines.append(f"logic [{width-1}:0] {aligned_name};")
+                        if isinstance(width, str):
+                            lines.append(f"logic [{width}-1:0] {aligned_name};")
+                        else:
+                            lines.append(f"logic [{width-1}:0] {aligned_name};")
                     lines.append(
-                        f"delay_pipe #(.WIDTH({width}), .STAGES({delay_to_final})) u_align_{out_name}_to_output_bundle_d{delay_to_final} (.clk(clk), .rst_n(rst_n), .clken(pipe_en_internal), .data_in({out_name}_tdata), .data_out({aligned_name}));"
+                        f"delay_pipe #(.WIDTH({width if not isinstance(width, str) else width}), .STAGES({delay_to_final})) u_align_{out_name}_to_output_bundle_d{delay_to_final} (.clk(clk), .rst_n(rst_n), .clken(pipe_en_internal), .data_in({src_ref}), .data_out({aligned_name}));"
                     )
                     bundle_data_refs.append(aligned_name)
                 else:
-                    bundle_data_refs.append(f"{out_name}_tdata")
+                    bundle_data_refs.append(src_ref)
 
-            if any(final_out_stage - stage > 0 for _, _, stage in out_fields):
+            if any(final_out_stage - stage > 0 for _, _, stage, _ in out_fields):
                 lines.append("")
 
             pack_fields = ", ".join(bundle_data_refs)
@@ -1123,172 +1202,11 @@ class HardwareDAG:
             lines.append("    .m_axis_tready(output_bundle_buf_tready)")
             lines.append(");")
             lines.append("")
-            # Unpack buf_tdata back to individual outputs
-            unpack_fields = ", ".join(
-                f"m_axis_{name}_tdata" for name, _, _ in out_fields
-            )
-            lines.append(f"assign {{{unpack_fields}}} = output_bundle_buf_tdata;")
-            lines.append("assign m_axis_tvalid = output_bundle_buf_tvalid;")
-            lines.append("assign output_bundle_buf_tready = m_axis_tready;")
-            lines.append("")
             lines.append("// Pipeline control: clken = output skid can accept")
             lines.append("assign pipe_en_internal = output_bundle_s_axis_tready;")
             lines.append("assign input_bundle_m_axis_tready = pipe_en_internal;")
             lines.append("assign ready_out = input_bundle_s_axis_tready;")
         lines.append("")
-
-        Path(output_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-    def dump_graphviz_layout(self, schedule_result, output_path):
-        sorted_ops = schedule_result["sorted_ops"]
-        unit_by_node = schedule_result["unit_by_node"]
-        start_times = schedule_result["start_times"]
-        named_node_by_signal = {
-            name: node_id
-            for node_id, name in self.node_names.items()
-            if node_id in set(sorted_ops)
-        }
-
-        def op_symbol(info):
-            if info.op_type == "fp_add":
-                return "+"
-            if info.op_type == "fp_sub":
-                return "-"
-            if info.op_type in (
-                "fp_mul",
-                "fx_color_mul",
-                "fx_texture_mul",
-            ):
-                return "*"
-            if info.op_type in (
-                "fp_fma",
-                "fx_color_fma",
-                "fx_texture_fma",
-            ):
-                return "FMA"
-            if info.op_type == "fp_recip":
-                return "1/x"
-            if info.op_type == "fp_cmp":
-                return f"CMP\\n{info.cmp_kind}"
-            if info.op_type == "mux":
-                return "MUX\\n?:"
-            if info.op_type == "mem_read":
-                return "MEM_RD"
-            if info.op_type == "mem_write":
-                return "MEM_WR"
-            if info.op_type == "fp_to_fx2_23":
-                return "to\\nQ2.23"
-            if info.op_type == "fx_color_to_u8":
-                return "to\\nu8"
-            return info.op_type
-
-        def op_node_decl(node, info, start_cycle):
-            label = f"{op_symbol(info)}".replace('"', '\\"')
-            shape = "circle"
-            return (
-                f'    {node} [label="{label}", shape={shape}, '
-                f'group="c{start_cycle}", tooltip="{node} / {unit_by_node[node]}"];'
-            )
-
-        lines = [
-            "digraph thread_pipeline {",
-            "    rankdir=LR;",
-            "    splines=true;",
-            "    ranksep=1.0;",
-            "    nodesep=0.35;",
-            '    node [fontname="Helvetica", fontsize=10];',
-            '    edge [fontname="Helvetica", fontsize=9];',
-        ]
-
-        cycle_nodes = {}
-        for node in sorted_ops:
-            info = self.ops[node]
-            start_cycle = start_times[node]
-            cycle_nodes.setdefault(start_cycle, []).append(node)
-            lines.append(op_node_decl(node, info, start_cycle))
-
-        seen_leaf = set()
-        leaf_ids = []
-        for node in sorted_ops:
-            for sig in self.op_inputs[node]:
-                if isinstance(sig, (Signal, PredicateSignal)) and sig.hw_id:
-                    lines.append(f"    {sig.hw_id} -> {node};")
-                else:
-                    leaf = getattr(sig, "expr", str(sig))
-                    leaf_id = "L_" + re.sub(r"[^0-9A-Za-z_]", "_", leaf)
-                    if leaf_id not in seen_leaf:
-                        leaf_label = str(leaf).replace('"', '\\"')
-                        lines.append(
-                            f'    {leaf_id} [label="{leaf_label}", shape=note, style=filled, fillcolor="lightgray"];'
-                        )
-                        seen_leaf.add(leaf_id)
-                        leaf_ids.append(leaf_id)
-                    lines.append(f"    {leaf_id} -> {node};")
-
-        if leaf_ids:
-            lines.append("")
-            lines.append("    // Keep external inputs on the left side")
-            lines.append("    { rank=source;")
-            for leaf_id in leaf_ids:
-                lines.append(f"        {leaf_id};")
-            lines.append("    }")
-
-        for cycle in sorted(cycle_nodes.keys()):
-            nodes = cycle_nodes[cycle]
-            if not nodes:
-                continue
-            lines.append("")
-            lines.append(f"    // Operation nodes that start at cycle {cycle}")
-            lines.append("    { rank=same;")
-            for node in nodes:
-                lines.append(f"        {node};")
-            lines.append("    }")
-
-        # Mark final pipeline outputs on the right side.
-        out_edges = []
-        u_node = named_node_by_signal.get("u")
-        v_node = named_node_by_signal.get("v")
-        r_node = named_node_by_signal.get("r")
-        g_node = named_node_by_signal.get("g")
-        b_node = named_node_by_signal.get("b")
-        a_node = named_node_by_signal.get("a")
-
-        lines.append("")
-        lines.append("    // Final outputs")
-        lines.append(
-            '    OUT_u [label="u", shape=box, style=filled, fillcolor="lightyellow"];'
-        )
-        lines.append(
-            '    OUT_v [label="v", shape=box, style=filled, fillcolor="lightyellow"];'
-        )
-        lines.append(
-            '    OUT_argb [label="argb", shape=box, style=filled, fillcolor="lightyellow"];'
-        )
-
-        if u_node:
-            out_edges.append((u_node, "OUT_u"))
-        if v_node:
-            out_edges.append((v_node, "OUT_v"))
-        if a_node:
-            out_edges.append((a_node, "OUT_argb"))
-        if r_node:
-            out_edges.append((r_node, "OUT_argb"))
-        if g_node:
-            out_edges.append((g_node, "OUT_argb"))
-        if b_node:
-            out_edges.append((b_node, "OUT_argb"))
-
-        for src, dst in out_edges:
-            lines.append(f"    {src} -> {dst};")
-
-        lines.append("")
-        lines.append("    { rank=sink;")
-        lines.append("        OUT_u;")
-        lines.append("        OUT_v;")
-        lines.append("        OUT_argb;")
-        lines.append("    }")
-
-        lines.append("}")
 
         Path(output_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -1630,11 +1548,13 @@ class Signal:
         )
 
     @staticmethod
-    def mem_read(addr, after=None):
+    def mem_read(addr, after=None, lead_cycles=0):
         if not isinstance(addr, Signal):
             raise TypeError("mem_read requires a Signal address operand")
         expr = f"mem_read({addr.expr})"
-        node_id = addr.dag.add_memory_read_operation(addr, expr, after=after)
+        node_id = addr.dag.add_memory_read_operation(
+            addr, expr, after=after, lead_cycles=lead_cycles
+        )
         return Signal(
             addr.dag,
             hw_id=node_id,
@@ -1708,17 +1628,14 @@ def auto_name_signals(namespace):
 
 
 if __name__ == "__main__":
-    GENERATE_GRAPHVIZ_LAYOUT = True
-    GENERATE_WRAPPER_MODULES = False
-
     latencies = {
-        "fp_add": 7,
-        "fp_sub": 7,
-        "fp_mul": 5,
-        "fp_fma": 13,
-        "fp_recip": 22,
+        "fp_add": 11,
+        "fp_sub": 11,
+        "fp_mul": 8,
+        "fp_fma": 16,
+        "fp_recip": 29,
         "fp_cmp": 1,
-        "mem_read": 1,
+        "mem_read": 2,
         "mem_write": 1,
     }
 
@@ -1804,7 +1721,7 @@ if __name__ == "__main__":
     a = a_fx.as_u8()
 
     z = interpolate(v0_z, v1_z, v2_z, iw0, iw1, iw2)
-    current_z = Signal.mem_read(addr, after=z)
+    current_z = Signal.mem_read(addr, after=z, lead_cycles=1)
     # Depth test qualifier is computed, but pipeline is not fail-fast gated.
     # Decision whether to use outputs is made at the end of the pipeline.
     comp_z = z <= current_z
@@ -1847,12 +1764,7 @@ if __name__ == "__main__":
     dag.print_schedule(result)
 
     out_svh = Path(__file__).with_name("thread_pipeline_autogen.svh")
-    out_graphviz = Path(__file__).with_name("thread_pipeline_graph.dot")
     dag.dump_thread_pipeline(result, out_svh)
-    if GENERATE_GRAPHVIZ_LAYOUT:
-        dag.dump_graphviz_layout(result, out_graphviz)
 
     print(f"\nGenerated: {out_svh}")
-    if GENERATE_GRAPHVIZ_LAYOUT:
-        print(f"Generated: {out_graphviz}")
     print(f"Final signal expr: {z.expr}")

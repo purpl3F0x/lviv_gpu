@@ -348,8 +348,7 @@ module thread_verilator_wrap (
     assign z_wr_data = z_wr_data_int;
       // Thread-local z-buffer in wrapper.
     z_buffer_ram #(
-        .ADDR_WIDTH(PIXEL_ADDR_W_THREAD),
-      .USE_XPM(1'b0)
+        .ADDR_WIDTH(PIXEL_ADDR_W_THREAD)
     ) u_z_buffer_ram (
       .clk(clk),
       .rst_n(rst_n),

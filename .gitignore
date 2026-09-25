@@ -5,3 +5,5 @@ tb_sim*
 *.exe
 **/__pycache__/
 **/*.pyc 
+*.dot
+/tools/

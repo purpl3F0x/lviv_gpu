@@ -279,7 +279,7 @@ delay_pipe #(
     .STAGES(8)
 ) u_align_v0_z_to_fp_mul_10_i0_d8_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v0_z),
     .data_out(align_v0_z_to_fp_mul_10_i0_d8)
@@ -289,7 +289,7 @@ delay_pipe #(
     .STAGES(8)
 ) u_align_v0_w_to_fp_mul_4_i0_d8_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v0_w),
     .data_out(align_v0_w_to_fp_mul_4_i0_d8)
@@ -299,7 +299,7 @@ delay_pipe #(
     .STAGES(8)
 ) u_align_v1_w_to_fp_mul_6_i0_d8_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v1_w),
     .data_out(align_v1_w_to_fp_mul_6_i0_d8)
@@ -309,7 +309,7 @@ delay_pipe #(
     .STAGES(8)
 ) u_align_v2_w_to_fp_mul_8_i0_d8_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v2_w),
     .data_out(align_v2_w_to_fp_mul_8_i0_d8)
@@ -319,7 +319,7 @@ delay_pipe #(
     .STAGES(8)
 ) u_align_v1_w_to_fp_fma_1_i0_d16_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(align_v1_w_to_fp_mul_6_i0_d8),
     .data_out(align_v1_w_to_fp_fma_1_i0_d16)
@@ -329,7 +329,7 @@ delay_pipe #(
     .STAGES(8)
 ) u_align_fp_mul_2_to_fp_fma_1_i1_d8_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_mul_2_res),
     .data_out(align_fp_mul_2_to_fp_fma_1_i1_d8)
@@ -339,7 +339,7 @@ delay_pipe #(
     .STAGES(16)
 ) u_align_v1_z_to_fp_fma_3_i0_d16_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v1_z),
     .data_out(align_v1_z_to_fp_fma_3_i0_d16)
@@ -349,7 +349,7 @@ delay_pipe #(
     .STAGES(8)
 ) u_align_fp_mul_2_to_fp_fma_3_i1_d8_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_mul_2_res),
     .data_out(align_fp_mul_2_to_fp_fma_3_i1_d8)
@@ -359,7 +359,7 @@ delay_pipe #(
     .STAGES(24)
 ) u_align_v2_w_to_fp_fma_2_i0_d32_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(align_v2_w_to_fp_mul_8_i0_d8),
     .data_out(align_v2_w_to_fp_fma_2_i0_d32)
@@ -369,7 +369,7 @@ delay_pipe #(
     .STAGES(24)
 ) u_align_fp_mul_3_to_fp_fma_2_i1_d24_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_mul_3_res),
     .data_out(align_fp_mul_3_to_fp_fma_2_i1_d24)
@@ -379,7 +379,7 @@ delay_pipe #(
     .STAGES(32)
 ) u_align_v2_z_to_fp_fma_4_i0_d32_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v2_z),
     .data_out(align_v2_z_to_fp_fma_4_i0_d32)
@@ -389,7 +389,7 @@ delay_pipe #(
     .STAGES(24)
 ) u_align_fp_mul_3_to_fp_fma_4_i1_d24_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_mul_3_res),
     .data_out(align_fp_mul_3_to_fp_fma_4_i1_d24)
@@ -399,7 +399,7 @@ delay_pipe #(
     .STAGES(47)
 ) u_align_addr_to_mem_read_1_i0_d47_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.addr[THREAD_ADDR_W-1:0]),
     .data_out(align_addr_to_mem_read_1_i0_d47)
@@ -409,7 +409,7 @@ delay_pipe #(
     .STAGES(1)
 ) u_align_fp_fma_4_to_fp_cmp_1_i0_d1_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_fma_4_res),
     .data_out(align_fp_fma_4_to_fp_cmp_1_i0_d1)
@@ -419,7 +419,7 @@ delay_pipe #(
     .STAGES(3)
 ) u_align_addr_to_mem_write_1_i0_d50_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(align_addr_to_mem_read_1_i0_d47),
     .data_out(align_addr_to_mem_write_1_i0_d50)
@@ -429,7 +429,7 @@ delay_pipe #(
     .STAGES(2)
 ) u_align_fp_fma_4_to_mem_write_1_i1_d2_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_fma_4_res),
     .data_out(align_fp_fma_4_to_mem_write_1_i1_d2)
@@ -439,7 +439,7 @@ delay_pipe #(
     .STAGES(61)
 ) u_align_fp_mul_4_to_fp_mul_5_i1_d61_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_mul_5_res),
     .data_out(align_fp_mul_4_to_fp_mul_5_i1_d61)
@@ -449,7 +449,7 @@ delay_pipe #(
     .STAGES(61)
 ) u_align_fp_mul_6_to_fp_mul_7_i1_d61_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_mul_6_res),
     .data_out(align_fp_mul_6_to_fp_mul_7_i1_d61)
@@ -459,7 +459,7 @@ delay_pipe #(
     .STAGES(61)
 ) u_align_fp_mul_8_to_fp_mul_9_i1_d61_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_mul_7_res),
     .data_out(align_fp_mul_8_to_fp_mul_9_i1_d61)
@@ -469,7 +469,7 @@ delay_pipe #(
     .STAGES(87)
 ) u_align_v0_color_r_to_fx_color_mul_1_i0_d87_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v0_color_r),
     .data_out(align_v0_color_r_to_fx_color_mul_1_i0_d87)
@@ -479,7 +479,7 @@ delay_pipe #(
     .STAGES(87)
 ) u_align_v0_color_g_to_fx_color_mul_2_i0_d87_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v0_color_g),
     .data_out(align_v0_color_g_to_fx_color_mul_2_i0_d87)
@@ -489,7 +489,7 @@ delay_pipe #(
     .STAGES(87)
 ) u_align_v0_color_b_to_fx_color_mul_3_i0_d87_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v0_color_b),
     .data_out(align_v0_color_b_to_fx_color_mul_3_i0_d87)
@@ -499,7 +499,7 @@ delay_pipe #(
     .STAGES(87)
 ) u_align_v0_color_a_to_fx_color_mul_4_i0_d87_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v0_color_a),
     .data_out(align_v0_color_a_to_fx_color_mul_4_i0_d87)
@@ -509,7 +509,7 @@ delay_pipe #(
     .STAGES(87)
 ) u_align_v0_texture_u_to_fx_texture_mul_1_i1_d87_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v0_u),
     .data_out(align_v0_texture_u_to_fx_texture_mul_1_i1_d87)
@@ -519,7 +519,7 @@ delay_pipe #(
     .STAGES(87)
 ) u_align_v0_texture_v_to_fx_texture_mul_2_i1_d87_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v0_v),
     .data_out(align_v0_texture_v_to_fx_texture_mul_2_i1_d87)
@@ -529,7 +529,7 @@ delay_pipe #(
     .STAGES(88)
 ) u_align_v1_color_r_to_fx_color_fma_1_i0_d88_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v1_color_r),
     .data_out(align_v1_color_r_to_fx_color_fma_1_i0_d88)
@@ -539,7 +539,7 @@ delay_pipe #(
     .STAGES(1)
 ) u_align_fp_to_fx2_23_2_to_fx_color_fma_1_i1_d1_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_to_fx2_23_2_res),
     .data_out(align_fp_to_fx2_23_2_to_fx_color_fma_1_i1_d1)
@@ -549,7 +549,7 @@ delay_pipe #(
     .STAGES(88)
 ) u_align_v1_color_g_to_fx_color_fma_3_i0_d88_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v1_color_g),
     .data_out(align_v1_color_g_to_fx_color_fma_3_i0_d88)
@@ -559,7 +559,7 @@ delay_pipe #(
     .STAGES(1)
 ) u_align_fp_to_fx2_23_2_to_fx_color_fma_3_i1_d1_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_to_fx2_23_2_res),
     .data_out(align_fp_to_fx2_23_2_to_fx_color_fma_3_i1_d1)
@@ -569,7 +569,7 @@ delay_pipe #(
     .STAGES(88)
 ) u_align_v1_color_b_to_fx_color_fma_5_i0_d88_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v1_color_b),
     .data_out(align_v1_color_b_to_fx_color_fma_5_i0_d88)
@@ -579,7 +579,7 @@ delay_pipe #(
     .STAGES(1)
 ) u_align_fp_to_fx2_23_2_to_fx_color_fma_5_i1_d1_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_to_fx2_23_2_res),
     .data_out(align_fp_to_fx2_23_2_to_fx_color_fma_5_i1_d1)
@@ -589,7 +589,7 @@ delay_pipe #(
     .STAGES(88)
 ) u_align_v1_color_a_to_fx_color_fma_7_i0_d88_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v1_color_a),
     .data_out(align_v1_color_a_to_fx_color_fma_7_i0_d88)
@@ -599,7 +599,7 @@ delay_pipe #(
     .STAGES(1)
 ) u_align_fp_to_fx2_23_2_to_fx_color_fma_7_i1_d1_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_to_fx2_23_2_res),
     .data_out(align_fp_to_fx2_23_2_to_fx_color_fma_7_i1_d1)
@@ -609,7 +609,7 @@ delay_pipe #(
     .STAGES(1)
 ) u_align_fp_to_fx2_23_2_to_fx_texture_fma_1_i0_d1_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_to_fx2_23_2_res),
     .data_out(align_fp_to_fx2_23_2_to_fx_texture_fma_1_i0_d1)
@@ -619,7 +619,7 @@ delay_pipe #(
     .STAGES(88)
 ) u_align_v1_texture_u_to_fx_texture_fma_1_i1_d88_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v1_u),
     .data_out(align_v1_texture_u_to_fx_texture_fma_1_i1_d88)
@@ -629,7 +629,7 @@ delay_pipe #(
     .STAGES(1)
 ) u_align_fp_to_fx2_23_2_to_fx_texture_fma_3_i0_d1_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_to_fx2_23_2_res),
     .data_out(align_fp_to_fx2_23_2_to_fx_texture_fma_3_i0_d1)
@@ -639,7 +639,7 @@ delay_pipe #(
     .STAGES(88)
 ) u_align_v1_texture_v_to_fx_texture_fma_3_i1_d88_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v1_v),
     .data_out(align_v1_texture_v_to_fx_texture_fma_3_i1_d88)
@@ -649,7 +649,7 @@ delay_pipe #(
     .STAGES(90)
 ) u_align_v2_color_r_to_fx_color_fma_2_i0_d90_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v2_color_r),
     .data_out(align_v2_color_r_to_fx_color_fma_2_i0_d90)
@@ -659,7 +659,7 @@ delay_pipe #(
     .STAGES(3)
 ) u_align_fp_to_fx2_23_3_to_fx_color_fma_2_i1_d3_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_to_fx2_23_3_res),
     .data_out(align_fp_to_fx2_23_3_to_fx_color_fma_2_i1_d3)
@@ -669,7 +669,7 @@ delay_pipe #(
     .STAGES(90)
 ) u_align_v2_color_g_to_fx_color_fma_4_i0_d90_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v2_color_g),
     .data_out(align_v2_color_g_to_fx_color_fma_4_i0_d90)
@@ -679,7 +679,7 @@ delay_pipe #(
     .STAGES(3)
 ) u_align_fp_to_fx2_23_3_to_fx_color_fma_4_i1_d3_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_to_fx2_23_3_res),
     .data_out(align_fp_to_fx2_23_3_to_fx_color_fma_4_i1_d3)
@@ -689,7 +689,7 @@ delay_pipe #(
     .STAGES(90)
 ) u_align_v2_color_b_to_fx_color_fma_6_i0_d90_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v2_color_b),
     .data_out(align_v2_color_b_to_fx_color_fma_6_i0_d90)
@@ -699,7 +699,7 @@ delay_pipe #(
     .STAGES(3)
 ) u_align_fp_to_fx2_23_3_to_fx_color_fma_6_i1_d3_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_to_fx2_23_3_res),
     .data_out(align_fp_to_fx2_23_3_to_fx_color_fma_6_i1_d3)
@@ -709,7 +709,7 @@ delay_pipe #(
     .STAGES(90)
 ) u_align_v2_color_a_to_fx_color_fma_8_i0_d90_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v2_color_a),
     .data_out(align_v2_color_a_to_fx_color_fma_8_i0_d90)
@@ -719,7 +719,7 @@ delay_pipe #(
     .STAGES(3)
 ) u_align_fp_to_fx2_23_3_to_fx_color_fma_8_i1_d3_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_to_fx2_23_3_res),
     .data_out(align_fp_to_fx2_23_3_to_fx_color_fma_8_i1_d3)
@@ -729,7 +729,7 @@ delay_pipe #(
     .STAGES(3)
 ) u_align_fp_to_fx2_23_3_to_fx_texture_fma_2_i0_d3_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_to_fx2_23_3_res),
     .data_out(align_fp_to_fx2_23_3_to_fx_texture_fma_2_i0_d3)
@@ -739,7 +739,7 @@ delay_pipe #(
     .STAGES(90)
 ) u_align_v2_texture_u_to_fx_texture_fma_2_i1_d90_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v2_u),
     .data_out(align_v2_texture_u_to_fx_texture_fma_2_i1_d90)
@@ -749,7 +749,7 @@ delay_pipe #(
     .STAGES(3)
 ) u_align_fp_to_fx2_23_3_to_fx_texture_fma_4_i0_d3_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(fp_to_fx2_23_3_res),
     .data_out(align_fp_to_fx2_23_3_to_fx_texture_fma_4_i0_d3)
@@ -759,7 +759,7 @@ delay_pipe #(
     .STAGES(90)
 ) u_align_v2_texture_v_to_fx_texture_fma_4_i1_d90_data_delay (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(thread_data_buf.v2_v),
     .data_out(align_v2_texture_v_to_fx_texture_fma_4_i1_d90)
@@ -777,7 +777,6 @@ fp_mul #(
     .LATENCY(8)
 ) u_fp_mul_1 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[1]),
     .valid_in(),
@@ -789,7 +788,6 @@ fp_mul #(
     .LATENCY(8)
 ) u_fp_mul_2 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[1]),
     .valid_in(),
@@ -801,7 +799,6 @@ fp_mul #(
     .LATENCY(8)
 ) u_fp_mul_3 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[1]),
     .valid_in(),
@@ -813,7 +810,6 @@ fp_mul #(
     .LATENCY(8)
 ) u_fp_mul_4 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[9]),
     .valid_in(),
@@ -825,7 +821,6 @@ fp_mul #(
     .LATENCY(8)
 ) u_fp_mul_5 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[9]),
     .valid_in(),
@@ -837,7 +832,6 @@ fp_mul #(
     .LATENCY(8)
 ) u_fp_mul_6 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[9]),
     .valid_in(),
@@ -849,7 +843,6 @@ fp_mul #(
     .LATENCY(8)
 ) u_fp_mul_7 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[9]),
     .valid_in(),
@@ -861,7 +854,6 @@ fp_fma #(
     .LATENCY(16)
 ) u_fp_fma_1 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[17]),
     .valid_in(),
@@ -874,7 +866,6 @@ fp_fma #(
     .LATENCY(16)
 ) u_fp_fma_2 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[17]),
     .valid_in(),
@@ -887,7 +878,6 @@ fp_fma #(
     .LATENCY(16)
 ) u_fp_fma_3 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[33]),
     .valid_in(),
@@ -900,7 +890,6 @@ fp_fma #(
     .LATENCY(16)
 ) u_fp_fma_4 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[33]),
     .valid_in(),
@@ -913,7 +902,6 @@ fp_recip #(
     .LATENCY(29)
 ) u_fp_recip_1 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[49]),
     .valid_in(),
@@ -942,7 +930,6 @@ fp_mul #(
     .LATENCY(8)
 ) u_fp_mul_8 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[78]),
     .valid_in(),
@@ -954,7 +941,6 @@ fp_mul #(
     .LATENCY(8)
 ) u_fp_mul_9 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[78]),
     .valid_in(),
@@ -966,7 +952,6 @@ fp_mul #(
     .LATENCY(8)
 ) u_fp_mul_10 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[78]),
     .valid_in(),
@@ -976,7 +961,6 @@ fp_mul #(
 );
 fp_to_fx2_23 u_fp_to_fx2_23_1 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     .s_axis_a_tvalid(valid_pipe[86]),
     .s_axis_a_tdata(fp_mul_8_res),
@@ -985,7 +969,6 @@ fp_to_fx2_23 u_fp_to_fx2_23_1 (
 );
 fp_to_fx2_23 u_fp_to_fx2_23_2 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     .s_axis_a_tvalid(valid_pipe[86]),
     .s_axis_a_tdata(fp_mul_9_res),
@@ -994,7 +977,6 @@ fp_to_fx2_23 u_fp_to_fx2_23_2 (
 );
 fp_to_fx2_23 u_fp_to_fx2_23_3 (
     .aclk(clk),
-    .aresetn(rst_n),
     .aclken(pipe_en_internal),
     .s_axis_a_tvalid(valid_pipe[86]),
     .s_axis_a_tdata(fp_mul_10_res),
@@ -1203,7 +1185,7 @@ delay_pipe #(
     .STAGES(1)
 ) u_align_texcoord_u_to_output_bundle_d1 (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(texcoord_u_tdata),
     .data_out(texcoord_u_bundle_tdata)
@@ -1214,7 +1196,7 @@ delay_pipe #(
     .STAGES(1)
 ) u_align_texcoord_v_to_output_bundle_d1 (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(texcoord_v_tdata),
     .data_out(texcoord_v_bundle_tdata)
@@ -1225,7 +1207,7 @@ delay_pipe #(
     .STAGES(93)
 ) u_align_addr_to_output_bundle_d93 (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(addr_tdata),
     .data_out(addr_bundle_tdata)
@@ -1236,7 +1218,7 @@ delay_pipe #(
     .STAGES(93)
 ) u_align_tex_id_to_output_bundle_d93 (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(tex_id_tdata),
     .data_out(tex_id_bundle_tdata)
@@ -1247,7 +1229,7 @@ delay_pipe #(
     .STAGES(93)
 ) u_align_texture_mode_u_to_output_bundle_d93 (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(texture_mode_u_tdata),
     .data_out(texture_mode_u_bundle_tdata)
@@ -1258,7 +1240,7 @@ delay_pipe #(
     .STAGES(93)
 ) u_align_texture_mode_v_to_output_bundle_d93 (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(texture_mode_v_tdata),
     .data_out(texture_mode_v_bundle_tdata)
@@ -1269,7 +1251,7 @@ delay_pipe #(
     .STAGES(93)
 ) u_align_texture_function_to_output_bundle_d93 (
     .clk(clk),
-    .rst_n(rst_n),
+    .rst_n(1'b1),
     .clken(pipe_en_internal),
     .data_in(texture_function_tdata),
     .data_out(texture_function_bundle_tdata)
@@ -1341,9 +1323,12 @@ assign ready_out = input_bundle_s_axis_tready;
     texture_address_mode_t texture_mode_v;
     fragment_op_t texture_function;
     color_argb_t color;
-    logic comp_z;
-    logic valid;
   } fragment_token_t;
+
+    typedef struct packed {
+        logic valid;
+        logic comp_z;
+    } fragment_control_t;
 
   typedef struct packed {
     fragment_token_t token;
@@ -1376,17 +1361,24 @@ assign ready_out = input_bundle_s_axis_tready;
   } fragment_request_token_t;
 
     typedef struct packed {
-        fragment_request_token_t token;
-        logic valid;
-    } fragment_request_pipe_t;
+        logic [31:0] texture_addr;
+        color_argb_t pixel_color;
+        fragment_op_t op;
+        logic [THREAD_ADDR_W-1:0] addr;
+        logic use_texture;
+    } fragment_request_payload_t;
 
   fragment_token_t post_skid_token;
   fragment_bundle_t post_skid_bundle;
   address_token_t address_token_s3;
+    fragment_control_t address_control_input;
+    fragment_control_t address_control_s3;
   fragment_request_token_t fragment_request_input;
   fragment_request_token_t fragment_request_output;
-    fragment_request_pipe_t fragment_request_delay_input;
-    fragment_request_pipe_t fragment_request_delay_output;
+    fragment_request_payload_t fragment_request_delay_input;
+    fragment_request_payload_t fragment_request_delay_output;
+    fragment_control_t fragment_request_control_input;
+    fragment_control_t fragment_request_control_output;
   logic address_step;
   logic address_use_texture;
     logic texture_response_ready;
@@ -1415,7 +1407,7 @@ assign ready_out = input_bundle_s_axis_tready;
   logic [THREAD_ADDR_W-1:0] fb_addr_tdata;
   logic cmp_pass_fragment_out_tdata;
 
-  assign address_pipe_valid = address_token_s3.token.valid;
+    assign address_pipe_valid = address_control_s3.valid;
     assign texture_wait_valid = delayed_texture_wait || !l1_cache_req_ready;
   assign fragment_join_output_valid = fragment_request_output_valid;
   assign fragment_join_input_ready = fragment_request_input_ready;
@@ -1435,13 +1427,14 @@ assign ready_out = input_bundle_s_axis_tready;
     post_skid_token.color.r = post_skid_bundle.color_r;
     post_skid_token.color.g = post_skid_bundle.color_g;
     post_skid_token.color.b = post_skid_bundle.color_b;
-    post_skid_token.comp_z = post_skid_bundle.comp_z;
-    post_skid_token.valid = output_bundle_buf_tvalid;
   end
 
+    assign address_control_input.valid = output_bundle_buf_tvalid;
+    assign address_control_input.comp_z = post_skid_bundle.comp_z;
+
   assign texture_response_ready =
-      fragment_request_delay_output.valid
-      && fragment_request_delay_output.token.use_texture
+            fragment_request_control_output.valid
+            && fragment_request_delay_output.use_texture
       && l1_resp_valid;
     // Backpressure from the fragment request skid is the holding point for the
     // address stage; delayed accepted requests continue toward cache responses.
@@ -1453,10 +1446,21 @@ assign ready_out = input_bundle_s_axis_tready;
       .STAGES(3)
   ) u_fragment_token_to_address_stage (
       .clk(clk),
-      .rst_n(rst_n),
+      .rst_n(1'b1),
       .clken(address_step),
       .data_in(post_skid_token),
       .data_out(address_token_s3.token)
+  );
+
+  delay_pipe #(
+      .WIDTH ($bits(fragment_control_t)),
+      .STAGES(3)
+  ) u_fragment_control_to_address_stage (
+      .clk(clk),
+      .rst_n(rst_n),
+      .clken(address_step),
+      .data_in(address_control_input),
+      .data_out(address_control_s3)
   );
 
   texture_address_generator u_texture_address_generator (
@@ -1481,8 +1485,8 @@ assign ready_out = input_bundle_s_axis_tready;
   assign address_token_s3.no_texture = texture_no_texture;
 
   assign address_use_texture =
-      address_token_s3.token.valid
-      && address_token_s3.token.comp_z
+      address_control_s3.valid
+      && address_control_s3.comp_z
       && address_token_s3.token.texture_function != COLOR
       && !address_token_s3.no_texture;
 
@@ -1525,7 +1529,7 @@ assign ready_out = input_bundle_s_axis_tready;
       .perf_rvalid()
   );
 
-  assign fragment_request_input_valid = address_token_s3.token.valid;
+    assign fragment_request_input_valid = address_control_s3.valid;
 
   always_comb begin
     fragment_request_input = '0;
@@ -1535,7 +1539,7 @@ assign ready_out = input_bundle_s_axis_tready;
                 ? address_token_s3.token.texture_function
                 : COLOR);
     fragment_request_input.addr = address_token_s3.token.addr;
-    fragment_request_input.comp_z = address_token_s3.token.comp_z;
+    fragment_request_input.comp_z = address_control_s3.comp_z;
     fragment_request_input.use_texture = address_use_texture;
   end
 
@@ -1556,8 +1560,8 @@ assign ready_out = input_bundle_s_axis_tready;
   );
 
   assign delayed_texture_wait =
-      fragment_request_delay_output.valid
-      && fragment_request_delay_output.token.use_texture
+      fragment_request_control_output.valid
+      && fragment_request_delay_output.use_texture
       && !l1_resp_valid;
 
   assign fragment_request_output_ready =
@@ -1568,19 +1572,35 @@ assign ready_out = input_bundle_s_axis_tready;
 
   always_comb begin
     fragment_request_delay_input = '0;
-    fragment_request_delay_input.token = fragment_request_output;
-    fragment_request_delay_input.valid = fragment_request_fire;
+    fragment_request_delay_input.texture_addr = fragment_request_output.texture_addr;
+    fragment_request_delay_input.pixel_color = fragment_request_output.pixel_color;
+    fragment_request_delay_input.op = fragment_request_output.op;
+    fragment_request_delay_input.addr = fragment_request_output.addr;
+    fragment_request_delay_input.use_texture = fragment_request_output.use_texture;
+    fragment_request_control_input.valid = fragment_request_fire;
+    fragment_request_control_input.comp_z = fragment_request_output.comp_z;
   end
 
   delay_pipe #(
-      .WIDTH ($bits(fragment_request_pipe_t)),
+      .WIDTH ($bits(fragment_request_payload_t)),
       .STAGES(L1_TEXTURE_HIT_LATENCY_STAGES)
   ) u_fragment_request_to_l1_response_stage (
       .clk(clk),
-      .rst_n(rst_n),
+      .rst_n(1'b1),
       .clken(!delayed_texture_wait),
       .data_in(fragment_request_delay_input),
       .data_out(fragment_request_delay_output)
+  );
+
+  delay_pipe #(
+      .WIDTH ($bits(fragment_control_t)),
+      .STAGES(L1_TEXTURE_HIT_LATENCY_STAGES)
+  ) u_fragment_control_to_l1_response_stage (
+      .clk(clk),
+      .rst_n(rst_n),
+      .clken(!delayed_texture_wait),
+      .data_in(fragment_request_control_input),
+      .data_out(fragment_request_control_output)
   );
 
   // L1 requests fire from the skid's held output. Hit streams can issue one
@@ -1592,16 +1612,16 @@ assign ready_out = input_bundle_s_axis_tready;
 
   logic fragment_shader_input_valid;
   assign fragment_shader_input_valid =
-            fragment_request_delay_output.valid
-            && (!fragment_request_delay_output.token.use_texture || texture_response_ready);
+            fragment_request_control_output.valid
+            && (!fragment_request_delay_output.use_texture || texture_response_ready);
 
   fragment_shader u_fragment_shader (
       .clk(clk),
       .rst_n(rst_n),
-      .pixel_color(fragment_request_delay_output.token.pixel_color),
+    .pixel_color(fragment_request_delay_output.pixel_color),
       .texture_color(color_argb_t'(l1_resp_data)),
       .env_color('0),
-      .op(fragment_request_delay_output.token.op),
+    .op(fragment_request_delay_output.op),
       .valid_in(fragment_shader_input_valid),
       .fragment_color(fragment_color_tdata),
       .valid_out(fragment_valid_tdata)
@@ -1612,9 +1632,9 @@ assign ready_out = input_bundle_s_axis_tready;
       .STAGES(FRAGMENT_SHADER_LATENCY_STAGES)
   ) u_align_fb_addr_to_fragment_output (
       .clk(clk),
-      .rst_n(rst_n),
+      .rst_n(1'b1),
       .clken(1'b1),
-      .data_in(fragment_request_delay_output.token.addr),
+    .data_in(fragment_request_delay_output.addr),
       .data_out(fb_addr_tdata)
   );
 
@@ -1625,7 +1645,7 @@ assign ready_out = input_bundle_s_axis_tready;
       .clk(clk),
       .rst_n(rst_n),
       .clken(1'b1),
-      .data_in(fragment_request_delay_output.token.comp_z),
+    .data_in(fragment_request_control_output.comp_z),
       .data_out(cmp_pass_fragment_out_tdata)
   );
 

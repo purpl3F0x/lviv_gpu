@@ -757,7 +757,7 @@ class HardwareDAG:
             _declare_buffer_signal(dst_ref, width)
             width_expr = width if isinstance(width, str) else str(width)
             align_skeletons.append(
-                f"delay_pipe #(.WIDTH({width_expr}), .STAGES({stages})) u_{dst_ref}_data_delay (.clk(clk), .rst_n(rst_n), .clken(pipe_en_internal), .data_in({src_ref}), .data_out({dst_ref}));"
+                f"delay_pipe #(.WIDTH({width_expr}), .STAGES({stages})) u_{dst_ref}_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in({src_ref}), .data_out({dst_ref}));"
             )
 
         # Track alignment delays to find max alignment depth
@@ -950,9 +950,7 @@ class HardwareDAG:
                 a = input_ref_by_edge[(node, 0)]
                 b = input_ref_by_edge[(node, 1)]
                 lines.append(f"fp_add #(.LATENCY({info.latency})) u_{unit} (")
-                lines.append(
-                    "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
-                )
+                lines.append("    .aclk(clk), .aclken(pipe_en_internal),")
                 lines.append(f"    // .valid_in({valid_in}),")
                 lines.append("    .valid_in(),")
                 lines.append(f"    .a({a}), .b({b}),")
@@ -962,9 +960,7 @@ class HardwareDAG:
                 a = input_ref_by_edge[(node, 0)]
                 b = input_ref_by_edge[(node, 1)]
                 lines.append(f"fp_sub #(.LATENCY({info.latency})) u_{unit} (")
-                lines.append(
-                    "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
-                )
+                lines.append("    .aclk(clk), .aclken(pipe_en_internal),")
                 lines.append(f"    // .valid_in({valid_in}),")
                 lines.append("    .valid_in(),")
                 lines.append(f"    .a({a}), .b({b}),")
@@ -974,9 +970,7 @@ class HardwareDAG:
                 a = input_ref_by_edge[(node, 0)]
                 b = input_ref_by_edge[(node, 1)]
                 lines.append(f"fp_mul #(.LATENCY({info.latency})) u_{unit} (")
-                lines.append(
-                    "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
-                )
+                lines.append("    .aclk(clk), .aclken(pipe_en_internal),")
                 lines.append(f"    // .valid_in({valid_in}),")
                 lines.append("    .valid_in(),")
                 lines.append(f"    .a({a}), .b({b}),")
@@ -987,9 +981,7 @@ class HardwareDAG:
                 b = input_ref_by_edge[(node, 1)]
                 c = input_ref_by_edge[(node, 2)]
                 lines.append(f"fp_fma #(.LATENCY({info.latency})) u_{unit} (")
-                lines.append(
-                    "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
-                )
+                lines.append("    .aclk(clk), .aclken(pipe_en_internal),")
                 lines.append(f"    // .valid_in({valid_in}),")
                 lines.append("    .valid_in(),")
                 lines.append(f"    .a({a}), .b({b}), .c({c}),")
@@ -998,9 +990,7 @@ class HardwareDAG:
             elif info.op_type == "fp_recip":
                 a = input_ref_by_edge[(node, 0)]
                 lines.append(f"fp_recip #(.LATENCY({info.latency})) u_{unit} (")
-                lines.append(
-                    "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
-                )
+                lines.append("    .aclk(clk), .aclken(pipe_en_internal),")
                 lines.append(f"    // .valid_in({valid_in}),")
                 lines.append("    .valid_in(),")
                 lines.append(f"    .a({a}),")
@@ -1067,9 +1057,7 @@ class HardwareDAG:
                     }
                     cmp_op = cmp_map.get(info.cmp_kind, "3'd1")
                     lines.append(f"fp_cmp #(.LATENCY(1)) u_{unit} (")
-                    lines.append(
-                        "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
-                    )
+                    lines.append("    .aclk(clk), .aclken(pipe_en_internal),")
                     lines.append(f"    .cmp_op({cmp_op}),")
                     lines.append(f"    .valid_in({valid_in}),")
                     lines.append(f"    .a({a}), .b({b}),")
@@ -1112,9 +1100,7 @@ class HardwareDAG:
             elif info.op_type == "fp_to_fx2_23":
                 a = input_ref_by_edge[(node, 0)]
                 lines.append(f"fp_to_fx2_23 u_{unit} (")
-                lines.append(
-                    "    .aclk(clk), .aresetn(rst_n), .aclken(pipe_en_internal),"
-                )
+                lines.append("    .aclk(clk), .aclken(pipe_en_internal),")
                 lines.append(f"    .s_axis_a_tvalid({valid_in}),")
                 lines.append(f"    .s_axis_a_tdata({a}),")
                 lines.append("    .m_axis_result_tvalid(),")
@@ -1167,6 +1153,7 @@ class HardwareDAG:
                 delay_to_final = final_out_stage - stage
                 if delay_to_final > 0:
                     aligned_name = f"{out_name}_bundle_tdata"
+                    reset_signal = "rst_n" if out_name == "comp_z" else "1'b1"
                     if width == 1:
                         lines.append(f"logic {aligned_name};")
                     else:
@@ -1175,7 +1162,7 @@ class HardwareDAG:
                         else:
                             lines.append(f"logic [{width-1}:0] {aligned_name};")
                     lines.append(
-                        f"delay_pipe #(.WIDTH({width if not isinstance(width, str) else width}), .STAGES({delay_to_final})) u_align_{out_name}_to_output_bundle_d{delay_to_final} (.clk(clk), .rst_n(rst_n), .clken(pipe_en_internal), .data_in({src_ref}), .data_out({aligned_name}));"
+                        f"delay_pipe #(.WIDTH({width if not isinstance(width, str) else width}), .STAGES({delay_to_final})) u_align_{out_name}_to_output_bundle_d{delay_to_final} (.clk(clk), .rst_n({reset_signal}), .clken(pipe_en_internal), .data_in({src_ref}), .data_out({aligned_name}));"
                     )
                     bundle_data_refs.append(aligned_name)
                 else:

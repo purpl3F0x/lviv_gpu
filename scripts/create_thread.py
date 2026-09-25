@@ -1004,7 +1004,7 @@ class HardwareDAG:
                     lines.append(f"assign {out_wire} = ({s}) ? ({t}) : ({f});")
                 elif info.op_type == "mem_read":
                     addr = input_ref_by_edge[(node, 0)]
-                    lines.append(f"assign z_rd_en = {node}_fire && pipe_en_internal;")
+                    lines.append("assign z_rd_en = pipe_en_internal;")
                     lines.append(f"assign z_rd_addr = {addr};")
                     lines.append(f"assign {out_wire} = z_rd_data;")
                 else:
@@ -1619,9 +1619,10 @@ if __name__ == "__main__":
         "fp_add": 11,
         "fp_sub": 11,
         "fp_mul": 8,
-        "fp_fma": 16,
+        "fp_fma": 19,
         "fp_recip": 29,
         "fp_cmp": 1,
+        "fp_to_fx2_23": 2,
         "mem_read": 2,
         "mem_write": 1,
     }

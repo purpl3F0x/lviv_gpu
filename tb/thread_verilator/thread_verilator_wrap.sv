@@ -396,7 +396,8 @@ module thread_verilator_wrap (
   );
 
   logic uv_sample_event_now;
-  assign uv_sample_event_now = u_thread.address_step && u_thread.post_skid_token.valid;
+  assign uv_sample_event_now =
+      u_thread.address_step && u_thread.address_control_input.valid;
 
   // Register the address-stage token-accept event at the clock edge so the
   // checker sees a stable pulse aligned with the updated stage-1 UV regs.

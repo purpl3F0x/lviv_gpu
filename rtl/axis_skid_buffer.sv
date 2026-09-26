@@ -19,7 +19,11 @@ module axis_skid_buffer #(
 );
 
   logic [WIDTH-1:0] skid_data;
+  logic             s_axis_tready_reg;
   logic             skid_valid;
+
+  assign s_axis_tready = s_axis_tready_reg;
+  assign skid_valid = !s_axis_tready_reg;
 
   logic s_hsk;
   logic m_stall;
@@ -27,15 +31,13 @@ module axis_skid_buffer #(
   assign m_stall = m_axis_tvalid && !m_axis_tready;
 
   // Fully-registered slice
-  assign s_axis_tready = !skid_valid;
-
   always_ff @(posedge aclk) begin
     if (!aresetn) begin
-      skid_valid <= 1'b0;
+      s_axis_tready_reg <= 1'b1;
     end else if (s_hsk && m_stall) begin
-      skid_valid <= 1'b1;
+      s_axis_tready_reg <= 1'b0;
     end else if (m_axis_tready) begin
-      skid_valid <= 1'b0;
+      s_axis_tready_reg <= 1'b1;
     end
   end
 

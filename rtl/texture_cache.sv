@@ -35,7 +35,7 @@ module texture_bram_asym #(
   logic [WIDTHB-1:0] readB;
 
   always_ff @(posedge clkb) begin
-    if (enaB) begin
+    if (1) begin
       readB <= ram[addrB];
     end
 

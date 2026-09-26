@@ -74,7 +74,7 @@ void check_fragment_shader_output(int actual, int expected, int *passed, int *fa
 #include <cstdlib>
 #include <queue>
 #include <verilated.h>
-#include <verilated_fst_c.h>
+#include <verilated_vcd_c.h>
 
 int main(int argc, char **argv)
 {
@@ -84,7 +84,7 @@ int main(int argc, char **argv)
     contextp->traceEverOn(true); // enable tracing
 
     bool dump_trace = false;
-    const char *fst_name = "waves.fst";
+    const char *vcd_name = "waves.vcd";
 
     for (int i = 1; i < argc; i++)
     {
@@ -94,7 +94,7 @@ int main(int argc, char **argv)
             dump_trace = true;
             if (i + 1 < argc && argv[i + 1][0] != '-')
             {
-                fst_name = argv[i + 1];
+                vcd_name = argv[i + 1];
                 i++;
             }
         }
@@ -103,18 +103,18 @@ int main(int argc, char **argv)
     // Create top-level module
     Vfragment_shader *top = new Vfragment_shader{contextp};
 
-    // Create FST trace
-    VerilatedFstC *tfp = nullptr;
+    // Create VCD trace
+    VerilatedVcdC *tfp = nullptr;
     if (dump_trace)
     {
-        tfp = new VerilatedFstC;
+        tfp = new VerilatedVcdC;
         top->trace(tfp, 99); // trace 99 levels deep
-        tfp->open(fst_name); // waveform file
+        tfp->open(vcd_name); // waveform file
     }
 
     // Initialize simulation at time 0
     top->clk = 0;
-    top->rst = 1;
+    top->rst_n = 0;
     top->valid_in = 0;
     top->pixel_color = 0;
     top->texture_color = 0;
@@ -140,16 +140,16 @@ int main(int argc, char **argv)
 
         if (contextp->time() < 12)
         {
-            top->rst = 1; // assert reset
+            top->rst_n = 0; // assert reset
             top->valid_in = 0;
         }
         else
         {
-            top->rst = 0; // release reset
+            top->rst_n = 1; // release reset
         }
 
         // On positive edge
-        if (top->clk && !top->rst)
+        if (top->clk && top->rst_n)
         {
             // Sink: Read output
             if (top->valid_out)

@@ -58,7 +58,7 @@ module thread (
   logic [INBUNDLEWIDTH-1:0] input_bundle_buf_tdata;
   logic input_bundle_buf_tvalid;
   logic input_bundle_m_axis_tready;
-  (* max_fanout = 250 *) logic pipe_en_internal;
+  logic pipe_en_internal;
   thread_data_in_t thread_data_buf;
 
   // Reject triangles with e0 < 0 or e1 < 0 or e2 < 0
@@ -1175,7 +1175,7 @@ localparam unsigned ValidPipeDepth = 103;
   );
   logic [OUTBUNDLEWIDTH-1:0] output_bundle_tdata;
   logic output_bundle_tvalid;
-  logic output_bundle_s_axis_tready;
+  (* max_fanout = 250 *) logic output_bundle_s_axis_tready;
   logic [OUTBUNDLEWIDTH-1:0] output_bundle_buf_tdata;
   logic output_bundle_buf_tvalid;
   logic output_bundle_buf_tready;
@@ -1306,7 +1306,7 @@ localparam unsigned ValidPipeDepth = 103;
 
 
 
-  localparam int FRAGMENT_SHADER_LATENCY_STAGES = 5;
+    localparam int FRAGMENT_SHADER_LATENCY_STAGES = 5;
   localparam int L1_TEXTURE_HIT_LATENCY_STAGES  = 3;
 
   typedef struct packed {

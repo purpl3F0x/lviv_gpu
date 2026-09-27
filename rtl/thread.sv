@@ -86,7 +86,7 @@ module thread (
   // -------------------------------
   // ---- Master valid pipeline ----
   // -------------------------------
-localparam unsigned ValidPipeDepth = 103;
+  localparam unsigned ValidPipeDepth = 103;
   logic [ValidPipeDepth:0] valid_pipe;
   assign valid_pipe[0] = input_bundle_buf_tvalid;
   always_ff @(posedge clk) begin
@@ -185,10 +185,10 @@ localparam unsigned ValidPipeDepth = 103;
   // fp_fma_3         -> fp_fma_2          out=fp_fma_2_res        start= 16  end= 35  valid=(pipe_en)  expr=fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))
   // fp_fma_2         -> fp_fma_3          out=fp_fma_3_res        start= 35  end= 54  valid=(pipe_en)  expr=fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))
   // fp_fma_4         -> fp_fma_4          out=fp_fma_4_res        start= 35  end= 54  valid=(pipe_en)  expr=fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area))))
-  // mem_read_1       -> mem_read_1        out=mem_read_1_rdata    start= 53  end= 55  valid=(pipe_en)  expr=mem_read(addr)
+  // mem_read_1       -> mem_read_1        out=mem_read_1_rdata    start= 53  end= 56  valid=(pipe_en)  expr=mem_read(addr)
   // fp_recip_1       -> fp_recip_1        out=fp_recip_1_out      start= 54  end= 83  valid=(pipe_en)  expr=(1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area)))))
-  // fp_cmp_1         -> fp_cmp_1          out=fp_cmp_1_pred       start= 55  end= 56  valid=(pipe_en)  expr=(fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))) <= mem_read(addr))
-  // mem_write_1      -> mem_write_1       out=mem_write_1_pred    start= 56  end= 57  valid=(pipe_en)  expr=mem_write(addr, fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))))
+  // fp_cmp_1         -> fp_cmp_1          out=fp_cmp_1_pred       start= 56  end= 58  valid=(pipe_en)  expr=(fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))) <= mem_read(addr))
+  // mem_write_1      -> mem_write_1       out=mem_write_1_pred    start= 58  end= 59  valid=(pipe_en)  expr=mem_write(addr, fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))))
   // fp_mul_5         -> fp_mul_8          out=fp_mul_8_res        start= 83  end= 91  valid=(pipe_en)  expr=((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))
   // fp_mul_7         -> fp_mul_9          out=fp_mul_9_res        start= 83  end= 91  valid=(pipe_en)  expr=((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))
   // fp_mul_9         -> fp_mul_10         out=fp_mul_10_res       start= 83  end= 91  valid=(pipe_en)  expr=((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))
@@ -222,7 +222,7 @@ localparam unsigned ValidPipeDepth = 103;
   logic mem_read_1_fire;
   logic fp_cmp_1_fire;
   assign mem_read_1_fire = valid_pipe[53];
-  assign fp_cmp_1_fire   = valid_pipe[56];
+  assign fp_cmp_1_fire   = valid_pipe[57];
 
   // ---- Delay alignment for late-consumed inputs ----
   logic [31:0] align_v0_z_to_fp_mul_10_i0_d8;
@@ -238,9 +238,9 @@ localparam unsigned ValidPipeDepth = 103;
   logic [31:0] align_v2_z_to_fp_fma_4_i0_d35;
   logic [31:0] align_fp_mul_3_to_fp_fma_4_i1_d27;
   logic [THREAD_ADDR_W-1:0] align_addr_to_mem_read_1_i0_d53;
-  logic [31:0] align_fp_fma_4_to_fp_cmp_1_i0_d1;
-  logic [THREAD_ADDR_W-1:0] align_addr_to_mem_write_1_i0_d56;
-  logic [31:0] align_fp_fma_4_to_mem_write_1_i1_d2;
+  logic [31:0] align_fp_fma_4_to_fp_cmp_1_i0_d2;
+  logic [THREAD_ADDR_W-1:0] align_addr_to_mem_write_1_i0_d58;
+  logic [31:0] align_fp_fma_4_to_mem_write_1_i1_d4;
   logic [31:0] align_fp_mul_4_to_fp_mul_5_i1_d67;
   logic [31:0] align_fp_mul_6_to_fp_mul_7_i1_d67;
   logic [31:0] align_fp_mul_8_to_fp_mul_9_i1_d67;
@@ -407,33 +407,33 @@ localparam unsigned ValidPipeDepth = 103;
   );
   delay_pipe #(
       .WIDTH (32),
-      .STAGES(1)
-  ) u_align_fp_fma_4_to_fp_cmp_1_i0_d1_data_delay (
+      .STAGES(2)
+  ) u_align_fp_fma_4_to_fp_cmp_1_i0_d2_data_delay (
       .clk(clk),
       .rst_n(1'b1),
       .clken(pipe_en_internal),
       .data_in(fp_fma_4_res),
-      .data_out(align_fp_fma_4_to_fp_cmp_1_i0_d1)
+      .data_out(align_fp_fma_4_to_fp_cmp_1_i0_d2)
   );
   delay_pipe #(
       .WIDTH (THREAD_ADDR_W),
-      .STAGES(3)
-  ) u_align_addr_to_mem_write_1_i0_d56_data_delay (
+      .STAGES(5)
+  ) u_align_addr_to_mem_write_1_i0_d58_data_delay (
       .clk(clk),
       .rst_n(1'b1),
       .clken(pipe_en_internal),
       .data_in(align_addr_to_mem_read_1_i0_d53),
-      .data_out(align_addr_to_mem_write_1_i0_d56)
+      .data_out(align_addr_to_mem_write_1_i0_d58)
   );
   delay_pipe #(
       .WIDTH (32),
-      .STAGES(2)
-  ) u_align_fp_fma_4_to_mem_write_1_i1_d2_data_delay (
+      .STAGES(4)
+  ) u_align_fp_fma_4_to_mem_write_1_i1_d4_data_delay (
       .clk(clk),
       .rst_n(1'b1),
       .clken(pipe_en_internal),
       .data_in(fp_fma_4_res),
-      .data_out(align_fp_fma_4_to_mem_write_1_i1_d2)
+      .data_out(align_fp_fma_4_to_mem_write_1_i1_d4)
   );
   delay_pipe #(
       .WIDTH (32),
@@ -915,18 +915,18 @@ localparam unsigned ValidPipeDepth = 103;
   fp_cmp_le u_fp_cmp_1 (
       .aclk(clk),
       .aclken(pipe_en_internal),
-      .s_axis_a(align_fp_fma_4_to_fp_cmp_1_i0_d1),
+      .s_axis_a(align_fp_fma_4_to_fp_cmp_1_i0_d2),
       //   .s_axis_a_valid(),
       .s_axis_b(mem_read_1_rdata),
       //   .s_axis_b_valid(),
       .m_axis_res(fp_cmp_1_pred[0])
       //   .m_axis_tvalid()
   );
-  assign mem_write_1_fire = valid_pipe[56];
+  assign mem_write_1_fire = valid_pipe[58];
   assign mem_write_1_pred[0] = (fp_cmp_1_pred[0]);
   assign z_wr_en = mem_write_1_fire && mem_write_1_pred[0] && pipe_en_internal;
-  assign z_wr_addr = align_addr_to_mem_write_1_i0_d56;
-  assign z_wr_data = align_fp_fma_4_to_mem_write_1_i1_d2;
+  assign z_wr_addr = align_addr_to_mem_write_1_i0_d58;
+  assign z_wr_data = align_fp_fma_4_to_mem_write_1_i1_d4;
   fp_mul #(
       .LATENCY(8)
   ) u_fp_mul_8 (
@@ -1175,7 +1175,7 @@ localparam unsigned ValidPipeDepth = 103;
   );
   logic [OUTBUNDLEWIDTH-1:0] output_bundle_tdata;
   logic output_bundle_tvalid;
-  (* max_fanout = 250 *) logic output_bundle_s_axis_tready;
+  logic output_bundle_s_axis_tready;
   logic [OUTBUNDLEWIDTH-1:0] output_bundle_buf_tdata;
   logic output_bundle_buf_tvalid;
   logic output_bundle_buf_tready;
@@ -1260,8 +1260,8 @@ localparam unsigned ValidPipeDepth = 103;
   logic comp_z_bundle_tdata;
   delay_pipe #(
       .WIDTH (1),
-      .STAGES(47)
-  ) u_align_comp_z_to_output_bundle_d47 (
+      .STAGES(45)
+  ) u_align_comp_z_to_output_bundle_d45 (
       .clk(clk),
       .rst_n(rst_n),
       .clken(pipe_en_internal),
@@ -1306,8 +1306,11 @@ localparam unsigned ValidPipeDepth = 103;
 
 
 
-    localparam int FRAGMENT_SHADER_LATENCY_STAGES = 5;
-  localparam int L1_TEXTURE_HIT_LATENCY_STAGES  = 3;
+  localparam int FRAGMENT_SHADER_LATENCY_STAGES = 5;
+  localparam int L1_TEXTURE_HIT_LATENCY_STAGES = 4;
+  localparam int L1RespQueueDepth = L1_TEXTURE_HIT_LATENCY_STAGES + 1;
+  localparam int L1RespPtrWidth = $clog2(L1RespQueueDepth);
+  localparam int L1RespCountWidth = $clog2(L1RespQueueDepth + 1);
 
   typedef struct packed {
     logic [47:0] texcoord_u;
@@ -1377,6 +1380,15 @@ localparam unsigned ValidPipeDepth = 103;
   logic address_step;
   logic address_use_texture;
   logic texture_response_ready;
+  logic texture_response_available;
+  logic [31:0] texture_response_data;
+  logic texture_response_consume;
+  logic texture_response_queue_push;
+  logic texture_response_queue_pop;
+  logic [31:0] texture_response_queue[L1RespQueueDepth];
+  logic [L1RespPtrWidth-1:0] texture_response_queue_wr_ptr;
+  logic [L1RespPtrWidth-1:0] texture_response_queue_rd_ptr;
+  logic [L1RespCountWidth-1:0] texture_response_queue_count;
   logic fragment_request_input_valid;
   logic fragment_request_input_ready;
   logic fragment_request_output_valid;
@@ -1427,10 +1439,19 @@ localparam unsigned ValidPipeDepth = 103;
   assign address_control_input.valid = output_bundle_buf_tvalid;
   assign address_control_input.comp_z = post_skid_bundle.comp_z;
 
-  assign texture_response_ready =
-            fragment_request_control_output.valid
-            && fragment_request_delay_output.use_texture
-      && l1_resp_valid;
+  assign texture_response_available = (texture_response_queue_count != 0) || l1_resp_valid;
+  assign texture_response_data = (texture_response_queue_count != 0)
+      ? texture_response_queue[texture_response_queue_rd_ptr]
+      : l1_resp_data;
+  assign texture_response_consume =
+      fragment_request_control_output.valid
+      && fragment_request_delay_output.use_texture
+      && texture_response_available;
+  assign texture_response_ready = texture_response_consume;
+  assign texture_response_queue_pop =
+      texture_response_consume && (texture_response_queue_count != 0);
+  assign texture_response_queue_push =
+      l1_resp_valid && !((texture_response_queue_count == 0) && texture_response_consume);
   // Backpressure from the fragment request skid is the holding point for the
   // address stage; delayed accepted requests continue toward cache responses.
   assign address_step = fragment_request_input_ready;
@@ -1557,7 +1578,7 @@ localparam unsigned ValidPipeDepth = 103;
   assign delayed_texture_wait =
       fragment_request_control_output.valid
       && fragment_request_delay_output.use_texture
-      && !l1_resp_valid;
+      && !texture_response_available;
 
   assign fragment_request_output_ready = !delayed_texture_wait && l1_cache_req_ready;
 
@@ -1608,11 +1629,49 @@ localparam unsigned ValidPipeDepth = 103;
             fragment_request_control_output.valid
             && (!fragment_request_delay_output.use_texture || texture_response_ready);
 
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      texture_response_queue_wr_ptr <= '0;
+      texture_response_queue_rd_ptr <= '0;
+      texture_response_queue_count  <= '0;
+    end else begin
+      if (texture_response_queue_push) begin
+        texture_response_queue[texture_response_queue_wr_ptr] <= l1_resp_data;
+        if (texture_response_queue_wr_ptr == L1RespPtrWidth'(L1RespQueueDepth - 1)) begin
+          texture_response_queue_wr_ptr <= '0;
+        end else begin
+          texture_response_queue_wr_ptr <= texture_response_queue_wr_ptr + 1'b1;
+        end
+      end
+
+      if (texture_response_queue_pop) begin
+        if (texture_response_queue_rd_ptr == L1RespPtrWidth'(L1RespQueueDepth - 1)) begin
+          texture_response_queue_rd_ptr <= '0;
+        end else begin
+          texture_response_queue_rd_ptr <= texture_response_queue_rd_ptr + 1'b1;
+        end
+      end
+
+      case ({
+        texture_response_queue_push, texture_response_queue_pop
+      })
+        2'b10:   texture_response_queue_count <= texture_response_queue_count + 1'b1;
+        2'b01:   texture_response_queue_count <= texture_response_queue_count - 1'b1;
+        default: texture_response_queue_count <= texture_response_queue_count;
+      endcase
+
+      if (texture_response_queue_push && !texture_response_queue_pop
+                      && (texture_response_queue_count == L1RespCountWidth'(L1RespQueueDepth))) begin
+        $fatal(1, "thread texture response queue overflow");
+      end
+    end
+  end
+
   fragment_shader u_fragment_shader (
       .clk(clk),
       .rst_n(rst_n),
       .pixel_color(fragment_request_delay_output.pixel_color),
-      .texture_color(color_argb_t'(l1_resp_data)),
+      .texture_color(color_argb_t'(texture_response_data)),
       .env_color('0),
       .op(fragment_request_delay_output.op),
       .valid_in(fragment_shader_input_valid),

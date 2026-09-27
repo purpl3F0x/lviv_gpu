@@ -7,7 +7,7 @@ SNAPSHOT = tb_sim
 
 # Source files
 RTL_SRCS = ../../rtl/texture_cache.sv
-TB_SRCS  = tb_texture_cache.sv
+TB_SRCS  = ../common/axi_ram.v tb_texture_cache.sv
 
 .PHONY: all compile run waves clean
 

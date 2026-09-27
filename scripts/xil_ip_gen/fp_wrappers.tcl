@@ -96,3 +96,21 @@ set_property -dict [list \
   CONFIG.Has_RESULT_TREADY {false} \
   CONFIG.Operation_Type {Multiply} \
   CONFIG.Result_Precision_Type {Single}] [get_ips xil_fp_mul]
+
+create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name xil_fp_fma
+set_property -dict [list \
+  CONFIG.A_Precision_Type {Single} \
+  CONFIG.Add_Sub_Value {Add} \
+  CONFIG.C_A_Exponent_Width {8} \
+  CONFIG.C_A_Fraction_Width {24} \
+  CONFIG.C_Latency {19} \
+  CONFIG.C_Mult_Usage {Full_Usage} \
+  CONFIG.C_Rate {1} \
+  CONFIG.C_Result_Exponent_Width {8} \
+  CONFIG.C_Result_Fraction_Width {24} \
+  CONFIG.Flow_Control {NonBlocking} \
+  CONFIG.Has_ACLKEN {true} \
+  CONFIG.Has_RESULT_TREADY {false} \
+  CONFIG.Operation_Type {FMA} \
+  CONFIG.Result_Precision_Type {Single} \
+] [get_ips xil_fp_fma]

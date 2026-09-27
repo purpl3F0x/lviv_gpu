@@ -1680,9 +1680,20 @@ module thread (
       .texture_color(color_argb_t'(texture_response_data)),
       .env_color('0),
       .op(fragment_request_delay_output.op),
-      .valid_in(fragment_shader_input_valid),
+      .valid_in(),  // Leave unused
       .fragment_color(fragment_color_tdata),
-      .valid_out(fragment_valid_tdata)
+      .valid_out()
+  );
+
+  delay_pipe #(
+      .WIDTH (1),
+      .STAGES(FRAGMENT_SHADER_LATENCY_STAGES)
+  ) u_fragment_valid_to_output (
+      .clk(clk),
+      .rst_n(rst_n),
+      .clken(1'b1),
+      .data_in(fragment_shader_input_valid),
+      .data_out(fragment_valid_tdata)
   );
 
   delay_pipe #(

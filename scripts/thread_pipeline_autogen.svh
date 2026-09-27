@@ -89,44 +89,44 @@ assign comp_z_tdata = fp_cmp_1_pred;
 // fp_fma_3         -> fp_fma_2          out=fp_fma_2_res        start= 16  end= 35  valid=(pipe_en)  expr=fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))
 // fp_fma_2         -> fp_fma_3          out=fp_fma_3_res        start= 35  end= 54  valid=(pipe_en)  expr=fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))
 // fp_fma_4         -> fp_fma_4          out=fp_fma_4_res        start= 35  end= 54  valid=(pipe_en)  expr=fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area))))
-// mem_read_1       -> mem_read_1        out=mem_read_1_rdata    start= 53  end= 55  valid=(pipe_en)  expr=mem_read(addr)
+// mem_read_1       -> mem_read_1        out=mem_read_1_rdata    start= 53  end= 56  valid=(pipe_en)  expr=mem_read(addr)
 // fp_recip_1       -> fp_recip_1        out=fp_recip_1_out      start= 54  end= 83  valid=(pipe_en)  expr=(1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area)))))
-// fp_cmp_1         -> fp_cmp_1          out=fp_cmp_1_pred       start= 55  end= 56  valid=(pipe_en)  expr=(fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))) <= mem_read(addr))
-// mem_write_1      -> mem_write_1       out=mem_write_1_pred    start= 56  end= 57  valid=(pipe_en)  expr=mem_write(addr, fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))))
+// fp_cmp_1         -> fp_cmp_1          out=fp_cmp_1_pred       start= 56  end= 58  valid=(pipe_en)  expr=(fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))) <= mem_read(addr))
+// mem_write_1      -> mem_write_1       out=mem_write_1_pred    start= 58  end= 59  valid=(pipe_en)  expr=mem_write(addr, fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))))
 // fp_mul_5         -> fp_mul_8          out=fp_mul_8_res        start= 83  end= 91  valid=(pipe_en)  expr=((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))
 // fp_mul_7         -> fp_mul_9          out=fp_mul_9_res        start= 83  end= 91  valid=(pipe_en)  expr=((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))
 // fp_mul_9         -> fp_mul_10         out=fp_mul_10_res       start= 83  end= 91  valid=(pipe_en)  expr=((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))
-// fp_to_fx2_23_1   -> fp_to_fx2_23_1    out=fp_to_fx2_23_1_res  start= 91  end= 93  valid=(pipe_en)  expr=fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))
-// fp_to_fx2_23_2   -> fp_to_fx2_23_2    out=fp_to_fx2_23_2_res  start= 91  end= 93  valid=(pipe_en)  expr=fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area))))
-// fp_to_fx2_23_3   -> fp_to_fx2_23_3    out=fp_to_fx2_23_3_res  start= 91  end= 93  valid=(pipe_en)  expr=fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area))))
-// fx_color_mul_1   -> fx_color_mul_1    out=fx_color_mul_1_res  start= 93  end= 94  valid=(pipe_en)  expr=(v0_color_r * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))
-// fx_color_mul_2   -> fx_color_mul_2    out=fx_color_mul_2_res  start= 93  end= 94  valid=(pipe_en)  expr=(v0_color_g * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))
-// fx_color_mul_3   -> fx_color_mul_3    out=fx_color_mul_3_res  start= 93  end= 94  valid=(pipe_en)  expr=(v0_color_b * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))
-// fx_color_mul_4   -> fx_color_mul_4    out=fx_color_mul_4_res  start= 93  end= 94  valid=(pipe_en)  expr=(v0_color_a * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))
-// fx_texture_mul_1 -> fx_texture_mul_1  out=fx_texture_mul_1_res  start= 93  end= 94  valid=(pipe_en)  expr=(v0_texture_u * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))
-// fx_texture_mul_2 -> fx_texture_mul_2  out=fx_texture_mul_2_res  start= 93  end= 94  valid=(pipe_en)  expr=(v0_texture_v * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))
-// fx_color_fma_1   -> fx_color_fma_1    out=fx_color_fma_1_res  start= 94  end= 96  valid=(pipe_en)  expr=fma(v1_color_r, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_r * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))
-// fx_color_fma_3   -> fx_color_fma_2    out=fx_color_fma_2_res  start= 94  end= 96  valid=(pipe_en)  expr=fma(v1_color_g, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_g * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))
-// fx_color_fma_5   -> fx_color_fma_3    out=fx_color_fma_3_res  start= 94  end= 96  valid=(pipe_en)  expr=fma(v1_color_b, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_b * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))
-// fx_color_fma_7   -> fx_color_fma_4    out=fx_color_fma_4_res  start= 94  end= 96  valid=(pipe_en)  expr=fma(v1_color_a, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_a * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))
-// fx_texture_fma_1 -> fx_texture_fma_1  out=fx_texture_fma_1_res  start= 94  end= 96  valid=(pipe_en)  expr=fma(v1_texture_u, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_texture_u * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))
-// fx_texture_fma_3 -> fx_texture_fma_2  out=fx_texture_fma_2_res  start= 94  end= 96  valid=(pipe_en)  expr=fma(v1_texture_v, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_texture_v * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))
-// fx_color_fma_2   -> fx_color_fma_5    out=fx_color_fma_5_res  start= 96  end= 98  valid=(pipe_en)  expr=fma(v2_color_r, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_r, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_r * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))))
-// fx_color_fma_4   -> fx_color_fma_6    out=fx_color_fma_6_res  start= 96  end= 98  valid=(pipe_en)  expr=fma(v2_color_g, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_g, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_g * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))))
-// fx_color_fma_6   -> fx_color_fma_7    out=fx_color_fma_7_res  start= 96  end= 98  valid=(pipe_en)  expr=fma(v2_color_b, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_b, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_b * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))))
-// fx_color_fma_8   -> fx_color_fma_8    out=fx_color_fma_8_res  start= 96  end= 98  valid=(pipe_en)  expr=fma(v2_color_a, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_a, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_a * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))))
-// fx_texture_fma_2 -> fx_texture_fma_3  out=fx_texture_fma_3_res  start= 96  end= 98  valid=(pipe_en)  expr=fma(v2_texture_u, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_texture_u, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_texture_u * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))))
-// fx_texture_fma_4 -> fx_texture_fma_4  out=fx_texture_fma_4_res  start= 96  end= 98  valid=(pipe_en)  expr=fma(v2_texture_v, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_texture_v, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_texture_v * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))))
-// fx_color_to_u8_1 -> fx_color_to_u8_1  out=fx_color_to_u8_1_res  start= 98  end= 99  valid=(pipe_en)  expr=fx_color_to_u8(fma(v2_color_r, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_r, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_r * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))))
-// fx_color_to_u8_2 -> fx_color_to_u8_2  out=fx_color_to_u8_2_res  start= 98  end= 99  valid=(pipe_en)  expr=fx_color_to_u8(fma(v2_color_g, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_g, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_g * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))))
-// fx_color_to_u8_3 -> fx_color_to_u8_3  out=fx_color_to_u8_3_res  start= 98  end= 99  valid=(pipe_en)  expr=fx_color_to_u8(fma(v2_color_b, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_b, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_b * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))))
-// fx_color_to_u8_4 -> fx_color_to_u8_4  out=fx_color_to_u8_4_res  start= 98  end= 99  valid=(pipe_en)  expr=fx_color_to_u8(fma(v2_color_a, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_a, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_a * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))))
+// fp_to_fx2_23_1   -> fp_to_fx2_23_1    out=fp_to_fx2_23_1_res  start= 91  end= 97  valid=(pipe_en)  expr=fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))
+// fp_to_fx2_23_2   -> fp_to_fx2_23_2    out=fp_to_fx2_23_2_res  start= 91  end= 97  valid=(pipe_en)  expr=fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area))))
+// fp_to_fx2_23_3   -> fp_to_fx2_23_3    out=fp_to_fx2_23_3_res  start= 91  end= 97  valid=(pipe_en)  expr=fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area))))
+// fx_color_mul_1   -> fx_color_mul_1    out=fx_color_mul_1_res  start= 97  end= 99  valid=(pipe_en)  expr=(v0_color_r * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))
+// fx_color_mul_2   -> fx_color_mul_2    out=fx_color_mul_2_res  start= 97  end= 99  valid=(pipe_en)  expr=(v0_color_g * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))
+// fx_color_mul_3   -> fx_color_mul_3    out=fx_color_mul_3_res  start= 97  end= 99  valid=(pipe_en)  expr=(v0_color_b * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))
+// fx_color_mul_4   -> fx_color_mul_4    out=fx_color_mul_4_res  start= 97  end= 99  valid=(pipe_en)  expr=(v0_color_a * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))
+// fx_texture_mul_1 -> fx_texture_mul_1  out=fx_texture_mul_1_res  start= 97  end= 99  valid=(pipe_en)  expr=(v0_texture_u * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))
+// fx_texture_mul_2 -> fx_texture_mul_2  out=fx_texture_mul_2_res  start= 97  end= 99  valid=(pipe_en)  expr=(v0_texture_v * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))
+// fx_color_fma_1   -> fx_color_fma_1    out=fx_color_fma_1_res  start= 99  end=102  valid=(pipe_en)  expr=fma(v1_color_r, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_r * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))
+// fx_color_fma_3   -> fx_color_fma_2    out=fx_color_fma_2_res  start= 99  end=102  valid=(pipe_en)  expr=fma(v1_color_g, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_g * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))
+// fx_color_fma_5   -> fx_color_fma_3    out=fx_color_fma_3_res  start= 99  end=102  valid=(pipe_en)  expr=fma(v1_color_b, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_b * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))
+// fx_color_fma_7   -> fx_color_fma_4    out=fx_color_fma_4_res  start= 99  end=102  valid=(pipe_en)  expr=fma(v1_color_a, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_a * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))
+// fx_texture_fma_1 -> fx_texture_fma_1  out=fx_texture_fma_1_res  start= 99  end=102  valid=(pipe_en)  expr=fma(v1_texture_u, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_texture_u * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))
+// fx_texture_fma_3 -> fx_texture_fma_2  out=fx_texture_fma_2_res  start= 99  end=102  valid=(pipe_en)  expr=fma(v1_texture_v, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_texture_v * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))
+// fx_color_fma_2   -> fx_color_fma_5    out=fx_color_fma_5_res  start=102  end=105  valid=(pipe_en)  expr=fma(v2_color_r, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_r, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_r * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))))
+// fx_color_fma_4   -> fx_color_fma_6    out=fx_color_fma_6_res  start=102  end=105  valid=(pipe_en)  expr=fma(v2_color_g, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_g, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_g * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))))
+// fx_color_fma_6   -> fx_color_fma_7    out=fx_color_fma_7_res  start=102  end=105  valid=(pipe_en)  expr=fma(v2_color_b, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_b, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_b * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))))
+// fx_color_fma_8   -> fx_color_fma_8    out=fx_color_fma_8_res  start=102  end=105  valid=(pipe_en)  expr=fma(v2_color_a, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_a, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_a * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))))
+// fx_texture_fma_2 -> fx_texture_fma_3  out=fx_texture_fma_3_res  start=102  end=105  valid=(pipe_en)  expr=fma(v2_texture_u, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_texture_u, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_texture_u * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))))
+// fx_texture_fma_4 -> fx_texture_fma_4  out=fx_texture_fma_4_res  start=102  end=105  valid=(pipe_en)  expr=fma(v2_texture_v, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_texture_v, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_texture_v * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))))))
+// fx_color_to_u8_1 -> fx_color_to_u8_1  out=fx_color_to_u8_1_res  start=105  end=107  valid=(pipe_en)  expr=fx_color_to_u8(fma(v2_color_r, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_r, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_r * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))))
+// fx_color_to_u8_2 -> fx_color_to_u8_2  out=fx_color_to_u8_2_res  start=105  end=107  valid=(pipe_en)  expr=fx_color_to_u8(fma(v2_color_g, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_g, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_g * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))))
+// fx_color_to_u8_3 -> fx_color_to_u8_3  out=fx_color_to_u8_3_res  start=105  end=107  valid=(pipe_en)  expr=fx_color_to_u8(fma(v2_color_b, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_b, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_b * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))))
+// fx_color_to_u8_4 -> fx_color_to_u8_4  out=fx_color_to_u8_4_res  start=105  end=107  valid=(pipe_en)  expr=fx_color_to_u8(fma(v2_color_a, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))), fma(v1_color_a, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), (v0_color_a * fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))))))
 
 // ---- Non-AXIS consumer fire wiring ----
 logic mem_read_1_fire;
 logic fp_cmp_1_fire;
 assign mem_read_1_fire = valid_pipe[53];
-assign fp_cmp_1_fire   = valid_pipe[56];
+assign fp_cmp_1_fire = valid_pipe[57];
 
 // ---- Delay alignment for late-consumed inputs ----
 logic [31:0] align_v0_z_to_fp_mul_10_i0_d8;
@@ -142,533 +142,92 @@ logic [31:0] align_fp_mul_3_to_fp_fma_2_i1_d27;
 logic [31:0] align_v2_z_to_fp_fma_4_i0_d35;
 logic [31:0] align_fp_mul_3_to_fp_fma_4_i1_d27;
 logic [THREAD_ADDR_W-1:0] align_addr_to_mem_read_1_i0_d53;
-logic [31:0] align_fp_fma_4_to_fp_cmp_1_i0_d1;
-logic [THREAD_ADDR_W-1:0] align_addr_to_mem_write_1_i0_d56;
-logic [31:0] align_fp_fma_4_to_mem_write_1_i1_d2;
+logic [31:0] align_fp_fma_4_to_fp_cmp_1_i0_d2;
+logic [THREAD_ADDR_W-1:0] align_addr_to_mem_write_1_i0_d58;
+logic [31:0] align_fp_fma_4_to_mem_write_1_i1_d4;
 logic [31:0] align_fp_mul_4_to_fp_mul_5_i1_d67;
 logic [31:0] align_fp_mul_6_to_fp_mul_7_i1_d67;
 logic [31:0] align_fp_mul_8_to_fp_mul_9_i1_d67;
-logic [7:0] align_v0_color_r_to_fx_color_mul_1_i0_d93;
-logic [7:0] align_v0_color_g_to_fx_color_mul_2_i0_d93;
-logic [7:0] align_v0_color_b_to_fx_color_mul_3_i0_d93;
-logic [7:0] align_v0_color_a_to_fx_color_mul_4_i0_d93;
-logic [17:0] align_v0_texture_u_to_fx_texture_mul_1_i1_d93;
-logic [17:0] align_v0_texture_v_to_fx_texture_mul_2_i1_d93;
-logic [7:0] align_v1_color_r_to_fx_color_fma_1_i0_d94;
-logic [24:0] align_fp_to_fx2_23_2_to_fx_color_fma_1_i1_d1;
-logic [7:0] align_v1_color_g_to_fx_color_fma_3_i0_d94;
-logic [24:0] align_fp_to_fx2_23_2_to_fx_color_fma_3_i1_d1;
-logic [7:0] align_v1_color_b_to_fx_color_fma_5_i0_d94;
-logic [24:0] align_fp_to_fx2_23_2_to_fx_color_fma_5_i1_d1;
-logic [7:0] align_v1_color_a_to_fx_color_fma_7_i0_d94;
-logic [24:0] align_fp_to_fx2_23_2_to_fx_color_fma_7_i1_d1;
-logic [24:0] align_fp_to_fx2_23_2_to_fx_texture_fma_1_i0_d1;
-logic [17:0] align_v1_texture_u_to_fx_texture_fma_1_i1_d94;
-logic [24:0] align_fp_to_fx2_23_2_to_fx_texture_fma_3_i0_d1;
-logic [17:0] align_v1_texture_v_to_fx_texture_fma_3_i1_d94;
-logic [7:0] align_v2_color_r_to_fx_color_fma_2_i0_d96;
-logic [24:0] align_fp_to_fx2_23_3_to_fx_color_fma_2_i1_d3;
-logic [7:0] align_v2_color_g_to_fx_color_fma_4_i0_d96;
-logic [24:0] align_fp_to_fx2_23_3_to_fx_color_fma_4_i1_d3;
-logic [7:0] align_v2_color_b_to_fx_color_fma_6_i0_d96;
-logic [24:0] align_fp_to_fx2_23_3_to_fx_color_fma_6_i1_d3;
-logic [7:0] align_v2_color_a_to_fx_color_fma_8_i0_d96;
-logic [24:0] align_fp_to_fx2_23_3_to_fx_color_fma_8_i1_d3;
-logic [24:0] align_fp_to_fx2_23_3_to_fx_texture_fma_2_i0_d3;
-logic [17:0] align_v2_texture_u_to_fx_texture_fma_2_i1_d96;
-logic [24:0] align_fp_to_fx2_23_3_to_fx_texture_fma_4_i0_d3;
-logic [17:0] align_v2_texture_v_to_fx_texture_fma_4_i1_d96;
+logic [7:0] align_v0_color_r_to_fx_color_mul_1_i0_d97;
+logic [7:0] align_v0_color_g_to_fx_color_mul_2_i0_d97;
+logic [7:0] align_v0_color_b_to_fx_color_mul_3_i0_d97;
+logic [7:0] align_v0_color_a_to_fx_color_mul_4_i0_d97;
+logic [17:0] align_v0_texture_u_to_fx_texture_mul_1_i1_d97;
+logic [17:0] align_v0_texture_v_to_fx_texture_mul_2_i1_d97;
+logic [7:0] align_v1_color_r_to_fx_color_fma_1_i0_d99;
+logic [24:0] align_fp_to_fx2_23_2_to_fx_color_fma_1_i1_d2;
+logic [7:0] align_v1_color_g_to_fx_color_fma_3_i0_d99;
+logic [24:0] align_fp_to_fx2_23_2_to_fx_color_fma_3_i1_d2;
+logic [7:0] align_v1_color_b_to_fx_color_fma_5_i0_d99;
+logic [24:0] align_fp_to_fx2_23_2_to_fx_color_fma_5_i1_d2;
+logic [7:0] align_v1_color_a_to_fx_color_fma_7_i0_d99;
+logic [24:0] align_fp_to_fx2_23_2_to_fx_color_fma_7_i1_d2;
+logic [24:0] align_fp_to_fx2_23_2_to_fx_texture_fma_1_i0_d2;
+logic [17:0] align_v1_texture_u_to_fx_texture_fma_1_i1_d99;
+logic [24:0] align_fp_to_fx2_23_2_to_fx_texture_fma_3_i0_d2;
+logic [17:0] align_v1_texture_v_to_fx_texture_fma_3_i1_d99;
+logic [7:0] align_v2_color_r_to_fx_color_fma_2_i0_d102;
+logic [24:0] align_fp_to_fx2_23_3_to_fx_color_fma_2_i1_d5;
+logic [7:0] align_v2_color_g_to_fx_color_fma_4_i0_d102;
+logic [24:0] align_fp_to_fx2_23_3_to_fx_color_fma_4_i1_d5;
+logic [7:0] align_v2_color_b_to_fx_color_fma_6_i0_d102;
+logic [24:0] align_fp_to_fx2_23_3_to_fx_color_fma_6_i1_d5;
+logic [7:0] align_v2_color_a_to_fx_color_fma_8_i0_d102;
+logic [24:0] align_fp_to_fx2_23_3_to_fx_color_fma_8_i1_d5;
+logic [24:0] align_fp_to_fx2_23_3_to_fx_texture_fma_2_i0_d5;
+logic [17:0] align_v2_texture_u_to_fx_texture_fma_2_i1_d102;
+logic [24:0] align_fp_to_fx2_23_3_to_fx_texture_fma_4_i0_d5;
+logic [17:0] align_v2_texture_v_to_fx_texture_fma_4_i1_d102;
 
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(8)
-) u_align_v0_z_to_fp_mul_10_i0_d8_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v0_z),
-    .data_out(align_v0_z_to_fp_mul_10_i0_d8)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(8)
-) u_align_v0_w_to_fp_mul_4_i0_d8_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v0_w),
-    .data_out(align_v0_w_to_fp_mul_4_i0_d8)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(8)
-) u_align_v1_w_to_fp_mul_6_i0_d8_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v1_w),
-    .data_out(align_v1_w_to_fp_mul_6_i0_d8)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(8)
-) u_align_v2_w_to_fp_mul_8_i0_d8_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v2_w),
-    .data_out(align_v2_w_to_fp_mul_8_i0_d8)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(8)
-) u_align_v1_w_to_fp_fma_1_i0_d16_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(align_v1_w_to_fp_mul_6_i0_d8),
-    .data_out(align_v1_w_to_fp_fma_1_i0_d16)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(8)
-) u_align_fp_mul_2_to_fp_fma_1_i1_d8_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_mul_2_res),
-    .data_out(align_fp_mul_2_to_fp_fma_1_i1_d8)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(16)
-) u_align_v1_z_to_fp_fma_3_i0_d16_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v1_z),
-    .data_out(align_v1_z_to_fp_fma_3_i0_d16)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(8)
-) u_align_fp_mul_2_to_fp_fma_3_i1_d8_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_mul_2_res),
-    .data_out(align_fp_mul_2_to_fp_fma_3_i1_d8)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(27)
-) u_align_v2_w_to_fp_fma_2_i0_d35_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(align_v2_w_to_fp_mul_8_i0_d8),
-    .data_out(align_v2_w_to_fp_fma_2_i0_d35)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(27)
-) u_align_fp_mul_3_to_fp_fma_2_i1_d27_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_mul_3_res),
-    .data_out(align_fp_mul_3_to_fp_fma_2_i1_d27)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(35)
-) u_align_v2_z_to_fp_fma_4_i0_d35_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v2_z),
-    .data_out(align_v2_z_to_fp_fma_4_i0_d35)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(27)
-) u_align_fp_mul_3_to_fp_fma_4_i1_d27_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_mul_3_res),
-    .data_out(align_fp_mul_3_to_fp_fma_4_i1_d27)
-);
-delay_pipe #(
-    .WIDTH (THREAD_ADDR_W),
-    .STAGES(53)
-) u_align_addr_to_mem_read_1_i0_d53_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.addr[THREAD_ADDR_W-1:0]),
-    .data_out(align_addr_to_mem_read_1_i0_d53)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(1)
-) u_align_fp_fma_4_to_fp_cmp_1_i0_d1_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_fma_4_res),
-    .data_out(align_fp_fma_4_to_fp_cmp_1_i0_d1)
-);
-delay_pipe #(
-    .WIDTH (THREAD_ADDR_W),
-    .STAGES(3)
-) u_align_addr_to_mem_write_1_i0_d56_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(align_addr_to_mem_read_1_i0_d53),
-    .data_out(align_addr_to_mem_write_1_i0_d56)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(2)
-) u_align_fp_fma_4_to_mem_write_1_i1_d2_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_fma_4_res),
-    .data_out(align_fp_fma_4_to_mem_write_1_i1_d2)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(67)
-) u_align_fp_mul_4_to_fp_mul_5_i1_d67_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_mul_5_res),
-    .data_out(align_fp_mul_4_to_fp_mul_5_i1_d67)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(67)
-) u_align_fp_mul_6_to_fp_mul_7_i1_d67_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_mul_6_res),
-    .data_out(align_fp_mul_6_to_fp_mul_7_i1_d67)
-);
-delay_pipe #(
-    .WIDTH (32),
-    .STAGES(67)
-) u_align_fp_mul_8_to_fp_mul_9_i1_d67_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_mul_7_res),
-    .data_out(align_fp_mul_8_to_fp_mul_9_i1_d67)
-);
-delay_pipe #(
-    .WIDTH (8),
-    .STAGES(93)
-) u_align_v0_color_r_to_fx_color_mul_1_i0_d93_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v0_color_r),
-    .data_out(align_v0_color_r_to_fx_color_mul_1_i0_d93)
-);
-delay_pipe #(
-    .WIDTH (8),
-    .STAGES(93)
-) u_align_v0_color_g_to_fx_color_mul_2_i0_d93_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v0_color_g),
-    .data_out(align_v0_color_g_to_fx_color_mul_2_i0_d93)
-);
-delay_pipe #(
-    .WIDTH (8),
-    .STAGES(93)
-) u_align_v0_color_b_to_fx_color_mul_3_i0_d93_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v0_color_b),
-    .data_out(align_v0_color_b_to_fx_color_mul_3_i0_d93)
-);
-delay_pipe #(
-    .WIDTH (8),
-    .STAGES(93)
-) u_align_v0_color_a_to_fx_color_mul_4_i0_d93_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v0_color_a),
-    .data_out(align_v0_color_a_to_fx_color_mul_4_i0_d93)
-);
-delay_pipe #(
-    .WIDTH (18),
-    .STAGES(93)
-) u_align_v0_texture_u_to_fx_texture_mul_1_i1_d93_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v0_u),
-    .data_out(align_v0_texture_u_to_fx_texture_mul_1_i1_d93)
-);
-delay_pipe #(
-    .WIDTH (18),
-    .STAGES(93)
-) u_align_v0_texture_v_to_fx_texture_mul_2_i1_d93_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v0_v),
-    .data_out(align_v0_texture_v_to_fx_texture_mul_2_i1_d93)
-);
-delay_pipe #(
-    .WIDTH (8),
-    .STAGES(94)
-) u_align_v1_color_r_to_fx_color_fma_1_i0_d94_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v1_color_r),
-    .data_out(align_v1_color_r_to_fx_color_fma_1_i0_d94)
-);
-delay_pipe #(
-    .WIDTH (25),
-    .STAGES(1)
-) u_align_fp_to_fx2_23_2_to_fx_color_fma_1_i1_d1_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_to_fx2_23_2_res),
-    .data_out(align_fp_to_fx2_23_2_to_fx_color_fma_1_i1_d1)
-);
-delay_pipe #(
-    .WIDTH (8),
-    .STAGES(94)
-) u_align_v1_color_g_to_fx_color_fma_3_i0_d94_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v1_color_g),
-    .data_out(align_v1_color_g_to_fx_color_fma_3_i0_d94)
-);
-delay_pipe #(
-    .WIDTH (25),
-    .STAGES(1)
-) u_align_fp_to_fx2_23_2_to_fx_color_fma_3_i1_d1_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_to_fx2_23_2_res),
-    .data_out(align_fp_to_fx2_23_2_to_fx_color_fma_3_i1_d1)
-);
-delay_pipe #(
-    .WIDTH (8),
-    .STAGES(94)
-) u_align_v1_color_b_to_fx_color_fma_5_i0_d94_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v1_color_b),
-    .data_out(align_v1_color_b_to_fx_color_fma_5_i0_d94)
-);
-delay_pipe #(
-    .WIDTH (25),
-    .STAGES(1)
-) u_align_fp_to_fx2_23_2_to_fx_color_fma_5_i1_d1_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_to_fx2_23_2_res),
-    .data_out(align_fp_to_fx2_23_2_to_fx_color_fma_5_i1_d1)
-);
-delay_pipe #(
-    .WIDTH (8),
-    .STAGES(94)
-) u_align_v1_color_a_to_fx_color_fma_7_i0_d94_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v1_color_a),
-    .data_out(align_v1_color_a_to_fx_color_fma_7_i0_d94)
-);
-delay_pipe #(
-    .WIDTH (25),
-    .STAGES(1)
-) u_align_fp_to_fx2_23_2_to_fx_color_fma_7_i1_d1_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_to_fx2_23_2_res),
-    .data_out(align_fp_to_fx2_23_2_to_fx_color_fma_7_i1_d1)
-);
-delay_pipe #(
-    .WIDTH (25),
-    .STAGES(1)
-) u_align_fp_to_fx2_23_2_to_fx_texture_fma_1_i0_d1_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_to_fx2_23_2_res),
-    .data_out(align_fp_to_fx2_23_2_to_fx_texture_fma_1_i0_d1)
-);
-delay_pipe #(
-    .WIDTH (18),
-    .STAGES(94)
-) u_align_v1_texture_u_to_fx_texture_fma_1_i1_d94_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v1_u),
-    .data_out(align_v1_texture_u_to_fx_texture_fma_1_i1_d94)
-);
-delay_pipe #(
-    .WIDTH (25),
-    .STAGES(1)
-) u_align_fp_to_fx2_23_2_to_fx_texture_fma_3_i0_d1_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_to_fx2_23_2_res),
-    .data_out(align_fp_to_fx2_23_2_to_fx_texture_fma_3_i0_d1)
-);
-delay_pipe #(
-    .WIDTH (18),
-    .STAGES(94)
-) u_align_v1_texture_v_to_fx_texture_fma_3_i1_d94_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v1_v),
-    .data_out(align_v1_texture_v_to_fx_texture_fma_3_i1_d94)
-);
-delay_pipe #(
-    .WIDTH (8),
-    .STAGES(96)
-) u_align_v2_color_r_to_fx_color_fma_2_i0_d96_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v2_color_r),
-    .data_out(align_v2_color_r_to_fx_color_fma_2_i0_d96)
-);
-delay_pipe #(
-    .WIDTH (25),
-    .STAGES(3)
-) u_align_fp_to_fx2_23_3_to_fx_color_fma_2_i1_d3_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_to_fx2_23_3_res),
-    .data_out(align_fp_to_fx2_23_3_to_fx_color_fma_2_i1_d3)
-);
-delay_pipe #(
-    .WIDTH (8),
-    .STAGES(96)
-) u_align_v2_color_g_to_fx_color_fma_4_i0_d96_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v2_color_g),
-    .data_out(align_v2_color_g_to_fx_color_fma_4_i0_d96)
-);
-delay_pipe #(
-    .WIDTH (25),
-    .STAGES(3)
-) u_align_fp_to_fx2_23_3_to_fx_color_fma_4_i1_d3_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_to_fx2_23_3_res),
-    .data_out(align_fp_to_fx2_23_3_to_fx_color_fma_4_i1_d3)
-);
-delay_pipe #(
-    .WIDTH (8),
-    .STAGES(96)
-) u_align_v2_color_b_to_fx_color_fma_6_i0_d96_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v2_color_b),
-    .data_out(align_v2_color_b_to_fx_color_fma_6_i0_d96)
-);
-delay_pipe #(
-    .WIDTH (25),
-    .STAGES(3)
-) u_align_fp_to_fx2_23_3_to_fx_color_fma_6_i1_d3_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_to_fx2_23_3_res),
-    .data_out(align_fp_to_fx2_23_3_to_fx_color_fma_6_i1_d3)
-);
-delay_pipe #(
-    .WIDTH (8),
-    .STAGES(96)
-) u_align_v2_color_a_to_fx_color_fma_8_i0_d96_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v2_color_a),
-    .data_out(align_v2_color_a_to_fx_color_fma_8_i0_d96)
-);
-delay_pipe #(
-    .WIDTH (25),
-    .STAGES(3)
-) u_align_fp_to_fx2_23_3_to_fx_color_fma_8_i1_d3_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_to_fx2_23_3_res),
-    .data_out(align_fp_to_fx2_23_3_to_fx_color_fma_8_i1_d3)
-);
-delay_pipe #(
-    .WIDTH (25),
-    .STAGES(3)
-) u_align_fp_to_fx2_23_3_to_fx_texture_fma_2_i0_d3_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_to_fx2_23_3_res),
-    .data_out(align_fp_to_fx2_23_3_to_fx_texture_fma_2_i0_d3)
-);
-delay_pipe #(
-    .WIDTH (18),
-    .STAGES(96)
-) u_align_v2_texture_u_to_fx_texture_fma_2_i1_d96_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v2_u),
-    .data_out(align_v2_texture_u_to_fx_texture_fma_2_i1_d96)
-);
-delay_pipe #(
-    .WIDTH (25),
-    .STAGES(3)
-) u_align_fp_to_fx2_23_3_to_fx_texture_fma_4_i0_d3_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(fp_to_fx2_23_3_res),
-    .data_out(align_fp_to_fx2_23_3_to_fx_texture_fma_4_i0_d3)
-);
-delay_pipe #(
-    .WIDTH (18),
-    .STAGES(96)
-) u_align_v2_texture_v_to_fx_texture_fma_4_i1_d96_data_delay (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(thread_data_buf.v2_v),
-    .data_out(align_v2_texture_v_to_fx_texture_fma_4_i1_d96)
-);
+delay_pipe #(.WIDTH(32), .STAGES(8)) u_align_v0_z_to_fp_mul_10_i0_d8_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v0_z), .data_out(align_v0_z_to_fp_mul_10_i0_d8));
+delay_pipe #(.WIDTH(32), .STAGES(8)) u_align_v0_w_to_fp_mul_4_i0_d8_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v0_w), .data_out(align_v0_w_to_fp_mul_4_i0_d8));
+delay_pipe #(.WIDTH(32), .STAGES(8)) u_align_v1_w_to_fp_mul_6_i0_d8_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v1_w), .data_out(align_v1_w_to_fp_mul_6_i0_d8));
+delay_pipe #(.WIDTH(32), .STAGES(8)) u_align_v2_w_to_fp_mul_8_i0_d8_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v2_w), .data_out(align_v2_w_to_fp_mul_8_i0_d8));
+delay_pipe #(.WIDTH(32), .STAGES(8)) u_align_v1_w_to_fp_fma_1_i0_d16_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(align_v1_w_to_fp_mul_6_i0_d8), .data_out(align_v1_w_to_fp_fma_1_i0_d16));
+delay_pipe #(.WIDTH(32), .STAGES(8)) u_align_fp_mul_2_to_fp_fma_1_i1_d8_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_mul_2_res), .data_out(align_fp_mul_2_to_fp_fma_1_i1_d8));
+delay_pipe #(.WIDTH(32), .STAGES(16)) u_align_v1_z_to_fp_fma_3_i0_d16_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v1_z), .data_out(align_v1_z_to_fp_fma_3_i0_d16));
+delay_pipe #(.WIDTH(32), .STAGES(8)) u_align_fp_mul_2_to_fp_fma_3_i1_d8_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_mul_2_res), .data_out(align_fp_mul_2_to_fp_fma_3_i1_d8));
+delay_pipe #(.WIDTH(32), .STAGES(27)) u_align_v2_w_to_fp_fma_2_i0_d35_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(align_v2_w_to_fp_mul_8_i0_d8), .data_out(align_v2_w_to_fp_fma_2_i0_d35));
+delay_pipe #(.WIDTH(32), .STAGES(27)) u_align_fp_mul_3_to_fp_fma_2_i1_d27_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_mul_3_res), .data_out(align_fp_mul_3_to_fp_fma_2_i1_d27));
+delay_pipe #(.WIDTH(32), .STAGES(35)) u_align_v2_z_to_fp_fma_4_i0_d35_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v2_z), .data_out(align_v2_z_to_fp_fma_4_i0_d35));
+delay_pipe #(.WIDTH(32), .STAGES(27)) u_align_fp_mul_3_to_fp_fma_4_i1_d27_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_mul_3_res), .data_out(align_fp_mul_3_to_fp_fma_4_i1_d27));
+delay_pipe #(.WIDTH(THREAD_ADDR_W), .STAGES(53)) u_align_addr_to_mem_read_1_i0_d53_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.addr[THREAD_ADDR_W-1:0]), .data_out(align_addr_to_mem_read_1_i0_d53));
+delay_pipe #(.WIDTH(32), .STAGES(2)) u_align_fp_fma_4_to_fp_cmp_1_i0_d2_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_fma_4_res), .data_out(align_fp_fma_4_to_fp_cmp_1_i0_d2));
+delay_pipe #(.WIDTH(THREAD_ADDR_W), .STAGES(5)) u_align_addr_to_mem_write_1_i0_d58_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(align_addr_to_mem_read_1_i0_d53), .data_out(align_addr_to_mem_write_1_i0_d58));
+delay_pipe #(.WIDTH(32), .STAGES(4)) u_align_fp_fma_4_to_mem_write_1_i1_d4_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_fma_4_res), .data_out(align_fp_fma_4_to_mem_write_1_i1_d4));
+delay_pipe #(.WIDTH(32), .STAGES(67)) u_align_fp_mul_4_to_fp_mul_5_i1_d67_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_mul_5_res), .data_out(align_fp_mul_4_to_fp_mul_5_i1_d67));
+delay_pipe #(.WIDTH(32), .STAGES(67)) u_align_fp_mul_6_to_fp_mul_7_i1_d67_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_mul_6_res), .data_out(align_fp_mul_6_to_fp_mul_7_i1_d67));
+delay_pipe #(.WIDTH(32), .STAGES(67)) u_align_fp_mul_8_to_fp_mul_9_i1_d67_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_mul_7_res), .data_out(align_fp_mul_8_to_fp_mul_9_i1_d67));
+delay_pipe #(.WIDTH(8), .STAGES(97)) u_align_v0_color_r_to_fx_color_mul_1_i0_d97_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v0_color_r), .data_out(align_v0_color_r_to_fx_color_mul_1_i0_d97));
+delay_pipe #(.WIDTH(8), .STAGES(97)) u_align_v0_color_g_to_fx_color_mul_2_i0_d97_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v0_color_g), .data_out(align_v0_color_g_to_fx_color_mul_2_i0_d97));
+delay_pipe #(.WIDTH(8), .STAGES(97)) u_align_v0_color_b_to_fx_color_mul_3_i0_d97_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v0_color_b), .data_out(align_v0_color_b_to_fx_color_mul_3_i0_d97));
+delay_pipe #(.WIDTH(8), .STAGES(97)) u_align_v0_color_a_to_fx_color_mul_4_i0_d97_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v0_color_a), .data_out(align_v0_color_a_to_fx_color_mul_4_i0_d97));
+delay_pipe #(.WIDTH(18), .STAGES(97)) u_align_v0_texture_u_to_fx_texture_mul_1_i1_d97_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v0_u), .data_out(align_v0_texture_u_to_fx_texture_mul_1_i1_d97));
+delay_pipe #(.WIDTH(18), .STAGES(97)) u_align_v0_texture_v_to_fx_texture_mul_2_i1_d97_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v0_v), .data_out(align_v0_texture_v_to_fx_texture_mul_2_i1_d97));
+delay_pipe #(.WIDTH(8), .STAGES(99)) u_align_v1_color_r_to_fx_color_fma_1_i0_d99_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v1_color_r), .data_out(align_v1_color_r_to_fx_color_fma_1_i0_d99));
+delay_pipe #(.WIDTH(25), .STAGES(2)) u_align_fp_to_fx2_23_2_to_fx_color_fma_1_i1_d2_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_to_fx2_23_2_res), .data_out(align_fp_to_fx2_23_2_to_fx_color_fma_1_i1_d2));
+delay_pipe #(.WIDTH(8), .STAGES(99)) u_align_v1_color_g_to_fx_color_fma_3_i0_d99_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v1_color_g), .data_out(align_v1_color_g_to_fx_color_fma_3_i0_d99));
+delay_pipe #(.WIDTH(25), .STAGES(2)) u_align_fp_to_fx2_23_2_to_fx_color_fma_3_i1_d2_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_to_fx2_23_2_res), .data_out(align_fp_to_fx2_23_2_to_fx_color_fma_3_i1_d2));
+delay_pipe #(.WIDTH(8), .STAGES(99)) u_align_v1_color_b_to_fx_color_fma_5_i0_d99_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v1_color_b), .data_out(align_v1_color_b_to_fx_color_fma_5_i0_d99));
+delay_pipe #(.WIDTH(25), .STAGES(2)) u_align_fp_to_fx2_23_2_to_fx_color_fma_5_i1_d2_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_to_fx2_23_2_res), .data_out(align_fp_to_fx2_23_2_to_fx_color_fma_5_i1_d2));
+delay_pipe #(.WIDTH(8), .STAGES(99)) u_align_v1_color_a_to_fx_color_fma_7_i0_d99_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v1_color_a), .data_out(align_v1_color_a_to_fx_color_fma_7_i0_d99));
+delay_pipe #(.WIDTH(25), .STAGES(2)) u_align_fp_to_fx2_23_2_to_fx_color_fma_7_i1_d2_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_to_fx2_23_2_res), .data_out(align_fp_to_fx2_23_2_to_fx_color_fma_7_i1_d2));
+delay_pipe #(.WIDTH(25), .STAGES(2)) u_align_fp_to_fx2_23_2_to_fx_texture_fma_1_i0_d2_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_to_fx2_23_2_res), .data_out(align_fp_to_fx2_23_2_to_fx_texture_fma_1_i0_d2));
+delay_pipe #(.WIDTH(18), .STAGES(99)) u_align_v1_texture_u_to_fx_texture_fma_1_i1_d99_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v1_u), .data_out(align_v1_texture_u_to_fx_texture_fma_1_i1_d99));
+delay_pipe #(.WIDTH(25), .STAGES(2)) u_align_fp_to_fx2_23_2_to_fx_texture_fma_3_i0_d2_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_to_fx2_23_2_res), .data_out(align_fp_to_fx2_23_2_to_fx_texture_fma_3_i0_d2));
+delay_pipe #(.WIDTH(18), .STAGES(99)) u_align_v1_texture_v_to_fx_texture_fma_3_i1_d99_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v1_v), .data_out(align_v1_texture_v_to_fx_texture_fma_3_i1_d99));
+delay_pipe #(.WIDTH(8), .STAGES(102)) u_align_v2_color_r_to_fx_color_fma_2_i0_d102_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v2_color_r), .data_out(align_v2_color_r_to_fx_color_fma_2_i0_d102));
+delay_pipe #(.WIDTH(25), .STAGES(5)) u_align_fp_to_fx2_23_3_to_fx_color_fma_2_i1_d5_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_to_fx2_23_3_res), .data_out(align_fp_to_fx2_23_3_to_fx_color_fma_2_i1_d5));
+delay_pipe #(.WIDTH(8), .STAGES(102)) u_align_v2_color_g_to_fx_color_fma_4_i0_d102_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v2_color_g), .data_out(align_v2_color_g_to_fx_color_fma_4_i0_d102));
+delay_pipe #(.WIDTH(25), .STAGES(5)) u_align_fp_to_fx2_23_3_to_fx_color_fma_4_i1_d5_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_to_fx2_23_3_res), .data_out(align_fp_to_fx2_23_3_to_fx_color_fma_4_i1_d5));
+delay_pipe #(.WIDTH(8), .STAGES(102)) u_align_v2_color_b_to_fx_color_fma_6_i0_d102_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v2_color_b), .data_out(align_v2_color_b_to_fx_color_fma_6_i0_d102));
+delay_pipe #(.WIDTH(25), .STAGES(5)) u_align_fp_to_fx2_23_3_to_fx_color_fma_6_i1_d5_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_to_fx2_23_3_res), .data_out(align_fp_to_fx2_23_3_to_fx_color_fma_6_i1_d5));
+delay_pipe #(.WIDTH(8), .STAGES(102)) u_align_v2_color_a_to_fx_color_fma_8_i0_d102_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v2_color_a), .data_out(align_v2_color_a_to_fx_color_fma_8_i0_d102));
+delay_pipe #(.WIDTH(25), .STAGES(5)) u_align_fp_to_fx2_23_3_to_fx_color_fma_8_i1_d5_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_to_fx2_23_3_res), .data_out(align_fp_to_fx2_23_3_to_fx_color_fma_8_i1_d5));
+delay_pipe #(.WIDTH(25), .STAGES(5)) u_align_fp_to_fx2_23_3_to_fx_texture_fma_2_i0_d5_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_to_fx2_23_3_res), .data_out(align_fp_to_fx2_23_3_to_fx_texture_fma_2_i0_d5));
+delay_pipe #(.WIDTH(18), .STAGES(102)) u_align_v2_texture_u_to_fx_texture_fma_2_i1_d102_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v2_u), .data_out(align_v2_texture_u_to_fx_texture_fma_2_i1_d102));
+delay_pipe #(.WIDTH(25), .STAGES(5)) u_align_fp_to_fx2_23_3_to_fx_texture_fma_4_i0_d5_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_to_fx2_23_3_res), .data_out(align_fp_to_fx2_23_3_to_fx_texture_fma_4_i0_d5));
+delay_pipe #(.WIDTH(18), .STAGES(102)) u_align_v2_texture_v_to_fx_texture_fma_4_i1_d102_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v2_v), .data_out(align_v2_texture_v_to_fx_texture_fma_4_i1_d102));
 
 // Leaf ready signals not used (internal distribution only)
 
@@ -678,139 +237,88 @@ delay_pipe #(
 // ---- Unit instantiation skeletons ----
 // NOTE: Non-blocking FP modules with aclken(pipe_en_internal)
 // NOTE: Valid is propagated explicitly via valid_pipe
-fp_mul #(
-    .LATENCY(8)
-) u_fp_mul_1 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+fp_mul #(.LATENCY(8)) u_fp_mul_1 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[1]),
     .valid_in(),
-    .a(thread_data_buf.e0),
-    .b(thread_data_buf.inv_area),
+    .a(thread_data_buf.e0), .b(thread_data_buf.inv_area),
     .result(fp_mul_1_res)
 );
-fp_mul #(
-    .LATENCY(8)
-) u_fp_mul_2 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+fp_mul #(.LATENCY(8)) u_fp_mul_2 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[1]),
     .valid_in(),
-    .a(thread_data_buf.e1),
-    .b(thread_data_buf.inv_area),
+    .a(thread_data_buf.e1), .b(thread_data_buf.inv_area),
     .result(fp_mul_2_res)
 );
-fp_mul #(
-    .LATENCY(8)
-) u_fp_mul_3 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+fp_mul #(.LATENCY(8)) u_fp_mul_3 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[1]),
     .valid_in(),
-    .a(thread_data_buf.e2),
-    .b(thread_data_buf.inv_area),
+    .a(thread_data_buf.e2), .b(thread_data_buf.inv_area),
     .result(fp_mul_3_res)
 );
-fp_mul #(
-    .LATENCY(8)
-) u_fp_mul_4 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+fp_mul #(.LATENCY(8)) u_fp_mul_4 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[9]),
     .valid_in(),
-    .a(align_v0_z_to_fp_mul_10_i0_d8),
-    .b(fp_mul_1_res),
+    .a(align_v0_z_to_fp_mul_10_i0_d8), .b(fp_mul_1_res),
     .result(fp_mul_4_res)
 );
-fp_mul #(
-    .LATENCY(8)
-) u_fp_mul_5 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+fp_mul #(.LATENCY(8)) u_fp_mul_5 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[9]),
     .valid_in(),
-    .a(align_v0_w_to_fp_mul_4_i0_d8),
-    .b(fp_mul_1_res),
+    .a(align_v0_w_to_fp_mul_4_i0_d8), .b(fp_mul_1_res),
     .result(fp_mul_5_res)
 );
-fp_mul #(
-    .LATENCY(8)
-) u_fp_mul_6 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+fp_mul #(.LATENCY(8)) u_fp_mul_6 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[9]),
     .valid_in(),
-    .a(align_v1_w_to_fp_mul_6_i0_d8),
-    .b(fp_mul_2_res),
+    .a(align_v1_w_to_fp_mul_6_i0_d8), .b(fp_mul_2_res),
     .result(fp_mul_6_res)
 );
-fp_mul #(
-    .LATENCY(8)
-) u_fp_mul_7 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+fp_mul #(.LATENCY(8)) u_fp_mul_7 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[9]),
     .valid_in(),
-    .a(align_v2_w_to_fp_mul_8_i0_d8),
-    .b(fp_mul_3_res),
+    .a(align_v2_w_to_fp_mul_8_i0_d8), .b(fp_mul_3_res),
     .result(fp_mul_7_res)
 );
-fp_fma #(
-    .LATENCY(19)
-) u_fp_fma_1 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+fp_fma #(.LATENCY(19)) u_fp_fma_1 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[17]),
     .valid_in(),
-    .a(align_v1_w_to_fp_fma_1_i0_d16),
-    .b(align_fp_mul_2_to_fp_fma_1_i1_d8),
-    .c(fp_mul_5_res),
+    .a(align_v1_w_to_fp_fma_1_i0_d16), .b(align_fp_mul_2_to_fp_fma_1_i1_d8), .c(fp_mul_5_res),
     .result(fp_fma_1_res)
 );
-fp_fma #(
-    .LATENCY(19)
-) u_fp_fma_2 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+fp_fma #(.LATENCY(19)) u_fp_fma_2 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[17]),
     .valid_in(),
-    .a(align_v1_z_to_fp_fma_3_i0_d16),
-    .b(align_fp_mul_2_to_fp_fma_3_i1_d8),
-    .c(fp_mul_4_res),
+    .a(align_v1_z_to_fp_fma_3_i0_d16), .b(align_fp_mul_2_to_fp_fma_3_i1_d8), .c(fp_mul_4_res),
     .result(fp_fma_2_res)
 );
-fp_fma #(
-    .LATENCY(19)
-) u_fp_fma_3 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+fp_fma #(.LATENCY(19)) u_fp_fma_3 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[36]),
     .valid_in(),
-    .a(align_v2_w_to_fp_fma_2_i0_d35),
-    .b(align_fp_mul_3_to_fp_fma_2_i1_d27),
-    .c(fp_fma_1_res),
+    .a(align_v2_w_to_fp_fma_2_i0_d35), .b(align_fp_mul_3_to_fp_fma_2_i1_d27), .c(fp_fma_1_res),
     .result(fp_fma_3_res)
 );
-fp_fma #(
-    .LATENCY(19)
-) u_fp_fma_4 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+fp_fma #(.LATENCY(19)) u_fp_fma_4 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[36]),
     .valid_in(),
-    .a(align_v2_z_to_fp_fma_4_i0_d35),
-    .b(align_fp_mul_3_to_fp_fma_4_i1_d27),
-    .c(fp_fma_2_res),
+    .a(align_v2_z_to_fp_fma_4_i0_d35), .b(align_fp_mul_3_to_fp_fma_4_i1_d27), .c(fp_fma_2_res),
     .result(fp_fma_4_res)
 );
 assign z_rd_en = pipe_en_internal;
 assign z_rd_addr = align_addr_to_mem_read_1_i0_d53;
 assign mem_read_1_rdata = z_rd_data;
-fp_recip #(
-    .LATENCY(29)
-) u_fp_recip_1 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+fp_recip #(.LATENCY(29)) u_fp_recip_1 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[55]),
     .valid_in(),
     .a(fp_fma_3_res),
@@ -819,264 +327,173 @@ fp_recip #(
 fp_cmp_le u_fp_cmp_1 (
     .aclk(clk),
     .aclken(pipe_en_internal),
-    .s_axis_a(align_fp_fma_4_to_fp_cmp_1_i0_d1),
+    .s_axis_a(align_fp_fma_4_to_fp_cmp_1_i0_d2),
     //   .s_axis_a_valid(),
     .s_axis_b(mem_read_1_rdata),
     //   .s_axis_b_valid(),
     .m_axis_res(fp_cmp_1_pred[0])
     //   .m_axis_tvalid()
 );
-assign mem_write_1_fire = valid_pipe[56];
+assign mem_write_1_fire = valid_pipe[58];
 assign mem_write_1_pred[0] = (fp_cmp_1_pred[0]);
 assign z_wr_en = mem_write_1_fire && mem_write_1_pred[0] && pipe_en_internal;
-assign z_wr_addr = align_addr_to_mem_write_1_i0_d56;
-assign z_wr_data = align_fp_fma_4_to_mem_write_1_i1_d2;
-fp_mul #(
-    .LATENCY(8)
-) u_fp_mul_8 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+assign z_wr_addr = align_addr_to_mem_write_1_i0_d58;
+assign z_wr_data = align_fp_fma_4_to_mem_write_1_i1_d4;
+fp_mul #(.LATENCY(8)) u_fp_mul_8 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[84]),
     .valid_in(),
-    .a(fp_recip_1_out),
-    .b(align_fp_mul_4_to_fp_mul_5_i1_d67),
+    .a(fp_recip_1_out), .b(align_fp_mul_4_to_fp_mul_5_i1_d67),
     .result(fp_mul_8_res)
 );
-fp_mul #(
-    .LATENCY(8)
-) u_fp_mul_9 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+fp_mul #(.LATENCY(8)) u_fp_mul_9 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[84]),
     .valid_in(),
-    .a(fp_recip_1_out),
-    .b(align_fp_mul_6_to_fp_mul_7_i1_d67),
+    .a(fp_recip_1_out), .b(align_fp_mul_6_to_fp_mul_7_i1_d67),
     .result(fp_mul_9_res)
 );
-fp_mul #(
-    .LATENCY(8)
-) u_fp_mul_10 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+fp_mul #(.LATENCY(8)) u_fp_mul_10 (
+    .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[84]),
     .valid_in(),
-    .a(fp_recip_1_out),
-    .b(align_fp_mul_8_to_fp_mul_9_i1_d67),
+    .a(fp_recip_1_out), .b(align_fp_mul_8_to_fp_mul_9_i1_d67),
     .result(fp_mul_10_res)
 );
 fp_to_fx2_23 u_fp_to_fx2_23_1 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+    .aclk(clk), .aclken(pipe_en_internal),
     .s_axis_a_tvalid(valid_pipe[92]),
     .s_axis_a_tdata(fp_mul_8_res),
     .m_axis_result_tvalid(),
     .m_axis_result_tdata(fp_to_fx2_23_1_res)
 );
 fp_to_fx2_23 u_fp_to_fx2_23_2 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+    .aclk(clk), .aclken(pipe_en_internal),
     .s_axis_a_tvalid(valid_pipe[92]),
     .s_axis_a_tdata(fp_mul_9_res),
     .m_axis_result_tvalid(),
     .m_axis_result_tdata(fp_to_fx2_23_2_res)
 );
 fp_to_fx2_23 u_fp_to_fx2_23_3 (
-    .aclk(clk),
-    .aclken(pipe_en_internal),
+    .aclk(clk), .aclken(pipe_en_internal),
     .s_axis_a_tvalid(valid_pipe[92]),
     .s_axis_a_tdata(fp_mul_10_res),
     .m_axis_result_tvalid(),
     .m_axis_result_tdata(fp_to_fx2_23_3_res)
 );
 fx_color_mul u_fx_color_mul_1 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_v0_color_r_to_fx_color_mul_1_i0_d93),
-    .b(fp_to_fx2_23_1_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_v0_color_r_to_fx_color_mul_1_i0_d97), .b(fp_to_fx2_23_1_res),
     .q(fx_color_mul_1_res)
 );
 fx_color_mul u_fx_color_mul_2 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_v0_color_g_to_fx_color_mul_2_i0_d93),
-    .b(fp_to_fx2_23_1_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_v0_color_g_to_fx_color_mul_2_i0_d97), .b(fp_to_fx2_23_1_res),
     .q(fx_color_mul_2_res)
 );
 fx_color_mul u_fx_color_mul_3 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_v0_color_b_to_fx_color_mul_3_i0_d93),
-    .b(fp_to_fx2_23_1_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_v0_color_b_to_fx_color_mul_3_i0_d97), .b(fp_to_fx2_23_1_res),
     .q(fx_color_mul_3_res)
 );
 fx_color_mul u_fx_color_mul_4 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_v0_color_a_to_fx_color_mul_4_i0_d93),
-    .b(fp_to_fx2_23_1_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_v0_color_a_to_fx_color_mul_4_i0_d97), .b(fp_to_fx2_23_1_res),
     .q(fx_color_mul_4_res)
 );
 fx_texture_mul u_fx_texture_mul_1 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(fp_to_fx2_23_1_res),
-    .b(align_v0_texture_u_to_fx_texture_mul_1_i1_d93),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(fp_to_fx2_23_1_res), .b(align_v0_texture_u_to_fx_texture_mul_1_i1_d97),
     .q(fx_texture_mul_1_res)
 );
 fx_texture_mul u_fx_texture_mul_2 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(fp_to_fx2_23_1_res),
-    .b(align_v0_texture_v_to_fx_texture_mul_2_i1_d93),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(fp_to_fx2_23_1_res), .b(align_v0_texture_v_to_fx_texture_mul_2_i1_d97),
     .q(fx_texture_mul_2_res)
 );
 fx_color_fma u_fx_color_fma_1 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_v1_color_r_to_fx_color_fma_1_i0_d94),
-    .b(align_fp_to_fx2_23_2_to_fx_color_fma_1_i1_d1),
-    .c(fx_color_mul_1_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_v1_color_r_to_fx_color_fma_1_i0_d99), .b(align_fp_to_fx2_23_2_to_fx_color_fma_1_i1_d2), .c(fx_color_mul_1_res),
     .q(fx_color_fma_1_res)
 );
 fx_color_fma u_fx_color_fma_2 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_v1_color_g_to_fx_color_fma_3_i0_d94),
-    .b(align_fp_to_fx2_23_2_to_fx_color_fma_3_i1_d1),
-    .c(fx_color_mul_2_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_v1_color_g_to_fx_color_fma_3_i0_d99), .b(align_fp_to_fx2_23_2_to_fx_color_fma_3_i1_d2), .c(fx_color_mul_2_res),
     .q(fx_color_fma_2_res)
 );
 fx_color_fma u_fx_color_fma_3 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_v1_color_b_to_fx_color_fma_5_i0_d94),
-    .b(align_fp_to_fx2_23_2_to_fx_color_fma_5_i1_d1),
-    .c(fx_color_mul_3_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_v1_color_b_to_fx_color_fma_5_i0_d99), .b(align_fp_to_fx2_23_2_to_fx_color_fma_5_i1_d2), .c(fx_color_mul_3_res),
     .q(fx_color_fma_3_res)
 );
 fx_color_fma u_fx_color_fma_4 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_v1_color_a_to_fx_color_fma_7_i0_d94),
-    .b(align_fp_to_fx2_23_2_to_fx_color_fma_7_i1_d1),
-    .c(fx_color_mul_4_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_v1_color_a_to_fx_color_fma_7_i0_d99), .b(align_fp_to_fx2_23_2_to_fx_color_fma_7_i1_d2), .c(fx_color_mul_4_res),
     .q(fx_color_fma_4_res)
 );
 fx_texture_fma u_fx_texture_fma_1 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_fp_to_fx2_23_2_to_fx_texture_fma_1_i0_d1),
-    .b(align_v1_texture_u_to_fx_texture_fma_1_i1_d94),
-    .c(fx_texture_mul_1_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_fp_to_fx2_23_2_to_fx_texture_fma_1_i0_d2), .b(align_v1_texture_u_to_fx_texture_fma_1_i1_d99), .c(fx_texture_mul_1_res),
     .q(fx_texture_fma_1_res)
 );
 fx_texture_fma u_fx_texture_fma_2 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_fp_to_fx2_23_2_to_fx_texture_fma_3_i0_d1),
-    .b(align_v1_texture_v_to_fx_texture_fma_3_i1_d94),
-    .c(fx_texture_mul_2_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_fp_to_fx2_23_2_to_fx_texture_fma_3_i0_d2), .b(align_v1_texture_v_to_fx_texture_fma_3_i1_d99), .c(fx_texture_mul_2_res),
     .q(fx_texture_fma_2_res)
 );
 fx_color_fma u_fx_color_fma_5 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_v2_color_r_to_fx_color_fma_2_i0_d96),
-    .b(align_fp_to_fx2_23_3_to_fx_color_fma_2_i1_d3),
-    .c(fx_color_fma_1_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_v2_color_r_to_fx_color_fma_2_i0_d102), .b(align_fp_to_fx2_23_3_to_fx_color_fma_2_i1_d5), .c(fx_color_fma_1_res),
     .q(fx_color_fma_5_res)
 );
 fx_color_fma u_fx_color_fma_6 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_v2_color_g_to_fx_color_fma_4_i0_d96),
-    .b(align_fp_to_fx2_23_3_to_fx_color_fma_4_i1_d3),
-    .c(fx_color_fma_2_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_v2_color_g_to_fx_color_fma_4_i0_d102), .b(align_fp_to_fx2_23_3_to_fx_color_fma_4_i1_d5), .c(fx_color_fma_2_res),
     .q(fx_color_fma_6_res)
 );
 fx_color_fma u_fx_color_fma_7 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_v2_color_b_to_fx_color_fma_6_i0_d96),
-    .b(align_fp_to_fx2_23_3_to_fx_color_fma_6_i1_d3),
-    .c(fx_color_fma_3_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_v2_color_b_to_fx_color_fma_6_i0_d102), .b(align_fp_to_fx2_23_3_to_fx_color_fma_6_i1_d5), .c(fx_color_fma_3_res),
     .q(fx_color_fma_7_res)
 );
 fx_color_fma u_fx_color_fma_8 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_v2_color_a_to_fx_color_fma_8_i0_d96),
-    .b(align_fp_to_fx2_23_3_to_fx_color_fma_8_i1_d3),
-    .c(fx_color_fma_4_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_v2_color_a_to_fx_color_fma_8_i0_d102), .b(align_fp_to_fx2_23_3_to_fx_color_fma_8_i1_d5), .c(fx_color_fma_4_res),
     .q(fx_color_fma_8_res)
 );
 fx_texture_fma u_fx_texture_fma_3 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_fp_to_fx2_23_3_to_fx_texture_fma_2_i0_d3),
-    .b(align_v2_texture_u_to_fx_texture_fma_2_i1_d96),
-    .c(fx_texture_fma_1_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_fp_to_fx2_23_3_to_fx_texture_fma_2_i0_d5), .b(align_v2_texture_u_to_fx_texture_fma_2_i1_d102), .c(fx_texture_fma_1_res),
     .q(fx_texture_fma_3_res)
 );
 fx_texture_fma u_fx_texture_fma_4 (
-    .clk(clk),
-    .clken(pipe_en_internal),
-    .a(align_fp_to_fx2_23_3_to_fx_texture_fma_4_i0_d3),
-    .b(align_v2_texture_v_to_fx_texture_fma_4_i1_d96),
-    .c(fx_texture_fma_2_res),
+    .clk(clk), .clken(pipe_en_internal),
+    .a(align_fp_to_fx2_23_3_to_fx_texture_fma_4_i0_d5), .b(align_v2_texture_v_to_fx_texture_fma_4_i1_d102), .c(fx_texture_fma_2_res),
     .q(fx_texture_fma_4_res)
 );
 fx_color_to_u8 u_fx_color_to_u8_1 (
-    .clk(clk),
-    .clken(pipe_en_internal),
+    .clk(clk), .clken(pipe_en_internal),
     .in_fx_color(fx_color_fma_5_res),
     .out_u8(fx_color_to_u8_1_res)
 );
 fx_color_to_u8 u_fx_color_to_u8_2 (
-    .clk(clk),
-    .clken(pipe_en_internal),
+    .clk(clk), .clken(pipe_en_internal),
     .in_fx_color(fx_color_fma_6_res),
     .out_u8(fx_color_to_u8_2_res)
 );
 fx_color_to_u8 u_fx_color_to_u8_3 (
-    .clk(clk),
-    .clken(pipe_en_internal),
+    .clk(clk), .clken(pipe_en_internal),
     .in_fx_color(fx_color_fma_7_res),
     .out_u8(fx_color_to_u8_3_res)
 );
 fx_color_to_u8 u_fx_color_to_u8_4 (
-    .clk(clk),
-    .clken(pipe_en_internal),
+    .clk(clk), .clken(pipe_en_internal),
     .in_fx_color(fx_color_fma_8_res),
     .out_u8(fx_color_to_u8_4_res)
 );
 
 // ---- Output skid buffer ----
-localparam int OUTBUNDLEWIDTH = $bits(
-    texcoord_u_tdata
-) + $bits(
-    texcoord_v_tdata
-) + $bits(
-    addr_tdata
-) + $bits(
-    tex_id_tdata
-) + $bits(
-    texture_mode_u_tdata
-) + $bits(
-    texture_mode_v_tdata
-) + $bits(
-    texture_function_tdata
-) + $bits(
-    color_r_tdata
-) + $bits(
-    color_g_tdata
-) + $bits(
-    color_b_tdata
-) + $bits(
-    color_a_tdata
-) + $bits(
-    comp_z_tdata
-);
+localparam int OUTBUNDLEWIDTH = $bits(texcoord_u_tdata) + $bits(texcoord_v_tdata) + $bits(addr_tdata) + $bits(tex_id_tdata) + $bits(texture_mode_u_tdata) + $bits(texture_mode_v_tdata) + $bits(texture_function_tdata) + $bits(color_r_tdata) + $bits(color_g_tdata) + $bits(color_b_tdata) + $bits(color_a_tdata) + $bits(comp_z_tdata);
 logic [OUTBUNDLEWIDTH-1:0] output_bundle_tdata;
 logic output_bundle_tvalid;
 logic output_bundle_s_axis_tready;
@@ -1085,115 +502,29 @@ logic output_bundle_buf_tvalid;
 logic output_bundle_buf_tready;
 
 logic [47:0] texcoord_u_bundle_tdata;
-delay_pipe #(
-    .WIDTH (48),
-    .STAGES(1)
-) u_align_texcoord_u_to_output_bundle_d1 (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(texcoord_u_tdata),
-    .data_out(texcoord_u_bundle_tdata)
-);
+delay_pipe #(.WIDTH(48), .STAGES(2)) u_align_texcoord_u_to_output_bundle_d2 (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(texcoord_u_tdata), .data_out(texcoord_u_bundle_tdata));
 logic [47:0] texcoord_v_bundle_tdata;
-delay_pipe #(
-    .WIDTH (48),
-    .STAGES(1)
-) u_align_texcoord_v_to_output_bundle_d1 (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(texcoord_v_tdata),
-    .data_out(texcoord_v_bundle_tdata)
-);
+delay_pipe #(.WIDTH(48), .STAGES(2)) u_align_texcoord_v_to_output_bundle_d2 (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(texcoord_v_tdata), .data_out(texcoord_v_bundle_tdata));
 logic [THREAD_ADDR_W-1:0] addr_bundle_tdata;
-delay_pipe #(
-    .WIDTH (THREAD_ADDR_W),
-    .STAGES(99)
-) u_align_addr_to_output_bundle_d99 (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(addr_tdata),
-    .data_out(addr_bundle_tdata)
-);
+delay_pipe #(.WIDTH(THREAD_ADDR_W), .STAGES(107)) u_align_addr_to_output_bundle_d107 (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(addr_tdata), .data_out(addr_bundle_tdata));
 logic [7:0] tex_id_bundle_tdata;
-delay_pipe #(
-    .WIDTH (8),
-    .STAGES(99)
-) u_align_tex_id_to_output_bundle_d99 (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(tex_id_tdata),
-    .data_out(tex_id_bundle_tdata)
-);
+delay_pipe #(.WIDTH(8), .STAGES(107)) u_align_tex_id_to_output_bundle_d107 (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(tex_id_tdata), .data_out(tex_id_bundle_tdata));
 logic texture_mode_u_bundle_tdata;
-delay_pipe #(
-    .WIDTH (1),
-    .STAGES(99)
-) u_align_texture_mode_u_to_output_bundle_d99 (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(texture_mode_u_tdata),
-    .data_out(texture_mode_u_bundle_tdata)
-);
+delay_pipe #(.WIDTH(1), .STAGES(107)) u_align_texture_mode_u_to_output_bundle_d107 (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(texture_mode_u_tdata), .data_out(texture_mode_u_bundle_tdata));
 logic texture_mode_v_bundle_tdata;
-delay_pipe #(
-    .WIDTH (1),
-    .STAGES(99)
-) u_align_texture_mode_v_to_output_bundle_d99 (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(texture_mode_v_tdata),
-    .data_out(texture_mode_v_bundle_tdata)
-);
+delay_pipe #(.WIDTH(1), .STAGES(107)) u_align_texture_mode_v_to_output_bundle_d107 (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(texture_mode_v_tdata), .data_out(texture_mode_v_bundle_tdata));
 logic [2:0] texture_function_bundle_tdata;
-delay_pipe #(
-    .WIDTH (3),
-    .STAGES(99)
-) u_align_texture_function_to_output_bundle_d99 (
-    .clk(clk),
-    .rst_n(1'b1),
-    .clken(pipe_en_internal),
-    .data_in(texture_function_tdata),
-    .data_out(texture_function_bundle_tdata)
-);
+delay_pipe #(.WIDTH(3), .STAGES(107)) u_align_texture_function_to_output_bundle_d107 (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(texture_function_tdata), .data_out(texture_function_bundle_tdata));
 logic comp_z_bundle_tdata;
-delay_pipe #(
-    .WIDTH (1),
-    .STAGES(43)
-) u_align_comp_z_to_output_bundle_d43 (
-    .clk(clk),
-    .rst_n(rst_n),
-    .clken(pipe_en_internal),
-    .data_in(comp_z_tdata),
-    .data_out(comp_z_bundle_tdata)
-);
+delay_pipe #(.WIDTH(1), .STAGES(49)) u_align_comp_z_to_output_bundle_d49 (.clk(clk), .rst_n(rst_n), .clken(pipe_en_internal), .data_in(comp_z_tdata), .data_out(comp_z_bundle_tdata));
 
-assign output_bundle_tdata = {
-  texcoord_u_bundle_tdata,
-  texcoord_v_bundle_tdata,
-  addr_bundle_tdata,
-  tex_id_bundle_tdata,
-  texture_mode_u_bundle_tdata,
-  texture_mode_v_bundle_tdata,
-  texture_function_bundle_tdata,
-  color_r_tdata,
-  color_g_tdata,
-  color_b_tdata,
-  color_a_tdata,
-  comp_z_bundle_tdata
-};
-assign output_bundle_tvalid = valid_pipe[99];
+assign output_bundle_tdata = {texcoord_u_bundle_tdata, texcoord_v_bundle_tdata, addr_bundle_tdata, tex_id_bundle_tdata, texture_mode_u_bundle_tdata, texture_mode_v_bundle_tdata, texture_function_bundle_tdata, color_r_tdata, color_g_tdata, color_b_tdata, color_a_tdata, comp_z_bundle_tdata};
+assign output_bundle_tvalid = valid_pipe[107];
 
 axis_skid_buffer #(
     .WIDTH(OUTBUNDLEWIDTH)
 ) u_output_bundle_skid (
-    .aclk(clk),
-    .aresetn(rst_n),
+    .aclk(clk), .aresetn(rst_n),
     .s_axis_tdata(output_bundle_tdata),
     .s_axis_tvalid(output_bundle_tvalid),
     .s_axis_tready(output_bundle_s_axis_tready),

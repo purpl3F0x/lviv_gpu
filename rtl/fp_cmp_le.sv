@@ -16,6 +16,8 @@ module fp_cmp_le (
   logic lt_result;
   logic gt_result;
   logic eq_result;
+  logic [31:0] a_buffer;
+  logic [31:0] b_buffer;
   logic [2:0] cmp_result;
 
   // Returns {lt, gt, eq} for IEEE754 bit-pattern compare used by this pipeline.
@@ -41,11 +43,13 @@ module fp_cmp_le (
   endfunction
 
   always_comb begin
-    cmp_result = fp32_cmp_lge(s_axis_a, s_axis_b);
+    cmp_result = fp32_cmp_lge(a_buffer, b_buffer);
   end
 
   always_ff @(posedge aclk) begin
     if (aclken) begin
+      a_buffer  <= s_axis_a;
+      b_buffer  <= s_axis_b;
       lt_result  <= cmp_result[2];
       gt_result  <= cmp_result[1];
       eq_result  <= cmp_result[0];

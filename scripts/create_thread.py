@@ -29,7 +29,7 @@ DEFAULT_LATENCIES = {
     "fp_mul": 8,
     "fp_fma": 19,
     "fp_recip": 28,
-    "fp_cmp": 1,
+    "fp_cmp": 2,
     "mux": 1,
     "mem_read": 1,
     "mem_write": 1,
@@ -1621,9 +1621,9 @@ if __name__ == "__main__":
         "fp_mul": 8,
         "fp_fma": 19,
         "fp_recip": 29,
-        "fp_cmp": 1,
-        "fp_to_fx2_23": 2,
-        "mem_read": 2,
+        "fp_cmp": 2,
+        "fp_to_fx2_23": 6,
+        "mem_read": 3,
         "mem_write": 1,
     }
 

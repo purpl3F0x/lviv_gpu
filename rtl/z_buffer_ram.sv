@@ -1,7 +1,7 @@
 module z_buffer_ram #(
-  parameter int          ADDR_WIDTH      = 12,
-  parameter bit          PIPELINE_OUTPUT = 1'b1,
-    parameter logic [31:0] RESET_Z_VALUE = 32'h3F80_0000
+    parameter int          ADDR_WIDTH         = 12,
+    parameter int          PIPELINE_REGISTERS = 2,
+    parameter logic [31:0] RESET_Z_VALUE      = 32'h3F80_0000
 ) (
     input  logic clk,
     input  logic rst_n,
@@ -65,9 +65,10 @@ module z_buffer_ram #(
   // =========================================================================
   // Block RAM Storage
   // =========================================================================
-  (* ram_style = "block" *)
+  (* ram_style = "block", cascade_height = 1  *)
   logic [31:0] mem[DEPTH];
-  logic [31:0] ram_dout;
+  logic [31:0] ram_dout[PIPELINE_REGISTERS + 1];
+
 
   always_ff @(posedge clk) begin
     if (ram_wr_en) begin
@@ -75,21 +76,18 @@ module z_buffer_ram #(
     end
   end
 
-  // Synchronous BRAM read (1-cycle latency).
   always_ff @(posedge clk) begin
-      if (rd_en) begin
-        ram_dout <= mem[rd_addr];
+    if (rd_en) begin
+
+      ram_dout[0] <= mem[rd_addr];
+
+      for (int i = 0; i < PIPELINE_REGISTERS; i++) begin
+        ram_dout[i+1] <= ram_dout[i];
       end
+
+    end
   end
 
-  if (PIPELINE_OUTPUT) begin : gen_pipeline_output
-    always_ff @(posedge clk) begin
-      if (rd_en) begin
-        dout <= ram_dout;
-      end
-    end
-  end else begin : gen_direct_output
-    assign dout = ram_dout;
-  end
+  assign dout = ram_dout[PIPELINE_REGISTERS];
 
 endmodule

@@ -1312,7 +1312,7 @@ module thread (
 
   /** END OF AUTO-GENERATED PIPELINE LOGIC **/
 
-  localparam int FRAGMENT_SHADER_LATENCY_STAGES = 5;
+    localparam int FRAGMENT_SHADER_LATENCY_STAGES = 7;
   localparam int L1_TEXTURE_HIT_LATENCY_STAGES = 4;
   localparam int L1RespQueueDepth = L1_TEXTURE_HIT_LATENCY_STAGES + 1;
   localparam int L1RespPtrWidth = $clog2(L1RespQueueDepth);

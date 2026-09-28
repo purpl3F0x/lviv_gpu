@@ -104,7 +104,7 @@ set_property -dict [list \
   CONFIG.C_A_Exponent_Width {8} \
   CONFIG.C_A_Fraction_Width {24} \
   CONFIG.C_Latency {19} \
-  CONFIG.C_Mult_Usage {Full_Usage} \
+  CONFIG.C_Mult_Usage {Max_Usage} \
   CONFIG.C_Rate {1} \
   CONFIG.C_Result_Exponent_Width {8} \
   CONFIG.C_Result_Fraction_Width {24} \

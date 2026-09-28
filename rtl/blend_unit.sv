@@ -26,6 +26,8 @@ module blend_unit (
   color_argb_t dst_coeff_s3;
   color_argb_t src_color_s3;
   color_argb_t dst_color_s3;
+  color_argb_t dst_coeff_s4;
+  color_argb_t dst_color_s4;
 
   typedef struct packed {
     logic [15:0] a;
@@ -129,6 +131,8 @@ module blend_unit (
 
   // Stage 4: Perform multiplication 1 (N+1).
   always_ff @(posedge clk) begin
+    dst_coeff_s4 <= dst_coeff_s3;
+    dst_color_s4 <= dst_color_s3;
     src_product_s4.a <= src_color_s3.a * src_coeff_s3.a;
     src_product_s4.r <= src_color_s3.r * src_coeff_s3.r;
     src_product_s4.g <= src_color_s3.g * src_coeff_s3.g;
@@ -141,10 +145,10 @@ module blend_unit (
     src_sum_s5.r <= {1'b0, src_product_s4.r} + 17'd128;
     src_sum_s5.g <= {1'b0, src_product_s4.g} + 17'd128;
     src_sum_s5.b <= {1'b0, src_product_s4.b} + 17'd128;
-    dst_product_s5.a <= dst_color_s3.a * dst_coeff_s3.a;
-    dst_product_s5.r <= dst_color_s3.r * dst_coeff_s3.r;
-    dst_product_s5.g <= dst_color_s3.g * dst_coeff_s3.g;
-    dst_product_s5.b <= dst_color_s3.b * dst_coeff_s3.b;
+    dst_product_s5.a <= dst_color_s4.a * dst_coeff_s4.a;
+    dst_product_s5.r <= dst_color_s4.r * dst_coeff_s4.r;
+    dst_product_s5.g <= dst_color_s4.g * dst_coeff_s4.g;
+    dst_product_s5.b <= dst_color_s4.b * dst_coeff_s4.b;
   end
 
   // Stage 6: Add the two products (N+3).

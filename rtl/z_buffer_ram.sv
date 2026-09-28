@@ -23,9 +23,10 @@ module z_buffer_ram #(
   // =========================================================================
   // Reset / Scrubbing Logic
   // =========================================================================
-  typedef enum logic [0:0] {
-    ZBUF_SCRUB = 1'b0,
-    ZBUF_READY = 1'b1
+  typedef enum logic [1:0] {
+    ZBUF_SCRUB,
+    ZBUF_DRAIN,
+    ZBUF_READY
   } zbuf_state_t;
 
   zbuf_state_t                  zbuf_state;
@@ -35,10 +36,19 @@ module z_buffer_ram #(
   logic        [          31:0] ram_din;
 
   // While scrubbing, clear all memory locations to RESET_Z_VALUE.
-  assign ready       = (zbuf_state == ZBUF_READY);
-  assign ram_wr_en   = (zbuf_state == ZBUF_SCRUB) || (wr_en && rst_n && ready);
-  assign ram_wr_addr = (zbuf_state == ZBUF_SCRUB) ? scrub_addr : wr_addr;
-  assign ram_din     = (zbuf_state == ZBUF_SCRUB) ? RESET_Z_VALUE : din;
+  assign ready = (zbuf_state == ZBUF_READY);
+
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      ram_wr_en   <= 1'b0;
+      ram_wr_addr <= '0;
+      ram_din     <= '0;
+    end else begin
+      ram_wr_en   <= (zbuf_state == ZBUF_SCRUB) || (wr_en && ready);
+      ram_wr_addr <= (zbuf_state == ZBUF_SCRUB) ? scrub_addr : wr_addr;
+      ram_din     <= (zbuf_state == ZBUF_SCRUB) ? RESET_Z_VALUE : din;
+    end
+  end
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
@@ -48,10 +58,13 @@ module z_buffer_ram #(
       case (zbuf_state)
         ZBUF_SCRUB: begin
           if (scrub_addr == ADDR_WIDTH'(DEPTH - 1)) begin
-            zbuf_state <= ZBUF_READY;
+            zbuf_state <= ZBUF_DRAIN;
           end else begin
             scrub_addr <= scrub_addr + 1'b1;
           end
+        end
+        ZBUF_DRAIN: begin
+          zbuf_state <= ZBUF_READY;
         end
         ZBUF_READY: begin
           // Stay ready until reset.

@@ -1,4 +1,5 @@
 VERILATOR = verilator
+RUN_ARGS ?=
 .RECIPEPREFIX := >
 
 ROOT_DIR = $(abspath ../..)
@@ -24,6 +25,7 @@ SV_SRCS = ../../rtl/gpu_types_pkg.sv \
           ../../rtl/fx_color_fma.sv \
           ../../rtl/fx_color_to_u8.sv \
           ../../rtl/fragment_shader.sv \
+          ../../rtl/blend_unit.sv \
           ../../rtl/z_buffer_ram.sv \
           ../../rtl/texture_address_generator.sv \
           ../../rtl/texture_cache.sv \
@@ -52,7 +54,7 @@ compile:
 >mkdir -p $(BUILD_DIR) && mkdir -p $(OBJ_DIR) && $(VERILATOR) --cc --exe --build --top-module $(TOP) --Mdir $(OBJ_DIR) -o rasterizer_thread $(SV_SRCS) $(CPP_SRCS) $(VERILATOR_WARNINGS) $(VERILATOR_CFLAGS)
 
 run: compile
->$(OBJ_DIR)/rasterizer_thread
+>$(OBJ_DIR)/rasterizer_thread $(RUN_ARGS)
 
 clean:
 >rm -rf $(BUILD_DIR)

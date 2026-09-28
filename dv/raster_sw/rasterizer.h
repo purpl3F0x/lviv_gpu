@@ -41,6 +41,7 @@ class Rasterizer
   public:
     Framebuffer *fb;
     TextureUnit textureUnit;
+    bool alphaBlendingEnabled = false;
 
     uint64_t pixel_draw_count = 0;
 
@@ -89,6 +90,7 @@ class Rasterizer
                            int minX, int minY, int maxX, int maxY, uint32_t *tileColor, float *tileDepth);
 
     uint32_t fragmentShader(const Fragment_In &fIn);
+    uint32_t blendFragment(uint32_t source, uint32_t destination) const;
 
     // Helpers
     template <typename T> T edgeFunction(const tvec2<T> &a, const tvec2<T> &b, const tvec2<T> &c)

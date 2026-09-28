@@ -579,6 +579,8 @@ class HardwareDAG:
             "texture_mode_u": "texture_mode_u",
             "texture_mode_v": "texture_mode_v",
             "texture_function": "texture_function",
+            "sfactor_op": "sfactor_op",
+            "dfactor_op": "dfactor_op",
         }
         selected_output_order = (
             "texcoord_u",
@@ -588,6 +590,8 @@ class HardwareDAG:
             "texture_mode_u",
             "texture_mode_v",
             "texture_function",
+            "sfactor_op",
+            "dfactor_op",
             "color_r",
             "color_g",
             "color_b",
@@ -629,6 +633,10 @@ class HardwareDAG:
             elif name == "texture_function":
                 selected_outputs.append(
                     (None, name, (3, "thread_data_buf.texture_function", 0))
+                )
+            elif name in ("sfactor_op", "dfactor_op"):
+                selected_outputs.append(
+                    (None, name, ("$bits(blend_op_t)", f"thread_data_buf.{name}", 0))
                 )
 
         if selected_outputs:
@@ -1619,10 +1627,10 @@ if __name__ == "__main__":
         "fp_add": 11,
         "fp_sub": 11,
         "fp_mul": 8,
-        "fp_fma": 19,
+        "fp_fma": 16,
         "fp_recip": 29,
         "fp_cmp": 2,
-        "fp_to_fx2_23": 6,
+        "fp_to_fx2_23": 3,
         "mem_read": 3,
         "mem_write": 1,
     }

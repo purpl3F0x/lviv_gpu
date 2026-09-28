@@ -81,6 +81,8 @@ package gpu_types_pkg;
     texture_address_mode_t texture_mode_u;
     texture_address_mode_t texture_mode_v;
     fragment_op_t texture_function;
+    blend_op_t sfactor_op;
+    blend_op_t dfactor_op;
     logic [31:0] inv_area;
     logic [31:0] e2;
     logic [31:0] e1;

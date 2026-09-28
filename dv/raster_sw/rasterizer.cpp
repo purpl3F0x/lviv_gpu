@@ -417,7 +417,7 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_Sc
                     uint32_t finalColor = fragmentShader(fIn);
 
                     // --- STEP 9: Write to Framebuffer ---
-                    tileColor[tileIdx] = finalColor;
+                    tileColor[tileIdx] = blendFragment(finalColor, tileColor[tileIdx]);
                 }
             }
             e0 += e0_dx;
@@ -434,6 +434,23 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_Sc
 // -----------------------------------------------------------------------------
 // STEP 5: Fragment Shader
 // -----------------------------------------------------------------------------
+uint32_t Rasterizer::blendFragment(uint32_t source, uint32_t destination) const
+{
+    if (!alphaBlendingEnabled)
+        return source;
+
+    const uint32_t sourceFactor = source >> 24;
+    const uint32_t destinationFactor = 255 - sourceFactor;
+    uint32_t result = 0;
+    for (unsigned shift = 0; shift < 32; shift += 8)
+    {
+        const uint32_t sum = ((source >> shift) & 255) * sourceFactor +
+                             ((destination >> shift) & 255) * destinationFactor + 128;
+        result |= std::min(255u, sum >> 8) << shift;
+    }
+    return result;
+}
+
 Vec4 unpackColor(uint32_t c)
 {
     return Vec4(((c >> 16) & 0xFF) / 255.0f, ((c >> 8) & 0xFF) / 255.0f, (c & 0xFF) / 255.0f,

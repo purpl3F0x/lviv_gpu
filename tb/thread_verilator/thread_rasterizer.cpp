@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -122,6 +123,8 @@ struct ThreadToken {
     uint32_t texture_mode_u;
     uint32_t texture_mode_v;
     uint32_t texture_function;
+    uint32_t sfactor_op = 1;
+    uint32_t dfactor_op = 0;
     uint32_t inv_area;
     uint32_t e2;
     uint32_t e1;
@@ -183,6 +186,8 @@ class ThreadRasterCore {
             dut_[t]->valid_in = 0;
             clearInputToken(t);
             dut_[t]->z_rd_data = fbits(1.0f);
+            dut_[t]->in_fb_rd_color = 0;
+            framebuffer_read_pipe_[t].fill(0);
         }
 
         for (int i = 0; i < 8; ++i) {
@@ -226,6 +231,7 @@ class ThreadRasterCore {
                 dut_[tid]->valid_in = 0;
                 clearInputToken(tid);
                 driveZReadData(tid);
+                driveFramebufferRead(tid, tileColor);
                 tickHalfSingle(tid, 1);
                 captureWrites(tid, tileColor, tileDepth, fb_writes);
 
@@ -258,6 +264,7 @@ class ThreadRasterCore {
                 }
 
                 driveZReadData(tid);
+                driveFramebufferRead(tid, tileColor);
                 tickHalfSingle(tid, 1);
 
                 captureWrites(tid, tileColor, tileDepth, fb_writes);
@@ -285,6 +292,7 @@ class ThreadRasterCore {
             while (!dut_[tid]->empty ) {
                 tickHalfSingle(tid, 0);
                 driveZReadData(tid);
+                driveFramebufferRead(tid, tileColor);
                 tickHalfSingle(tid, 1);
                 captureWrites(tid, tileColor, tileDepth, fb_writes);
                 checkUvNorm(tid, perThreadTokens[tid], uvIdx, sentCount, uvChecked, uvMismatch);
@@ -306,6 +314,7 @@ class ThreadRasterCore {
                 bool had_activity = false;
                 tickHalfSingle(tid, 0);
                 driveZReadData(tid);
+                driveFramebufferRead(tid, tileColor);
                 tickHalfSingle(tid, 1);
 
                 had_activity = (dut_[tid]->uv_sample_fire != 0)
@@ -383,6 +392,8 @@ class ThreadRasterCore {
 
   private:
     std::array<Vthread_verilator_wrap*, HW_THREADS> dut_{};
+    static constexpr size_t kFramebufferReadLatency = 3;
+    std::array<std::array<uint32_t, kFramebufferReadLatency>, HW_THREADS> framebuffer_read_pipe_{};
         std::array<uint8_t, HW_THREADS> prev_out_fb_we_{};
         std::array<uint8_t, HW_THREADS> prev_z_wr_en_{};
         std::array<uint32_t, HW_THREADS> prev_out_fb_addr_{};
@@ -490,6 +501,22 @@ class ThreadRasterCore {
         dut_[tid]->z_rd_data = fbits(1.0f);
     }
 
+    void driveFramebufferRead(int tid, const uint32_t* tileColor)
+    {
+        auto& pipe = framebuffer_read_pipe_[tid];
+        dut_[tid]->in_fb_rd_color = pipe.back();
+        for (size_t stage = pipe.size() - 1; stage > 0; --stage)
+            pipe[stage] = pipe[stage - 1];
+        pipe[0] = 0;
+        if (dut_[tid]->out_fb_rd_en) {
+            const uint32_t address = tileAddrFromThreadAddr(
+                static_cast<uint32_t>(tid), dut_[tid]->out_fb_rd_addr);
+            if (address >= THREAD_PIXEL_ADDR_SPACE)
+                throw std::out_of_range("Framebuffer read address outside tile");
+            pipe[0] = tileColor[address];
+        }
+    }
+
     void captureWrites(int tid, uint32_t* tileColor, float* tileDepth,
                        std::vector<std::pair<uint32_t, uint32_t>>* fb_writes)
     {
@@ -557,6 +584,8 @@ class ThreadRasterCore {
         dut_[tid]->in_texture_mode_u = t.texture_mode_u;
         dut_[tid]->in_texture_mode_v = t.texture_mode_v;
         dut_[tid]->in_texture_function = t.texture_function;
+        dut_[tid]->in_sfactor_op = t.sfactor_op;
+        dut_[tid]->in_dfactor_op = t.dfactor_op;
         dut_[tid]->in_inv_area = t.inv_area;
         dut_[tid]->in_e2 = t.e2;
         dut_[tid]->in_e1 = t.e1;
@@ -594,6 +623,8 @@ class ThreadRasterCore {
         dut_[tid]->in_texture_mode_u = 0;
         dut_[tid]->in_texture_mode_v = 0;
         dut_[tid]->in_texture_function = 5; 
+        dut_[tid]->in_sfactor_op = 1;
+        dut_[tid]->in_dfactor_op = 0;
         dut_[tid]->in_inv_area = fbits(1.0f);
         dut_[tid]->in_e2 = 0;
         dut_[tid]->in_e1 = 0;
@@ -730,7 +761,7 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace& v0, const Vertex_Sc
     if (g_ref_width != fb->width || g_ref_height != fb->height) {
         g_ref_width = fb->width;
         g_ref_height = fb->height;
-        g_ref_color.assign(static_cast<size_t>(g_ref_width) * g_ref_height, 0xFF636363u);
+        g_ref_color = fb->colorBuffer;
     }
 
     uint32_t op = texOpFromMode(*this);
@@ -759,6 +790,8 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace& v0, const Vertex_Sc
                     t.texture_mode_u = 1; // TEXTURE_TILE, matches Texture::wrapModeS default (REPEAT)
                     t.texture_mode_v = 1; // TEXTURE_TILE, matches Texture::wrapModeT default (REPEAT)
                     t.texture_function = op;
+                    t.sfactor_op = alphaBlendingEnabled ? 6 : 1;
+                    t.dfactor_op = alphaBlendingEnabled ? 7 : 0;
                     t.inv_area = fbits(invArea);
                     t.e0 = fbits(e0);
                     t.e1 = fbits(e1);
@@ -843,8 +876,11 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace& v0, const Vertex_Sc
                     if (z < expectedDepth[tileIdx]) {
                         expectedDepth[tileIdx] = z;
 
-                        expectedWrites.push_back({static_cast<uint32_t>(tileIdx), expectedFragmentColor});
-                        g_ref_color[static_cast<size_t>(y) * g_ref_width + x] = expectedFragmentColor;
+                        const size_t referenceIndex = static_cast<size_t>(y) * g_ref_width + x;
+                        const uint32_t expectedColor = blendFragment(
+                            expectedFragmentColor, g_ref_color[referenceIndex]);
+                        expectedWrites.push_back({static_cast<uint32_t>(tileIdx), expectedColor});
+                        g_ref_color[referenceIndex] = expectedColor;
                     }
 
                 }

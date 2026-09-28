@@ -13,6 +13,8 @@ module thread_verilator_wrap (
     input  logic                     in_texture_mode_u,
     input  logic                     in_texture_mode_v,
     input  logic [2:0]               in_texture_function,
+    input  logic [3:0]               in_sfactor_op,
+    input  logic [3:0]               in_dfactor_op,
     input  logic [31:0]              in_inv_area,
     input  logic [31:0]              in_e2,
     input  logic [31:0]              in_e1,
@@ -46,6 +48,9 @@ module thread_verilator_wrap (
     output logic [PIXEL_ADDR_W_THREAD-1:0]  out_fb_addr,
     output logic                     out_fb_valid,
     output logic                     out_fb_we,
+    output logic                     out_fb_rd_en,
+    output logic [PIXEL_ADDR_W_THREAD-1:0] out_fb_rd_addr,
+    input  logic [31:0]              in_fb_rd_color,
     output logic                     uv_sample_fire,
     output logic [11:0]              uv_sample_u,
     output logic [11:0]              uv_sample_v,
@@ -110,6 +115,8 @@ module thread_verilator_wrap (
   assign in_data.texture_mode_u = gpu_types_pkg::texture_address_mode_t'(in_texture_mode_u);
   assign in_data.texture_mode_v = gpu_types_pkg::texture_address_mode_t'(in_texture_mode_v);
   assign in_data.texture_function = gpu_types_pkg::fragment_op_t'(in_texture_function);
+  assign in_data.sfactor_op = gpu_types_pkg::blend_op_t'(in_sfactor_op);
+  assign in_data.dfactor_op = gpu_types_pkg::blend_op_t'(in_dfactor_op);
   assign in_data.inv_area = in_inv_area;
   assign in_data.e2 = in_e2;
   assign in_data.e1 = in_e1;
@@ -372,6 +379,9 @@ module thread_verilator_wrap (
       .out_fb_addr(out_fb_addr),
       .out_fb_valid(out_fb_valid),
       .out_fb_we(out_fb_we),
+      .out_fb_rd_en(out_fb_rd_en),
+      .out_fb_rd_addr(out_fb_rd_addr),
+      .in_fb_rd_color(color_argb_t'(in_fb_rd_color)),
       .z_rd_en(z_rd_en_int),
       .z_rd_addr(z_rd_addr_int),
       .z_rd_data(z_rd_data_int),

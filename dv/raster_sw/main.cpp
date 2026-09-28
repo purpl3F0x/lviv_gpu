@@ -117,12 +117,24 @@ void savePNG(const Framebuffer &fb, const char *filename)
     stbi_write_png(filename, fb.width, fb.height, 4, fb.colorBuffer.data(), fb.width * 4);
 }
 
-int main()
+int main(int argc, char **argv)
 {
+    bool alphaBlend = false;
+    for (int argument = 1; argument < argc; ++argument)
+    {
+        if (std::string(argv[argument]) == "--alpha-blend")
+            alphaBlend = true;
+        else
+        {
+            std::cerr << "Usage: " << argv[0] << " [--alpha-blend]\n";
+            return 1;
+        }
+    }
     int width = 1280;
     int height = 720;
     Framebuffer fb(width, height);
     Rasterizer rasterizer(&fb);
+    rasterizer.alphaBlendingEnabled = alphaBlend;
     GeometryEngine geom(&rasterizer, width, height);
 
     // Load OBJ
@@ -180,7 +192,7 @@ int main()
 #ifndef THREAD_VERILATOR_NO_TEXTURE
     Texture myTex;
     int tw, th, tcomp;
-    const char *texture_path = "texture_3.jpg";
+    const char *texture_path = "texture_64x64.jpg";
     unsigned char *data = stbi_load(texture_path, &tw, &th, &tcomp, 4);
     if (data)
     {
@@ -193,6 +205,8 @@ int main()
             uint8_t g = data[i * 4 + 1];
             uint8_t b = data[i * 4 + 2];
             uint8_t a = data[i * 4 + 3];
+            if (alphaBlend)
+                a = static_cast<uint8_t>((static_cast<unsigned>(a) * 128 + 127) / 255);
             myTex.pixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
         }
         stbi_image_free(data);

@@ -28,6 +28,19 @@ package gpu_types_pkg;
     COLOR = 5
   } fragment_op_t;
 
+  typedef enum logic [3:0] {
+    ZERO = 0,
+    ONE = 1,
+    SRC_COLOR = 2,
+    ONE_MINUS_SRC_COLOR = 3,
+    DST_COLOR = 4,
+    ONE_MINUS_DST_COLOR = 5,
+    SRC_ALPHA = 6,
+    ONE_MINUS_SRC_ALPHA = 7,
+    DST_ALPHA = 8,
+    ONE_MINUS_DST_ALPHA = 9
+  } blend_op_t;
+
   typedef enum logic {
     TEXTURE_CLAMP = 1'b0,
     TEXTURE_TILE = 1'b1

@@ -1688,7 +1688,7 @@ module thread (
   logic fragment_shader_input_valid;
   assign fragment_shader_input_valid = fragment_request_control_output.valid && !delayed_texture_wait;
 
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       texture_response_queue_wr_ptr <= '0;
       texture_response_queue_rd_ptr <= '0;

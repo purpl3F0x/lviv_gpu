@@ -38,7 +38,7 @@ module z_buffer_ram #(
   // While scrubbing, clear all memory locations to RESET_Z_VALUE.
   assign ready = (zbuf_state == ZBUF_READY);
 
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       ram_wr_en   <= 1'b0;
       ram_wr_addr <= '0;
@@ -50,7 +50,7 @@ module z_buffer_ram #(
     end
   end
 
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       zbuf_state <= ZBUF_SCRUB;
       scrub_addr <= '0;

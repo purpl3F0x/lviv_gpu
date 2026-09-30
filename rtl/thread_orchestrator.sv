@@ -156,7 +156,7 @@ module thread_orchestrator (
   logic [31:0] e1_reg_reg      [4];
   logic [31:0] e2_reg_reg      [4];
 
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       fp_op_sub_reg   <= 1'b0;
       fp_valid_in_reg <= 1'b0;
@@ -236,7 +236,7 @@ module thread_orchestrator (
   endgenerate
 
   // State Machine and Traversal Logic
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       state       <= ST_IDLE;
       curr_qx     <= '0;
@@ -351,7 +351,7 @@ module thread_orchestrator (
   vertex_t        v1_pipe      [TOTAL_LATENCY];
   vertex_t        v2_pipe      [TOTAL_LATENCY];
 
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       for (int i = 0; i < TOTAL_LATENCY; i++) begin
         // in_bb_mask_pipe[i] <= '0;

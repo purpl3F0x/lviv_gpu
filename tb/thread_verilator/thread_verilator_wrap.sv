@@ -445,7 +445,7 @@ module thread_verilator_wrap (
 
   // Register the address-stage token-accept event at the clock edge so the
   // checker sees a stable pulse aligned with the updated stage-1 UV regs.
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       uv_input_valid_q <= 1'b0;
       uv_lut_valid_q <= 1'b0;

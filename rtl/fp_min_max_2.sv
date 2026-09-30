@@ -26,7 +26,7 @@ module fp_min_2 (
   end
 
   // Register output (1-cycle latency)
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       valid_out <= 1'b0;
       f_min     <= '0;
@@ -65,7 +65,7 @@ module fp_max_2 (
   end
 
   // Register output (1-cycle latency)
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       valid_out <= 1'b0;
       f_max     <= '0;

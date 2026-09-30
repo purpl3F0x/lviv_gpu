@@ -43,7 +43,7 @@ module fp_min_max_3 (
   logic [31:0] s1_max_ab;
   logic [31:0] s1_f_c;
 
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       valid_s1  <= 1'b0;
       s1_min_ab <= 32'd0;
@@ -69,7 +69,7 @@ module fp_min_max_3 (
   //-----------------------------------------------------------------
   // Pipeline Stage 2 Registers (Outputs)
   //-----------------------------------------------------------------
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       valid_out <= 1'b0;
       f_min     <= 32'd0;

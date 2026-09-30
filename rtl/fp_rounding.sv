@@ -27,7 +27,7 @@ module fp_ceil_n_clamp_to_odd (
   logic [23:0] s1_ext_mant_shifted;
   assign s1_ext_mant_shifted = {1'b1, f_in[22:0]} >> (8'd150 - f_in[30:23]);
 
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       v_pipe <= '0;
     end else begin
@@ -116,14 +116,9 @@ module fp_ceil_n_clamp_to_odd (
     end
   end
 
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      valid_out <= 1'b0;
-      f_out     <= '0;
-    end else begin
-      valid_out <= v_pipe[1];
-      f_out     <= final_output;
-    end
+  always_ff @(posedge clk) begin
+    valid_out <= v_pipe[1];
+    f_out     <= final_output;
   end
 
 endmodule
@@ -157,14 +152,10 @@ module fp_floor_n_clamp_to_even (
   logic [23:0] s1_ext_mant_shifted;
   assign s1_ext_mant_shifted = {1'b1, f_in[22:0]} >> (8'd150 - f_in[30:23]);
 
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      v_pipe <= '0;
-    end else begin
-      v_pipe[0] <= valid_in;
-      v_pipe[1] <= v_pipe[0];
-      v_pipe[2] <= v_pipe[1];
-    end
+  always_ff @(posedge clk) begin
+    v_pipe[0] <= valid_in;
+    v_pipe[1] <= v_pipe[0];
+    v_pipe[2] <= v_pipe[1];
   end
 
   always_ff @(posedge clk) begin
@@ -250,14 +241,9 @@ module fp_floor_n_clamp_to_even (
     end
   end
 
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      valid_out <= 1'b0;
-      f_out     <= '0;
-    end else begin
-      valid_out <= v_pipe[1];
-      f_out     <= final_output;
-    end
+  always_ff @(posedge clk) begin
+    valid_out <= v_pipe[1];
+    f_out     <= final_output;
   end
 
 endmodule

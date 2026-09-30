@@ -505,7 +505,7 @@ module tb_texture_cache;
     end
   endtask
 
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       axi_read_count <= 0;
       first_axi_addr <= '0;

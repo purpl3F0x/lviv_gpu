@@ -90,7 +90,7 @@ module texture_cache_tags #(
     end
   endgenerate
 
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       hit_oh_reg <= '0;
     end else if (flush) begin
@@ -111,7 +111,7 @@ module texture_cache_tags #(
     end
   end
 
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       for (int way = 0; way < NUM_LINES; way++) begin
         tag_mem[way]   <= '0;
@@ -407,7 +407,7 @@ module texture_cache #(
   // - PLRU updates
   // - Miss/refill FSM
   // ---------------------------------------------------------------------------
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       request_stage_valid <= 1'b0;
       request_stage_tag   <= '0;

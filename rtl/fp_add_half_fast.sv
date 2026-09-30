@@ -15,7 +15,7 @@ module fp_add_half_fast (
 
   logic v_pipe;
 
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) v_pipe <= 1'b0;
     else v_pipe <= valid_in;
   end
@@ -53,7 +53,7 @@ module fp_add_half_fast (
     end
   end
 
-  always_ff @(posedge clk or negedge rst_n) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       valid_out <= 1'b0;
       f_out     <= '0;

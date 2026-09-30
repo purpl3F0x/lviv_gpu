@@ -7,7 +7,7 @@ module tb_texture_address_generator;
   localparam int UvInFracW = 36;
   localparam int ScaledW = UvFracW + MaxTexLog2;
   localparam logic signed [47:0] UvOne = 48'sd1 <<< UvInFracW;
-  localparam int PipelineLatency = 3;
+  localparam int PipelineLatency = 5;
   localparam logic [7:0] NoTextureId = 8'd128;
 
   typedef struct packed {
@@ -27,13 +27,15 @@ module tb_texture_address_generator;
   logic [31:0] addr_out;
   logic no_texture;
 
-  logic        lut_addr_wr_en;
-  logic        lut_size_wr_en;
-  logic [ 6:0] lut_wr_addr;
-  logic [31:0] lut_wr_data;
+  logic [6:0] lut_addr;
+  logic [31:0] lut_base;
+  logic [3:0] lut_size;
 
   logic [31:0] texture_lut_model[0:127];
   logic [3:0]  texture_size_lut_model[0:127];
+
+  assign lut_base = texture_lut_model[lut_addr];
+  assign lut_size = texture_size_lut_model[lut_addr];
 
   logic [31:0] exp_addr_q[$];
   logic        exp_no_tex_q[$];
@@ -51,10 +53,9 @@ module tb_texture_address_generator;
       .texture_mode_v(texture_mode_v),
       .addr_out(addr_out),
       .no_texture(no_texture),
-      .lut_addr_wr_en(lut_addr_wr_en),
-      .lut_size_wr_en(lut_size_wr_en),
-      .lut_wr_addr(lut_wr_addr),
-      .lut_wr_data(lut_wr_data)
+      .lut_addr(lut_addr),
+      .lut_base(lut_base),
+      .lut_size(lut_size)
   );
 
   initial begin
@@ -162,6 +163,7 @@ module tb_texture_address_generator;
     exp_t e;
     begin
       @(negedge clk);
+      clken = 1'b1;
       tex_idx = idx;
       u_in = u;
       v_in = v;
@@ -177,28 +179,35 @@ module tb_texture_address_generator;
   task automatic write_lut_addr(input logic [6:0] idx, input logic [31:0] addr);
     begin
       @(negedge clk);
-      lut_wr_addr = idx;
-      lut_wr_data = addr;
-      lut_addr_wr_en = 1'b1;
-      lut_size_wr_en = 1'b0;
       texture_lut_model[idx] = addr;
-      @(negedge clk);
-      lut_addr_wr_en = 1'b0;
-      lut_wr_data = '0;
     end
   endtask
 
   task automatic write_lut_size(input logic [6:0] idx, input logic [3:0] sz);
     begin
       @(negedge clk);
-      lut_wr_addr = idx;
-      lut_wr_data = {28'd0, sz};
-      lut_addr_wr_en = 1'b0;
-      lut_size_wr_en = 1'b1;
       texture_size_lut_model[idx] = sz;
+    end
+  endtask
+
+  task automatic stall_pipeline;
+    logic [31:0] held_addr;
+    logic held_no_texture;
+    logic [6:0] held_lut_addr;
+    @(negedge clk);
+    clken = 1'b0;
+    held_addr = addr_out;
+    held_no_texture = no_texture;
+    held_lut_addr = lut_addr;
+    repeat (3) begin
+      tex_idx = ~tex_idx;
+      u_in = ~u_in;
+      v_in = ~v_in;
+      texture_mode_u = TEXTURE_TILE;
+      texture_mode_v = TEXTURE_CLAMP;
       @(negedge clk);
-      lut_size_wr_en = 1'b0;
-      lut_wr_data = '0;
+      if (addr_out !== held_addr || no_texture !== held_no_texture || lut_addr !== held_lut_addr)
+        $fatal(1, "Address pipeline changed while stalled");
     end
   endtask
 
@@ -230,10 +239,6 @@ module tb_texture_address_generator;
     v_in = '0;
     texture_mode_u = TEXTURE_CLAMP;
     texture_mode_v = TEXTURE_CLAMP;
-    lut_addr_wr_en = 1'b0;
-    lut_size_wr_en = 1'b0;
-    lut_wr_addr = '0;
-    lut_wr_data = '0;
     err_count = 0;
     check_count = 0;
     cyc = 0;
@@ -260,6 +265,12 @@ module tb_texture_address_generator;
     drive_input(7'd3, (48'sd1 <<< 36) >>> 1, (48'sd1 <<< 36) >>> 2, TEXTURE_CLAMP, TEXTURE_CLAMP);
     drive_input(7'd3, 48'sd1 <<< 36, 48'sd1 <<< 36, TEXTURE_CLAMP, TEXTURE_CLAMP);
     drive_input(7'd3, -((48'sd1 <<< 36) >>> 2), 48'sd0, TEXTURE_CLAMP, TEXTURE_CLAMP);
+    stall_pipeline();
+
+    drive_input(7'd4, -48'sd1, 48'sd1, TEXTURE_CLAMP, TEXTURE_CLAMP);
+    drive_input(7'd4, UvOne - 48'sd1, UvOne + 48'sd1, TEXTURE_CLAMP, TEXTURE_CLAMP);
+    drive_input(7'd4, 48'sh8000_0000_0000, 48'sh7fff_ffff_ffff, TEXTURE_CLAMP, TEXTURE_CLAMP);
+    drive_input(7'd4, 48'sh7fff_ffff_ffff, 48'sh8000_0000_0000, TEXTURE_CLAMP, TEXTURE_CLAMP);
 
     // Tile mode checks (negative and >1 wrap).
     drive_input(7'd4, -((48'sd1 <<< 36) >>> 2), ((48'sd1 <<< 36) + ((48'sd1 <<< 36) >>> 2)),
@@ -288,7 +299,8 @@ module tb_texture_address_generator;
     if (err_count == 0) begin
       $display("[TB PASS] texture_address_generator checks=%0d", check_count);
     end else begin
-      $display("[TB FAIL] texture_address_generator errors=%0d checks=%0d", err_count, check_count);
+            $fatal(1, "[TB FAIL] texture_address_generator errors=%0d checks=%0d",
+              err_count, check_count);
     end
 
     $finish;

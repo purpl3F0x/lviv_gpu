@@ -64,10 +64,14 @@ module thread_verilator_wrap (
     output logic [PIXEL_ADDR_W_THREAD-1:0]  z_wr_addr,
     output logic [31:0]              z_wr_data,
 
-    input  logic                     lut_addr_wr_en,
-    input  logic                     lut_size_wr_en,
-    input  logic [6:0]               lut_wr_addr,
-    input  logic [31:0]              lut_wr_data,
+    input  logic [9:0]               s_apb_PADDR,
+    input  logic                     s_apb_PSEL,
+    input  logic                     s_apb_PENABLE,
+    output logic                     s_apb_PREADY,
+    input  logic                     s_apb_PWRITE,
+    input  logic [31:0]              s_apb_PWDATA,
+    output logic [31:0]              s_apb_PRDATA,
+    output logic                     s_apb_PSLVERROR,
 
     input  logic                     tex_mem_wr_en,
     input  logic [31:0]              tex_mem_wr_addr,
@@ -75,6 +79,35 @@ module thread_verilator_wrap (
 );
 
   gpu_types_pkg::thread_data_in_t in_data;
+
+  logic [6:0] lut_addr;
+  logic [31:0] lut_base;
+  logic [3:0] lut_size;
+
+  ApbLutRam u_lut_ram (
+      .clk(clk),
+      .resetn(rst_n),
+      .s_apb_PADDR(s_apb_PADDR),
+      .s_apb_PSEL(s_apb_PSEL),
+      .s_apb_PENABLE(s_apb_PENABLE),
+      .s_apb_PREADY(s_apb_PREADY),
+      .s_apb_PWRITE(s_apb_PWRITE),
+      .s_apb_PWDATA(s_apb_PWDATA),
+      .s_apb_PRDATA(s_apb_PRDATA),
+      .s_apb_PSLVERROR(s_apb_PSLVERROR),
+      .lut_0_data_addr(lut_addr),
+      .lut_0_base(lut_base),
+      .lut_0_size(lut_size),
+      .lut_1_data_addr(7'd0),
+      .lut_1_base(),
+      .lut_1_size(),
+      .lut_2_data_addr(7'd0),
+      .lut_2_base(),
+      .lut_2_size(),
+      .lut_3_data_addr(7'd0),
+      .lut_3_base(),
+      .lut_3_size()
+  );
 
   logic [31:0]  tex_m_axi_araddr;
   logic [7:0]   tex_m_axi_arlen;
@@ -398,23 +431,30 @@ module thread_verilator_wrap (
       .tex_m_axi_rresp(tex_m_axi_rresp),
       .tex_m_axi_rvalid(tex_m_axi_rvalid),
       .tex_m_axi_rready(tex_m_axi_rready),
-        .tex_m_axi_rlast(tex_m_axi_rlast),
-        .lut_addr_wr_en(lut_addr_wr_en),
-        .lut_size_wr_en(lut_size_wr_en),
-        .lut_wr_addr(lut_wr_addr),
-        .lut_wr_data(lut_wr_data)
+      .tex_m_axi_rlast(tex_m_axi_rlast),
+      .lut_addr(lut_addr),
+      .lut_base(lut_base),
+      .lut_size(lut_size)
   );
 
   logic uv_sample_event_now;
+  logic uv_input_valid_q;
+  logic uv_lut_valid_q;
   assign uv_sample_event_now =
-      u_thread.address_step && u_thread.address_control_input.valid;
+      u_thread.address_step && uv_lut_valid_q;
 
   // Register the address-stage token-accept event at the clock edge so the
   // checker sees a stable pulse aligned with the updated stage-1 UV regs.
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
+      uv_input_valid_q <= 1'b0;
+      uv_lut_valid_q <= 1'b0;
       uv_sample_fire <= 1'b0;
     end else begin
+      if (u_thread.address_step) begin
+        uv_input_valid_q <= u_thread.address_control_input.valid;
+        uv_lut_valid_q <= uv_input_valid_q;
+      end
       uv_sample_fire <= uv_sample_event_now;
     end
   end

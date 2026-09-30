@@ -1,0 +1,2 @@
+`verilator_config
+lint_off -rule WIDTHTRUNC -file "*/rtl/generated/ApbLutRam.v" -match "Operator ASSIGNW expects 8 bits*"

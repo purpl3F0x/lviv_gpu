@@ -15,30 +15,17 @@ module texture_address_generator (
     output logic [31:0] addr_out,
     output logic no_texture,
 
-    // Texture LUT write interface
-    input logic        lut_addr_wr_en,
-    input logic        lut_size_wr_en,
-    input logic [ 6:0] lut_wr_addr,
-    input logic [31:0] lut_wr_data
+    // Texture LUT interface
+    output logic [ 6:0] lut_addr,
+    input  logic [31:0] lut_base,
+    input  logic [ 3:0] lut_size
 );
-  // Texture LUT: 128 entries of aligned base address and 4-bit size
-  (* ramstyle = "distributed" *) reg [31:0] texture_lut[128];
-  (* ramstyle = "distributed" *) reg [3:0] texture_size_lut[128];
 
-  // Default all entries to "no texture" until software/testbench programs LUT.
-  initial begin : init_texture_luts
-    int i;
-    for (i = 0; i < 128; i++) begin
-      texture_lut[i] = 32'd0;
-      texture_size_lut[i] = 4'hF;
-    end
-  end
 
   localparam int UvFracW = 12;
   localparam int MaxTexLog2 = 11;
   localparam int UvInFracW = 36;
   localparam int ScaledW = UvFracW + MaxTexLog2;
-  localparam logic signed [47:0] UvOne = 48'sd1 <<< UvInFracW;
 
   function automatic logic [UvFracW-1:0] normalize_uv(input logic signed [47:0] uv,
                                                       input texture_address_mode_t mode);
@@ -54,9 +41,9 @@ module texture_address_generator (
         normalize_uv = frac_q;
       end
       TEXTURE_CLAMP: begin
-        if (uv <= 48'sd0) begin
+        if (uv[47]) begin
           normalize_uv = '0;
-        end else if (uv >= UvOne) begin
+        end else if (|uv[46:UvInFracW]) begin
           normalize_uv = '1;
         end else begin
           normalize_uv = frac_q;
@@ -65,31 +52,56 @@ module texture_address_generator (
     endcase
   endfunction
 
-  // *-------------------------------------------------------*
-  // * Texture LUT write interface *
-  // *-------------------------------------------------------*
+  logic [7:0] tex_idx_q;
+  logic signed [47:0] u_in_q, v_in_q;
+  texture_address_mode_t texture_mode_u_q, texture_mode_v_q;
+
   always_ff @(posedge clk) begin
-    if (lut_addr_wr_en) begin
-      texture_lut[lut_wr_addr] <= lut_wr_data;
-    end else if (lut_size_wr_en) begin
-      texture_size_lut[lut_wr_addr] <= lut_wr_data[3:0];
+    if (clken) begin
+      tex_idx_q <= tex_idx;
+      u_in_q <= u_in;
+      v_in_q <= v_in;
+      texture_mode_u_q <= texture_mode_u;
+      texture_mode_v_q <= texture_mode_v;
+    end
+  end
+
+  (* shreg_extract = "no" *)logic [31:0] lut_base_q;
+  (* shreg_extract = "no" *)logic [ 3:0] lut_size_q;
+  (* shreg_extract = "no" *)logic [ 7:0] tex_idx_lut_q;
+  (* shreg_extract = "no" *) logic signed [47:0] u_lut_q, v_lut_q;
+  (* shreg_extract = "no" *) texture_address_mode_t texture_mode_u_lut_q, texture_mode_v_lut_q;
+
+  always_ff @(posedge clk) begin
+    if (clken) begin
+      lut_base_q <= lut_base;
+      lut_size_q <= lut_size;
+      tex_idx_lut_q <= tex_idx_q;
+      u_lut_q <= u_in_q;
+      v_lut_q <= v_in_q;
+      texture_mode_u_lut_q <= texture_mode_u_q;
+      texture_mode_v_lut_q <= texture_mode_v_q;
     end
   end
 
   // *-------------------------------------------------------*
-  // * Stage 1: Fetch texture size and normalize UVs *
+  // * Stage 1: Capture buffered LUT data and normalize UVs *
   // *-------------------------------------------------------*
   logic [3:0] texture_size;
   logic [7:0] tex_idx_s1;
   logic [UvFracW-1:0] u_norm_s1;
   logic [UvFracW-1:0] v_norm_s1;
+  (* shreg_extract = "no" *) logic [31:0] base_addr_s1;
+
+  assign lut_addr = tex_idx_q[6:0];
 
   always_ff @(posedge clk) begin
     if (clken) begin
-      texture_size <= texture_size_lut[tex_idx[6:0]];
-      tex_idx_s1 <= tex_idx;
-      u_norm_s1 <= normalize_uv(u_in, texture_mode_u);
-      v_norm_s1 <= normalize_uv(v_in, texture_mode_v);
+      texture_size <= lut_size_q;
+      base_addr_s1 <= lut_base_q;
+      tex_idx_s1 <= tex_idx_lut_q;
+      u_norm_s1 <= normalize_uv(u_lut_q, texture_mode_u_lut_q);
+      v_norm_s1 <= normalize_uv(v_lut_q, texture_mode_v_lut_q);
     end
   end
 
@@ -101,7 +113,7 @@ module texture_address_generator (
   logic [MaxTexLog2-1:0] max_idx_comb;
   logic no_texture_s2_comb;
   logic no_texture_s2;
-  logic [31:0] base_addr;
+  (* shreg_extract = "no" *) logic [31:0] base_addr_s2;
   logic [MaxTexLog2-1:0] max_idx_s2;
 
   always_comb begin
@@ -121,7 +133,7 @@ module texture_address_generator (
 
   always_ff @(posedge clk) begin
     if (clken) begin
-      base_addr <= texture_lut[tex_idx_s1[6:0]];
+      base_addr_s2 <= base_addr_s1;
       no_texture_s2 <= no_texture_s2_comb;
       x_scaled <= x_scaled_comb;
       y_scaled <= y_scaled_comb;
@@ -156,13 +168,13 @@ module texture_address_generator (
 
     addr_out_swizzled = 32'd0;
     for (bit_idx = 0; bit_idx < MaxTexLog2; bit_idx++) begin
-      addr_out_swizzled[(2*bit_idx)] = x_idx[bit_idx];
-      addr_out_swizzled[(2*bit_idx) + 1] = y_idx[bit_idx];
+      addr_out_swizzled[(2*bit_idx)]   = x_idx[bit_idx];
+      addr_out_swizzled[(2*bit_idx)+1] = y_idx[bit_idx];
     end
   end
 
   // Assumes base_addr is aligned to the size of the texture (aka lower bits are 0)
-  assign addr_out_comb = base_addr | addr_out_swizzled;
+  assign addr_out_comb = base_addr_s2 | addr_out_swizzled;
 
   always_ff @(posedge clk) begin
     if (clken) begin

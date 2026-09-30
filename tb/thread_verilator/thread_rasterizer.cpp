@@ -184,6 +184,11 @@ class ThreadRasterCore {
             dut_[t]->clk = 0;
             dut_[t]->rst_n = 0;
             dut_[t]->valid_in = 0;
+            dut_[t]->s_apb_PADDR = 0;
+            dut_[t]->s_apb_PWDATA = 0;
+            dut_[t]->s_apb_PSEL = 0;
+            dut_[t]->s_apb_PENABLE = 0;
+            dut_[t]->s_apb_PWRITE = 0;
             clearInputToken(t);
             dut_[t]->z_rd_data = fbits(1.0f);
             dut_[t]->in_fb_rd_color = 0;
@@ -431,30 +436,55 @@ class ThreadRasterCore {
         }
     }
 
-    void writeLutAddr(int tid, uint32_t idx, uint32_t addr)
+    uint32_t transferLutApb(int tid, uint32_t address, bool write, uint32_t data = 0)
     {
         tickHalfSingle(tid, 0);
-        dut_[tid]->lut_wr_addr = idx;
-        dut_[tid]->lut_wr_data = addr;
-        dut_[tid]->lut_addr_wr_en = 1;
-        dut_[tid]->lut_size_wr_en = 0;
+        dut_[tid]->s_apb_PADDR = address;
+        dut_[tid]->s_apb_PWDATA = data;
+        dut_[tid]->s_apb_PWRITE = write;
+        dut_[tid]->s_apb_PSEL = 1;
+        dut_[tid]->s_apb_PENABLE = 0;
         tickHalfSingle(tid, 1);
         tickHalfSingle(tid, 0);
-        dut_[tid]->lut_addr_wr_en = 0;
-        tickHalfSingle(tid, 1);
+        dut_[tid]->s_apb_PENABLE = 1;
+
+        for (unsigned cycle = 0; cycle < 1000; ++cycle) {
+            tickHalfSingle(tid, 0);
+            const bool ready = dut_[tid]->s_apb_PREADY != 0;
+            const bool error = dut_[tid]->s_apb_PSLVERROR != 0;
+            const uint32_t result = dut_[tid]->s_apb_PRDATA;
+            tickHalfSingle(tid, 1);
+            if (ready) {
+                tickHalfSingle(tid, 0);
+                dut_[tid]->s_apb_PSEL = 0;
+                dut_[tid]->s_apb_PENABLE = 0;
+                dut_[tid]->s_apb_PWRITE = 0;
+                tickHalfSingle(tid, 1);
+                if (error) {
+                    throw std::runtime_error("LUT APB slave error");
+                }
+                return result;
+            }
+        }
+        throw std::runtime_error("LUT APB transfer timed out");
+    }
+
+    void writeLutAddr(int tid, uint32_t idx, uint32_t addr)
+    {
+        const uint32_t address = idx * 4u;
+        transferLutApb(tid, address, true, addr);
+        if (transferLutApb(tid, address, false) != addr) {
+            throw std::runtime_error("LUT base APB readback mismatch");
+        }
     }
 
     void writeLutSize(int tid, uint32_t idx, uint32_t sizeLog2)
     {
-        tickHalfSingle(tid, 0);
-        dut_[tid]->lut_wr_addr = idx;
-        dut_[tid]->lut_wr_data = sizeLog2;
-        dut_[tid]->lut_size_wr_en = 1;
-        dut_[tid]->lut_addr_wr_en = 0;
-        tickHalfSingle(tid, 1);
-        tickHalfSingle(tid, 0);
-        dut_[tid]->lut_size_wr_en = 0;
-        tickHalfSingle(tid, 1);
+        const uint32_t address = 0x200u + idx * 4u;
+        transferLutApb(tid, address, true, sizeLog2);
+        if (transferLutApb(tid, address, false) != (sizeLog2 & 0xFu)) {
+            throw std::runtime_error("LUT size APB readback mismatch");
+        }
     }
 
     // Pokes the AXI RAM's backing mem[] storage directly (bypassing the AXI

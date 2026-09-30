@@ -42,11 +42,10 @@ module thread (
     output logic         tex_m_axi_rready,
     input  logic         tex_m_axi_rlast,
 
-    // Texture LUT programming interface
-    input logic        lut_addr_wr_en,
-    input logic        lut_size_wr_en,
-    input logic [ 6:0] lut_wr_addr,
-    input logic [31:0] lut_wr_data
+    // Texture LUT interface
+    output logic [ 6:0] lut_addr,
+    input  logic [31:0] lut_base,
+    input  logic [ 3:0] lut_size
 
 );
 
@@ -1514,9 +1513,11 @@ module thread (
   assign address_step = fragment_request_input_ready;
   assign output_bundle_buf_tready = address_step;
 
+  localparam int TextureAddressLatencyStages = 5;
+
   delay_pipe #(
       .WIDTH ($bits(fragment_token_t)),
-      .STAGES(3)
+      .STAGES(TextureAddressLatencyStages)
   ) u_fragment_token_to_address_stage (
       .clk(clk),
       .rst_n(1'b1),
@@ -1527,7 +1528,7 @@ module thread (
 
   delay_pipe #(
       .WIDTH ($bits(fragment_control_t)),
-      .STAGES(3)
+      .STAGES(TextureAddressLatencyStages)
   ) u_fragment_control_to_address_stage (
       .clk(clk),
       .rst_n(rst_n),
@@ -1546,13 +1547,12 @@ module thread (
       .texture_mode_v(post_skid_token.texture_mode_v),
       .addr_out(texture_addr),
       .no_texture(texture_no_texture),
-      .lut_addr_wr_en(lut_addr_wr_en),
-      .lut_size_wr_en(lut_size_wr_en),
-      .lut_wr_addr(lut_wr_addr),
-      .lut_wr_data(lut_wr_data)
+      .lut_addr(lut_addr),
+      .lut_base(lut_base),
+      .lut_size(lut_size)
   );
 
-  // The address generator is itself a three-stage registered pipeline. Its
+  // The address generator is itself a five-stage registered pipeline. Its
   // outputs are therefore already aligned with the delayed fragment token.
   assign address_token_s3.texture_addr = texture_addr;
   assign address_token_s3.no_texture = texture_no_texture;
@@ -1686,9 +1686,7 @@ module thread (
       && !delayed_texture_wait;
 
   logic fragment_shader_input_valid;
-  assign fragment_shader_input_valid =
-            fragment_request_control_output.valid
-            && (!fragment_request_delay_output.use_texture || texture_response_ready);
+  assign fragment_shader_input_valid = fragment_request_control_output.valid && !delayed_texture_wait;
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin

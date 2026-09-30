@@ -12,7 +12,8 @@ OBJ_DIR = $(BUILD_DIR)/obj_dir
 TOP = thread_verilator_wrap
 TARGET = $(BUILD_DIR)/rasterizer_thread.exe
 
-SV_SRCS = ../../rtl/gpu_types_pkg.sv \
+SV_SRCS = verilator.vlt \
+          ../../rtl/gpu_types_pkg.sv \
           thread_verilator_wrap.sv \
           ../../tb/common/axi_ram.v \
           ../../rtl/fp_wrappers.sv \
@@ -28,6 +29,7 @@ SV_SRCS = ../../rtl/gpu_types_pkg.sv \
           ../../rtl/blend_unit.sv \
           ../../rtl/z_buffer_ram.sv \
           ../../rtl/texture_address_generator.sv \
+          ../../rtl/generated/ApbLutRam.v \
           ../../rtl/texture_cache.sv \
           ../../rtl/thread.sv
 

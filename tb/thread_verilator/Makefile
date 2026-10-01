@@ -30,6 +30,7 @@ SV_SRCS = verilator.vlt \
           ../../rtl/z_buffer_ram.sv \
           ../../rtl/texture_address_generator.sv \
           ../../rtl/generated/ApbLutRam.v \
+          ../../rtl/generated/ApbThreadRegs.v \
           ../../rtl/texture_cache.sv \
           ../../rtl/thread.sv
 

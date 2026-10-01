@@ -189,6 +189,11 @@ class ThreadRasterCore {
             dut_[t]->s_apb_PSEL = 0;
             dut_[t]->s_apb_PENABLE = 0;
             dut_[t]->s_apb_PWRITE = 0;
+            dut_[t]->thread_apb_PADDR = 0;
+            dut_[t]->thread_apb_PWDATA = 0;
+            dut_[t]->thread_apb_PSEL = 0;
+            dut_[t]->thread_apb_PENABLE = 0;
+            dut_[t]->thread_apb_PWRITE = 0;
             clearInputToken(t);
             dut_[t]->z_rd_data = fbits(1.0f);
             dut_[t]->in_fb_rd_color = 0;
@@ -215,6 +220,9 @@ class ThreadRasterCore {
         // Reset once per bin so z-buffer is scrubbed for each tile, but not per triangle.
         if (!has_active_bin_ || active_bin_min_x_ != binMinX || active_bin_min_y_ != binMinY) {
             resetInternal();
+            for (int tid = 0; tid < HW_THREADS; ++tid) {
+                clearZBufferApb(tid);
+            }
             has_active_bin_ = true;
             active_bin_min_x_ = binMinX;
             active_bin_min_y_ = binMinY;
@@ -467,6 +475,44 @@ class ThreadRasterCore {
             }
         }
         throw std::runtime_error("LUT APB transfer timed out");
+    }
+
+    uint32_t transferThreadApb(int tid, uint32_t address, bool write, uint32_t data = 0)
+    {
+        tickHalfSingle(tid, 0);
+        dut_[tid]->thread_apb_PADDR = address;
+        dut_[tid]->thread_apb_PWDATA = data;
+        dut_[tid]->thread_apb_PWRITE = write;
+        dut_[tid]->thread_apb_PSEL = 1;
+        dut_[tid]->thread_apb_PENABLE = 0;
+        tickHalfSingle(tid, 1);
+        tickHalfSingle(tid, 0);
+        dut_[tid]->thread_apb_PENABLE = 1;
+
+        for (unsigned cycle = 0; cycle < 1000; ++cycle) {
+            tickHalfSingle(tid, 0);
+            const bool ready = dut_[tid]->thread_apb_PREADY != 0;
+            const bool error = dut_[tid]->thread_apb_PSLVERROR != 0;
+            const uint32_t result = dut_[tid]->thread_apb_PRDATA;
+            tickHalfSingle(tid, 1);
+            if (ready) {
+                tickHalfSingle(tid, 0);
+                dut_[tid]->thread_apb_PSEL = 0;
+                dut_[tid]->thread_apb_PENABLE = 0;
+                dut_[tid]->thread_apb_PWRITE = 0;
+                tickHalfSingle(tid, 1);
+                if (error) {
+                    throw std::runtime_error("thread APB slave error");
+                }
+                return result;
+            }
+        }
+        throw std::runtime_error("thread APB transfer timed out");
+    }
+
+    void clearZBufferApb(int tid)
+    {
+        transferThreadApb(tid, 0x04, true, 1);
     }
 
     void writeLutAddr(int tid, uint32_t idx, uint32_t addr)

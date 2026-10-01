@@ -21,13 +21,17 @@ module thread (
     output logic        [PIXEL_ADDR_W_THREAD-1:0] out_fb_rd_addr,
     input  color_argb_t                           in_fb_rd_color,
 
-    // Z-buffer memory interface
-    output logic                           z_rd_en,
-    output logic [PIXEL_ADDR_W_THREAD-1:0] z_rd_addr,
-    input  logic [                   31:0] z_rd_data,
-    output logic                           z_wr_en,
-    output logic [PIXEL_ADDR_W_THREAD-1:0] z_wr_addr,
-    output logic [                   31:0] z_wr_data,
+    // APB Slave Interface
+    input  logic [ 7:0] s_apb_PADDR,
+    input  logic [ 0:0] s_apb_PSEL,
+    input  logic        s_apb_PENABLE,
+    output logic        s_apb_PREADY,
+    input  logic        s_apb_PWRITE,
+    input  logic [31:0] s_apb_PWDATA,
+    output logic [31:0] s_apb_PRDATA,
+    output logic        s_apb_PSLVERROR,
+
+    output logic        zbuf_ready,
 
     // L1 texture cache AXI read channel
     output logic [ 31:0] tex_m_axi_araddr,
@@ -52,6 +56,51 @@ module thread (
   localparam int THREAD_ADDR_W = PIXEL_ADDR_W_THREAD;
 
   logic [THREAD_ADDR_W-1:0] s_axis_addr_tdata;
+  logic z_rd_en;
+  logic [THREAD_ADDR_W-1:0] z_rd_addr;
+  logic [31:0] z_rd_data;
+  logic z_wr_en;
+  logic [THREAD_ADDR_W-1:0] z_wr_addr;
+  logic [31:0] z_wr_data;
+  logic zbuf_clear;
+  logic zbuf_clear_busy;
+  logic thread_soft_reset;
+  logic cache_flush;
+
+  ApbThreadRegs u_apb_thread_regs (
+      .s_apb_PADDR(s_apb_PADDR),
+      .s_apb_PSEL(s_apb_PSEL),
+      .s_apb_PENABLE(s_apb_PENABLE),
+      .s_apb_PREADY(s_apb_PREADY),
+      .s_apb_PWRITE(s_apb_PWRITE),
+      .s_apb_PWDATA(s_apb_PWDATA),
+      .s_apb_PRDATA(s_apb_PRDATA),
+      .s_apb_PSLVERROR(s_apb_PSLVERROR),
+      .thread_busy(!empty),
+      .zbuf_clear_busy(zbuf_clear_busy),
+      .zbuf_clear(zbuf_clear),
+      .thread_soft_reset(thread_soft_reset),
+      .cache_flush(cache_flush),
+      .clk(clk),
+      .resetn(rst_n),
+      .thread_clk(clk)
+  );
+
+  z_buffer_ram #(
+      .ADDR_WIDTH(THREAD_ADDR_W)
+  ) u_z_buffer_ram (
+      .clk(clk),
+      .rst_n(rst_n && !zbuf_clear),
+      .ready(zbuf_ready),
+      .wr_en(z_wr_en),
+      .wr_addr(z_wr_addr),
+      .din(z_wr_data),
+      .rd_en(z_rd_en),
+      .rd_addr(z_rd_addr),
+      .dout(z_rd_data)
+  );
+
+  assign zbuf_clear_busy = !zbuf_ready;
 
   // Single ingress skid buffer for the whole orchestrator token.
   localparam int INBUNDLEWIDTH = $bits(thread_data_in_t);
@@ -1574,7 +1623,7 @@ module thread (
   ) u_l1_texture_cache (
       .clk(clk),
       .rst_n(rst_n),
-      .flush(1'b0),
+      .flush(cache_flush),
       .req_valid(l1_req_valid),
       .req_ready(l1_cache_req_ready),
       .req_addr(fragment_request_output.texture_addr[26:0]),
@@ -1694,7 +1743,7 @@ module thread (
     end
   end
 
-    always_ff @(posedge clk) begin
+  always_ff @(posedge clk) begin
     if (!rst_n) begin
       texture_response_queue_wr_ptr <= '0;
       texture_response_queue_rd_ptr <= '0;

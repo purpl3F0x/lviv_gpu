@@ -73,6 +73,15 @@ module thread_verilator_wrap (
     output logic [31:0]              s_apb_PRDATA,
     output logic                     s_apb_PSLVERROR,
 
+    input  logic [7:0]               thread_apb_PADDR,
+    input  logic                     thread_apb_PSEL,
+    input  logic                     thread_apb_PENABLE,
+    output logic                     thread_apb_PREADY,
+    input  logic                     thread_apb_PWRITE,
+    input  logic [31:0]              thread_apb_PWDATA,
+    output logic [31:0]              thread_apb_PRDATA,
+    output logic                     thread_apb_PSLVERROR,
+
     input  logic                     tex_mem_wr_en,
     input  logic [31:0]              tex_mem_wr_addr,
     input  logic [31:0]              tex_mem_wr_data
@@ -120,13 +129,6 @@ module thread_verilator_wrap (
   logic         tex_m_axi_rvalid;
   logic         tex_m_axi_rready;
   logic         tex_m_axi_rlast;
-
-  logic                           z_rd_en_int;
-  logic [PIXEL_ADDR_W_THREAD-1:0] z_rd_addr_int;
-  logic [31:0]                    z_rd_data_int;
-  logic                           z_wr_en_int;
-  logic [PIXEL_ADDR_W_THREAD-1:0] z_wr_addr_int;
-  logic [31:0]                    z_wr_data_int;
 
   localparam int TEX_AXI_ADDR_W = 24;
 
@@ -381,25 +383,11 @@ module thread_verilator_wrap (
       .s_axi_rready(tex_m_axi_rready)
   );
 
-    assign z_rd_en = z_rd_en_int;
-    assign z_rd_addr = z_rd_addr_int;
-    assign z_wr_en = z_wr_en_int;
-    assign z_wr_addr = z_wr_addr_int;
-    assign z_wr_data = z_wr_data_int;
-      // Thread-local z-buffer in wrapper.
-    z_buffer_ram #(
-        .ADDR_WIDTH(PIXEL_ADDR_W_THREAD)
-    ) u_z_buffer_ram (
-      .clk(clk),
-      .rst_n(rst_n),
-      .ready(z_buf_ready),
-      .wr_en(z_wr_en_int),
-        .wr_addr(z_wr_addr_int),
-      .din(z_wr_data_int),
-      .rd_en(z_rd_en_int),
-        .rd_addr(z_rd_addr_int),
-      .dout(z_rd_data_int)
-    );
+  assign z_rd_en = u_thread.z_rd_en;
+  assign z_rd_addr = u_thread.z_rd_addr;
+  assign z_wr_en = u_thread.z_wr_en;
+  assign z_wr_addr = u_thread.z_wr_addr;
+  assign z_wr_data = u_thread.z_wr_data;
 
   thread u_thread (
       .clk(clk),
@@ -415,12 +403,15 @@ module thread_verilator_wrap (
       .out_fb_rd_en(out_fb_rd_en),
       .out_fb_rd_addr(out_fb_rd_addr),
       .in_fb_rd_color(color_argb_t'(in_fb_rd_color)),
-      .z_rd_en(z_rd_en_int),
-      .z_rd_addr(z_rd_addr_int),
-      .z_rd_data(z_rd_data_int),
-      .z_wr_en(z_wr_en_int),
-      .z_wr_addr(z_wr_addr_int),
-      .z_wr_data(z_wr_data_int),
+      .s_apb_PADDR(thread_apb_PADDR),
+      .s_apb_PSEL(thread_apb_PSEL),
+      .s_apb_PENABLE(thread_apb_PENABLE),
+      .s_apb_PREADY(thread_apb_PREADY),
+      .s_apb_PWRITE(thread_apb_PWRITE),
+      .s_apb_PWDATA(thread_apb_PWDATA),
+      .s_apb_PRDATA(thread_apb_PRDATA),
+      .s_apb_PSLVERROR(thread_apb_PSLVERROR),
+      .zbuf_ready(z_buf_ready),
       .tex_m_axi_araddr(tex_m_axi_araddr),
       .tex_m_axi_arlen(tex_m_axi_arlen),
       .tex_m_axi_arsize(tex_m_axi_arsize),

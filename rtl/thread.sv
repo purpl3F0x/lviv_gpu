@@ -1352,7 +1352,7 @@ module thread (
   localparam int FRAGMENT_OUTPUT_LATENCY_STAGES = FRAGMENT_SHADER_LATENCY_STAGES + BLEND_UNIT_LATENCY_STAGES;
   localparam int DST_READ_REQUEST_DELAY_STAGES = FRAGMENT_SHADER_LATENCY_STAGES - FRAME_BUFFER_READ_LATECNY;
   localparam int L1_TEXTURE_HIT_LATENCY_STAGES = 4;
-  localparam int L1RespQueueDepth = L1_TEXTURE_HIT_LATENCY_STAGES + 1;
+  localparam int L1RespQueueDepth = 1 << $clog2(L1_TEXTURE_HIT_LATENCY_STAGES + 1);
   localparam int L1RespPtrWidth = $clog2(L1RespQueueDepth);
   localparam int L1RespCountWidth = $clog2(L1RespQueueDepth + 1);
 
@@ -1437,7 +1437,7 @@ module thread (
   logic texture_response_consume;
   logic texture_response_queue_push;
   logic texture_response_queue_pop;
-  logic [31:0] texture_response_queue[L1RespQueueDepth];
+  (* ram_style = "distributed" *) logic [31:0] texture_response_queue[L1RespQueueDepth];
   logic [L1RespPtrWidth-1:0] texture_response_queue_wr_ptr;
   logic [L1RespPtrWidth-1:0] texture_response_queue_rd_ptr;
   logic [L1RespCountWidth-1:0] texture_response_queue_count;
@@ -1689,35 +1689,30 @@ module thread (
   assign fragment_shader_input_valid = fragment_request_control_output.valid && !delayed_texture_wait;
 
   always_ff @(posedge clk) begin
+    if (texture_response_queue_push) begin
+      texture_response_queue[texture_response_queue_wr_ptr] <= l1_resp_data;
+    end
+  end
+
+    always_ff @(posedge clk) begin
     if (!rst_n) begin
       texture_response_queue_wr_ptr <= '0;
       texture_response_queue_rd_ptr <= '0;
       texture_response_queue_count  <= '0;
     end else begin
       if (texture_response_queue_push) begin
-        texture_response_queue[texture_response_queue_wr_ptr] <= l1_resp_data;
-        if (texture_response_queue_wr_ptr == L1RespPtrWidth'(L1RespQueueDepth - 1)) begin
-          texture_response_queue_wr_ptr <= '0;
-        end else begin
-          texture_response_queue_wr_ptr <= texture_response_queue_wr_ptr + 1'b1;
-        end
+        texture_response_queue_wr_ptr <= texture_response_queue_wr_ptr + 1'b1;
       end
 
       if (texture_response_queue_pop) begin
-        if (texture_response_queue_rd_ptr == L1RespPtrWidth'(L1RespQueueDepth - 1)) begin
-          texture_response_queue_rd_ptr <= '0;
-        end else begin
-          texture_response_queue_rd_ptr <= texture_response_queue_rd_ptr + 1'b1;
-        end
+        texture_response_queue_rd_ptr <= texture_response_queue_rd_ptr + 1'b1;
       end
 
-      case ({
-        texture_response_queue_push, texture_response_queue_pop
-      })
-        2'b10:   texture_response_queue_count <= texture_response_queue_count + 1'b1;
-        2'b01:   texture_response_queue_count <= texture_response_queue_count - 1'b1;
-        default: texture_response_queue_count <= texture_response_queue_count;
-      endcase
+      if (texture_response_queue_push != texture_response_queue_pop) begin
+        texture_response_queue_count <= texture_response_queue_push
+                        ? texture_response_queue_count + 1'b1
+                        : texture_response_queue_count - 1'b1;
+      end
 
       if (texture_response_queue_push && !texture_response_queue_pop
                       && (texture_response_queue_count == L1RespCountWidth'(L1RespQueueDepth))) begin

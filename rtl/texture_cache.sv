@@ -79,8 +79,8 @@ module texture_cache_tags #(
   // Tag array for fully-associative lookup (parallel compare over all ways)
   // -----------------------------------------------------------------------------
 
-  logic [TAG_WIDTH-1:0] tag_mem  [NUM_LINES];
-  logic                 valid_mem[NUM_LINES];
+  logic [TAG_WIDTH-1:0] tag_mem    [NUM_LINES];
+  logic                 valid_mem  [NUM_LINES];
   logic [NUM_LINES-1:0] hit_oh;
   logic [NUM_LINES-1:0] hit_oh_reg;
 
@@ -93,10 +93,12 @@ module texture_cache_tags #(
   always_ff @(posedge clk) begin
     if (!rst_n) begin
       hit_oh_reg <= '0;
-    end else if (flush) begin
-      hit_oh_reg <= '0;
     end else begin
-      hit_oh_reg <= hit_oh;
+      if (flush) begin
+        hit_oh_reg <= '0;
+      end else begin
+        hit_oh_reg <= hit_oh;
+      end
     end
   end
 
@@ -114,7 +116,7 @@ module texture_cache_tags #(
   always_ff @(posedge clk) begin
     if (!rst_n) begin
       for (int way = 0; way < NUM_LINES; way++) begin
-        tag_mem[way]   <= '0;
+        // tag_mem[way]   <= '0;
         valid_mem[way] <= 1'b0;
       end
     end else if (flush) begin
@@ -137,7 +139,7 @@ endmodule
 
 module texture_cache #(
     parameter int ADDR_WIDTH           = 32,
-  parameter int AXI_ADDR_WIDTH       = ((ADDR_WIDTH + 7) / 8) * 8,
+    parameter int AXI_ADDR_WIDTH       = ((ADDR_WIDTH + 7) / 8) * 8,
     parameter int PIXEL_BITS           = 32,
     parameter int CACHE_LINES          = 32,
     parameter int LINE_PIXELS_X        = 8,
@@ -157,11 +159,11 @@ module texture_cache #(
     output logic [PIXEL_BITS-1:0] resp_data,
 
     output logic [AXI_ADDR_WIDTH-1:0] m_axi_araddr,
-    output logic [           7:0] m_axi_arlen,
-    output logic [           2:0] m_axi_arsize,
-    output logic [           1:0] m_axi_arburst,
-    output logic                  m_axi_arvalid,
-    input  logic                  m_axi_arready,
+    output logic [               7:0] m_axi_arlen,
+    output logic [               2:0] m_axi_arsize,
+    output logic [               1:0] m_axi_arburst,
+    output logic                      m_axi_arvalid,
+    input  logic                      m_axi_arready,
 
     input  logic [AXI_DATA_WIDTH-1:0] m_axi_rdata,
     input  logic [               1:0] m_axi_rresp,
@@ -342,11 +344,11 @@ module texture_cache #(
   end
 
   // External interface wiring and top-level flow-control.
-    assign stage0_miss_active = stage0_valid && !tag_lookup_hit_found;
-    assign stage1_miss_active = stage1_valid && !stage1_hit_found;
-    assign req_ready = !flush && (refill_state == REFILL_IDLE) &&
+  assign stage0_miss_active = stage0_valid && !tag_lookup_hit_found;
+  assign stage1_miss_active = stage1_valid && !stage1_hit_found;
+  assign req_ready = !flush && (refill_state == REFILL_IDLE) &&
       !stage0_miss_active && !stage1_miss_active;
-    assign lookup_fire = request_stage_valid && (refill_state == REFILL_IDLE) &&
+  assign lookup_fire = request_stage_valid && (refill_state == REFILL_IDLE) &&
       !stage0_miss_active && !stage1_miss_active;
   assign m_axi_araddr = {{AxiAddrPadBits{1'b0}}, refill_base_addr};
   assign m_axi_arlen = 8'(BeatsPerLine - 1);
@@ -409,75 +411,75 @@ module texture_cache #(
   // ---------------------------------------------------------------------------
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      request_stage_valid <= 1'b0;
-      request_stage_tag   <= '0;
-      request_stage_pixel_index <= '0;
+      request_stage_valid          <= 1'b0;
+      request_stage_tag            <= '0;
+      request_stage_pixel_index    <= '0;
       request_stage_line_base_addr <= '0;
-      stage0_valid       <= 1'b0;
-      stage0_tag         <= '0;
-      stage0_pixel_index <= '0;
-      stage0_line_base_addr <= '0;
-      stage1_valid       <= 1'b0;
-      stage2_valid       <= 1'b0;
-      stage3_valid       <= 1'b0;
-      stage1_hit_found   <= 1'b0;
-      stage1_hit_way     <= '0;
-      stage1_tag         <= '0;
-      stage1_pixel_index <= '0;
-      stage1_line_base_addr <= '0;
-      refill_state       <= REFILL_IDLE;
-      refill_way         <= '0;
-      refill_base_addr   <= '0;
-      refill_tag         <= '0;
-      refill_pixel_index <= '0;
-      refill_beat        <= '0;
-      axi_rresp_error    <= 1'b0;
-      plru_tree          <= '0;
-      perf_total_req_q   <= '0;
-      perf_hit_req_q     <= '0;
-      perf_miss_req_q    <= '0;
-      perf_rdata_q       <= '0;
-      perf_rvalid_q      <= 1'b0;
+      stage0_valid                 <= 1'b0;
+      stage0_tag                   <= '0;
+      stage0_pixel_index           <= '0;
+      stage0_line_base_addr        <= '0;
+      stage1_valid                 <= 1'b0;
+      stage2_valid                 <= 1'b0;
+      stage3_valid                 <= 1'b0;
+      stage1_hit_found             <= 1'b0;
+      stage1_hit_way               <= '0;
+      stage1_tag                   <= '0;
+      stage1_pixel_index           <= '0;
+      stage1_line_base_addr        <= '0;
+      refill_state                 <= REFILL_IDLE;
+      refill_way                   <= '0;
+      refill_base_addr             <= '0;
+      refill_tag                   <= '0;
+      refill_pixel_index           <= '0;
+      refill_beat                  <= '0;
+      axi_rresp_error              <= 1'b0;
+      plru_tree                    <= '0;
+      perf_total_req_q             <= '0;
+      perf_hit_req_q               <= '0;
+      perf_miss_req_q              <= '0;
+      perf_rdata_q                 <= '0;
+      perf_rvalid_q                <= 1'b0;
 
-      tag_clear_en       <= 1'b0;
-      tag_clear_way      <= '0;
-      tag_fill_en        <= 1'b0;
-      tag_fill_way       <= '0;
+      tag_clear_en                 <= 1'b0;
+      tag_clear_way                <= '0;
+      tag_fill_en                  <= 1'b0;
+      tag_fill_way                 <= '0;
     end else begin
-      stage1_valid    <= stage0_valid;
-      stage2_valid    <= cache_read_en;
-      stage3_valid    <= stage2_valid;
-      tag_clear_en    <= 1'b0;
-      tag_clear_way   <= '0;
-      tag_fill_en     <= 1'b0;
-      tag_fill_way    <= '0;
-      perf_rvalid_q   <= 1'b0;
+      stage1_valid  <= stage0_valid;
+      stage2_valid  <= cache_read_en;
+      stage3_valid  <= stage2_valid;
+      tag_clear_en  <= 1'b0;
+      tag_clear_way <= '0;
+      tag_fill_en   <= 1'b0;
+      tag_fill_way  <= '0;
+      perf_rvalid_q <= 1'b0;
 
       if (flush) begin
-        request_stage_valid <= 1'b0;
-        request_stage_tag   <= '0;
-        request_stage_pixel_index <= '0;
+        request_stage_valid          <= 1'b0;
+        request_stage_tag            <= '0;
+        request_stage_pixel_index    <= '0;
         request_stage_line_base_addr <= '0;
-        stage0_valid       <= 1'b0;
-        stage0_tag         <= '0;
-        stage0_pixel_index <= '0;
-        stage0_line_base_addr <= '0;
-        stage1_valid       <= 1'b0;
-        stage2_valid       <= 1'b0;
-        stage3_valid       <= 1'b0;
-        stage1_hit_found   <= 1'b0;
-        stage1_hit_way     <= '0;
-        stage1_tag         <= '0;
-        stage1_pixel_index <= '0;
-        stage1_line_base_addr <= '0;
-        refill_state       <= REFILL_IDLE;
-        refill_way         <= '0;
-        refill_base_addr   <= '0;
-        refill_tag         <= '0;
-        refill_pixel_index <= '0;
-        refill_beat        <= '0;
-        axi_rresp_error    <= 1'b0;
-        plru_tree          <= '0;
+        stage0_valid                 <= 1'b0;
+        stage0_tag                   <= '0;
+        stage0_pixel_index           <= '0;
+        stage0_line_base_addr        <= '0;
+        stage1_valid                 <= 1'b0;
+        stage2_valid                 <= 1'b0;
+        stage3_valid                 <= 1'b0;
+        stage1_hit_found             <= 1'b0;
+        stage1_hit_way               <= '0;
+        stage1_tag                   <= '0;
+        stage1_pixel_index           <= '0;
+        stage1_line_base_addr        <= '0;
+        refill_state                 <= REFILL_IDLE;
+        refill_way                   <= '0;
+        refill_base_addr             <= '0;
+        refill_tag                   <= '0;
+        refill_pixel_index           <= '0;
+        refill_beat                  <= '0;
+        axi_rresp_error              <= 1'b0;
+        plru_tree                    <= '0;
       end else begin
         if (ENABLE_PERF_COUNTERS) begin
           if (lookup_fire) begin
@@ -512,21 +514,23 @@ module texture_cache #(
 
         if (req_accepted) begin
           request_stage_valid <= 1'b1;
-          request_stage_tag   <= addr_tag(req_byte_addr);
+          request_stage_tag <= addr_tag(req_byte_addr);
           request_stage_pixel_index <= addr_pixel_index(req_byte_addr);
-          request_stage_line_base_addr <= {req_byte_addr[ADDR_WIDTH-1:LineOffsetBits], {LineOffsetBits{1'b0}}};
+          request_stage_line_base_addr <= {
+            req_byte_addr[ADDR_WIDTH-1:LineOffsetBits], {LineOffsetBits{1'b0}}
+          };
         end else if (lookup_fire) begin
           request_stage_valid <= 1'b0;
         end
 
         if (lookup_fire) begin
           // Stage0 captures the request alongside the registered compare vector.
-          stage0_valid     <= 1'b1;
-          stage0_tag       <= request_stage_tag;
-          stage0_pixel_index <= request_stage_pixel_index;
+          stage0_valid          <= 1'b1;
+          stage0_tag            <= request_stage_tag;
+          stage0_pixel_index    <= request_stage_pixel_index;
           stage0_line_base_addr <= request_stage_line_base_addr;
         end else begin
-          stage0_valid     <= 1'b0;
+          stage0_valid <= 1'b0;
         end
 
         stage1_hit_found <= tag_lookup_hit_found;

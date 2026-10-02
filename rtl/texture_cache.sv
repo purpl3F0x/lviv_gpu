@@ -203,6 +203,7 @@ module texture_cache #(
   localparam int BramWriteBits = WayBits + BeatBits;
   localparam int BramReadBits = WayBits + PixelIndexBits;
   localparam int PlruBits = CACHE_LINES - 1;
+  localparam int PlruNodeBits = (PlruBits > 1) ? $clog2(PlruBits) : 1;
   localparam int TotalWords = CACHE_LINES * LinePixels;
   localparam int TotalBeats = TotalWords / (AXI_DATA_WIDTH / PIXEL_BITS);
   localparam int AxiAddrPadBits = AXI_ADDR_WIDTH - ADDR_WIDTH;
@@ -213,8 +214,9 @@ module texture_cache #(
     end
   end
 
-  typedef enum logic [1:0] {
+  typedef enum logic [2:0] {
     REFILL_IDLE,
+    REFILL_SELECT,
     REFILL_AR,
     REFILL_R,
     REFILL_RESP
@@ -241,10 +243,17 @@ module texture_cache #(
 
   refill_state_t                      refill_state;
   logic          [       WayBits-1:0] refill_way;
+  logic          [       WayBits-1:0] victim_way_next;
+  logic          [   PlruNodeBits-1:0] victim_node;
+  logic          [       WayBits-1:0] victim_level;
+  logic                               victim_direction;
   logic          [    ADDR_WIDTH-1:0] refill_base_addr;
   logic          [       TagBits-1:0] refill_tag;
   logic          [PixelIndexBits-1:0] refill_pixel_index;
   logic          [      BeatBits-1:0] refill_beat;
+
+  assign victim_direction = plru_tree[victim_node];
+  assign victim_way_next = WayBits'((refill_way << 1) | victim_direction);
 
   logic                               tag_lookup_hit_found;
   logic          [       WayBits-1:0] tag_lookup_hit_way;
@@ -429,6 +438,8 @@ module texture_cache #(
       stage1_line_base_addr        <= '0;
       refill_state                 <= REFILL_IDLE;
       refill_way                   <= '0;
+      victim_node                  <= '0;
+      victim_level                 <= '0;
       refill_base_addr             <= '0;
       refill_tag                   <= '0;
       refill_pixel_index           <= '0;
@@ -474,6 +485,8 @@ module texture_cache #(
         stage1_line_base_addr        <= '0;
         refill_state                 <= REFILL_IDLE;
         refill_way                   <= '0;
+        victim_node                  <= '0;
+        victim_level                 <= '0;
         refill_base_addr             <= '0;
         refill_tag                   <= '0;
         refill_pixel_index           <= '0;
@@ -544,20 +557,33 @@ module texture_cache #(
         end
 
         if (stage1_miss_active && (refill_state == REFILL_IDLE)) begin
-          // Start miss refill using the decoded stage1 request context.
-          refill_state <= REFILL_AR;
-          refill_way <= select_victim(plru_tree);
+          // Capture the miss, then walk the PLRU tree one level per cycle.
+          refill_state <= REFILL_SELECT;
+          refill_way <= '0;
+          victim_node <= '0;
+          victim_level <= '0;
           refill_base_addr <= stage1_line_base_addr;
           refill_tag <= stage1_tag;
           refill_pixel_index <= stage1_pixel_index;
           refill_beat <= '0;
           axi_rresp_error <= 1'b0;
-          tag_clear_en <= 1'b1;
-          tag_clear_way <= select_victim(plru_tree);
         end
 
         unique case (refill_state)
           REFILL_IDLE: begin
+          end
+
+          REFILL_SELECT: begin
+            refill_way <= victim_way_next;
+            if (victim_level == WayBits'(WayBits - 1)) begin
+              refill_state <= REFILL_AR;
+              tag_clear_en <= 1'b1;
+              tag_clear_way <= victim_way_next;
+            end else begin
+              victim_node <= PlruNodeBits'((int'(victim_node) << 1)
+                                  + (victim_direction ? 2 : 1));
+              victim_level <= victim_level + 1'b1;
+            end
           end
 
           REFILL_AR: begin

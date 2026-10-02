@@ -42,6 +42,8 @@ module fragment_shader (
   logic valid_s1;
   fragment_op_t op_s1;
   logic [7:0] C_pass_a_s1, C_pass_r_s1, C_pass_g_s1, C_pass_b_s1;
+  logic [7:0] add_pixel_r_s1, add_pixel_g_s1, add_pixel_b_s1;
+  logic [7:0] add_texture_r_s1, add_texture_g_s1, add_texture_b_s1;
   logic [8:0] add_sum_r_s1, add_sum_g_s1, add_sum_b_s1;
 
   logic [7:0] m1_a_r, m1_b_r, m2_a_r, m2_b_r;
@@ -65,7 +67,6 @@ module fragment_shader (
   logic valid_s2;
   fragment_op_t op_s2;
   logic [7:0] C_pass_a_s2, C_pass_r_s2, C_pass_g_s2, C_pass_b_s2;
-  logic [7:0] add_r_s2, add_g_s2, add_b_s2;
 
   logic [15:0] prod1_r, prod2_r;
   logic [15:0] prod1_g, prod2_g;
@@ -100,6 +101,8 @@ module fragment_shader (
   logic [16:0] sum_r_s5, sum_g_s5, sum_b_s5;
   logic [15:0] prod_a_s4;
   logic [15:0] prod_a_s5;
+  logic [16:0] sum_r_s6, sum_g_s6, sum_b_s6;
+  logic [15:0] prod_a_s6;
 
   always_ff @(posedge clk) begin
     if (!rst_n) begin
@@ -141,10 +144,13 @@ module fragment_shader (
         C_pass_b_s1 <= pixel_color_s0.b;
       end
 
-      // Register the raw sums; clamp them in the following stage.
-      add_sum_r_s1 <= {1'b0, pixel_color_s0.r} + {1'b0, texture_color_s0_b.r};
-      add_sum_g_s1 <= {1'b0, pixel_color_s0.g} + {1'b0, texture_color_s0_b.g};
-      add_sum_b_s1 <= {1'b0, pixel_color_s0.b} + {1'b0, texture_color_s0_b.b};
+      // Buffer both DSP operands before registering the SIMD sum.
+      add_pixel_r_s1 <= pixel_color_s0.r;
+      add_pixel_g_s1 <= pixel_color_s0.g;
+      add_pixel_b_s1 <= pixel_color_s0.b;
+      add_texture_r_s1 <= texture_color_s0_b.r;
+      add_texture_g_s1 <= texture_color_s0_b.g;
+      add_texture_b_s1 <= texture_color_s0_b.b;
 
       // Setup Multipliers
       m1_a_r <= pixel_color_s0.r;
@@ -206,9 +212,9 @@ module fragment_shader (
       C_pass_r_s2 <= C_pass_r_s1;
       C_pass_g_s2 <= C_pass_g_s1;
       C_pass_b_s2 <= C_pass_b_s1;
-      add_r_s2 <= add_sum_r_s1[8] ? 8'd255 : add_sum_r_s1[7:0];
-      add_g_s2 <= add_sum_g_s1[8] ? 8'd255 : add_sum_g_s1[7:0];
-      add_b_s2 <= add_sum_b_s1[8] ? 8'd255 : add_sum_b_s1[7:0];
+      add_sum_r_s1 <= {1'b0, add_pixel_r_s1} + {1'b0, add_texture_r_s1};
+      add_sum_g_s1 <= {1'b0, add_pixel_g_s1} + {1'b0, add_texture_g_s1};
+      add_sum_b_s1 <= {1'b0, add_pixel_b_s1} + {1'b0, add_texture_b_s1};
 
       m1_a_r_s3 <= m1_a_r;
       m1_b_r_s3 <= m1_b_r;
@@ -237,9 +243,9 @@ module fragment_shader (
       C_pass_r_s3 <= C_pass_r_s2;
       C_pass_g_s3 <= C_pass_g_s2;
       C_pass_b_s3 <= C_pass_b_s2;
-      add_r_s3 <= add_r_s2;
-      add_g_s3 <= add_g_s2;
-      add_b_s3 <= add_b_s2;
+      add_r_s3 <= add_sum_r_s1[8] ? 8'd255 : add_sum_r_s1[7:0];
+      add_g_s3 <= add_sum_g_s1[8] ? 8'd255 : add_sum_g_s1[7:0];
+      add_b_s3 <= add_sum_b_s1[8] ? 8'd255 : add_sum_b_s1[7:0];
 
       prod1_r <= m1_a_r_s3 * m1_b_r_s3;
       prod1_g <= m1_a_g_s3 * m1_b_g_s3;
@@ -291,18 +297,35 @@ module fragment_shader (
       prod_a_s5 <= prod_a_s4;
 
       // ========================================================
-      // STAGE 7: Final output selection.
+      // STAGE 7: Final alignment stage.
       // ========================================================
-      valid_out <= valid_s5;
+      valid_s6 <= valid_s5;
+      op_s6 <= op_s5;
+      C_pass_a_s6 <= C_pass_a_s5;
+      C_pass_r_s6 <= C_pass_r_s5;
+      C_pass_g_s6 <= C_pass_g_s5;
+      C_pass_b_s6 <= C_pass_b_s5;
+      add_r_s6 <= add_r_s5;
+      add_g_s6 <= add_g_s5;
+      add_b_s6 <= add_b_s5;
+      sum_r_s6 <= sum_r_s5;
+      sum_g_s6 <= sum_g_s5;
+      sum_b_s6 <= sum_b_s5;
+      prod_a_s6 <= prod_a_s5;
 
-      case (op_s5)
-        REPLACE: fragment_color <= {C_pass_a_s5, C_pass_r_s5, C_pass_g_s5, C_pass_b_s5};
+      // ========================================================
+      // STAGE 8: Final output selection.
+      // ========================================================
+      valid_out <= valid_s6;
+
+      case (op_s6)
+        REPLACE: fragment_color <= {C_pass_a_s6, C_pass_r_s6, C_pass_g_s6, C_pass_b_s6};
         MODULATE:
-        fragment_color <= {prod_a_s5[15:8], sum_r_s5[15:8], sum_g_s5[15:8], sum_b_s5[15:8]};
-        DECAL: fragment_color <= {C_pass_a_s5, sum_r_s5[15:8], sum_g_s5[15:8], sum_b_s5[15:8]};
-        BLEND: fragment_color <= {prod_a_s5[15:8], sum_r_s5[15:8], sum_g_s5[15:8], sum_b_s5[15:8]};
-        ADD: fragment_color <= {prod_a_s5[15:8], add_r_s5, add_g_s5, add_b_s5};
-        COLOR: fragment_color <= {C_pass_a_s5, C_pass_r_s5, C_pass_g_s5, C_pass_b_s5};
+        fragment_color <= {prod_a_s6[15:8], sum_r_s6[15:8], sum_g_s6[15:8], sum_b_s6[15:8]};
+        DECAL: fragment_color <= {C_pass_a_s6, sum_r_s6[15:8], sum_g_s6[15:8], sum_b_s6[15:8]};
+        BLEND: fragment_color <= {prod_a_s6[15:8], sum_r_s6[15:8], sum_g_s6[15:8], sum_b_s6[15:8]};
+        ADD: fragment_color <= {prod_a_s6[15:8], add_r_s6, add_g_s6, add_b_s6};
+        COLOR: fragment_color <= {C_pass_a_s6, C_pass_r_s6, C_pass_g_s6, C_pass_b_s6};
         default: fragment_color <= '0;
       endcase
     end

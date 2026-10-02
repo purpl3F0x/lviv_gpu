@@ -14,12 +14,10 @@ SUPPORTED_OPS = {
     "mux",
     "mem_read",
     "mem_write",
-    "fx_color_mul",
-    "fx_color_fma",
-    "fx_texture_mul",
-    "fx_texture_fma",
+    "fx_color_interpolate",
+    "fx_color_channel",
+    "fx_texture_interpolate",
     "fp_to_fx2_23",
-    "fx_color_to_u8",
 }
 
 
@@ -33,24 +31,20 @@ DEFAULT_LATENCIES = {
     "mux": 1,
     "mem_read": 1,
     "mem_write": 1,
-    # Fixed-point op latencies follow the RTL pipeline depths.
-    "fx_color_mul": 2,
-    "fx_color_fma": 3,
-    "fx_texture_mul": 2,
-    "fx_texture_fma": 3,
-    "fx_color_to_u8": 2,
+    # Interpolator latencies follow their RTL pipeline depths.
+    "fx_color_interpolate": 6,
+    "fx_color_channel": 0,
+    "fx_texture_interpolate": 6,
     # Xilinx conversion wrappers are 2-cycle latency.
     "fp_to_fx2_23": 2,
 }
 
 # Output bit-width for each op type (default 32 for fp ops).
 _FX_OP_WIDTHS = {
-    "fx_color_mul": 33,
-    "fx_color_fma": 33,
-    "fx_texture_mul": 48,
-    "fx_texture_fma": 48,
+    "fx_color_interpolate": 32,
+    "fx_color_channel": 8,
+    "fx_texture_interpolate": 48,
     "fp_to_fx2_23": 25,
-    "fx_color_to_u8": 8,
 }
 
 # Leaf-signal type → bit width.
@@ -59,9 +53,8 @@ _FX_OP_WIDTHS = {
 _LEAF_TYPE_WIDTHS = {
     "addr_t": "THREAD_ADDR_W",
     "uint8_t": 8,
-    "fx_color": 33,
+    "color_argb_t": 32,
     "fx_texture": 18,
-    "fx_texture_accum": 48,
     "fx_2_23": 25,
 }
 
@@ -74,6 +67,7 @@ class OpInfo:
     op_symbol: str = ""
     cmp_kind: str = ""
     valid_expr: str = "pipe_en"
+    channel: str = ""
 
 
 class HardwareDAG:
@@ -114,7 +108,15 @@ class HardwareDAG:
     def _sanitize_sv_name(name: str) -> str:
         return re.sub(r"[^0-9A-Za-z_]", "_", name)
 
-    def _new_node(self, op_type, expr, op_symbol="", cmp_kind="", valid_expr="pipe_en"):
+    def _new_node(
+        self,
+        op_type,
+        expr,
+        op_symbol="",
+        cmp_kind="",
+        valid_expr="pipe_en",
+        channel="",
+    ):
         self.counters[op_type] += 1
         node_id = f"{op_type}_{self.counters[op_type]}"
         self.ops[node_id] = OpInfo(
@@ -124,6 +126,7 @@ class HardwareDAG:
             op_symbol=op_symbol,
             cmp_kind=cmp_kind,
             valid_expr=valid_expr,
+            channel=channel,
         )
         return node_id
 
@@ -229,8 +232,7 @@ class HardwareDAG:
 
     def add_binary_operation(self, op_type, left, right, expr, op_symbol=""):
         _FP_BINARY = {"fp_add", "fp_sub", "fp_mul"}
-        _FX_BINARY = {"fx_color_mul", "fx_texture_mul"}
-        if op_type not in _FP_BINARY | _FX_BINARY:
+        if op_type not in _FP_BINARY:
             raise ValueError(f"Unsupported binary op type: {op_type}")
 
         valid_expr = self._merge_valid_expr(
@@ -262,11 +264,60 @@ class HardwareDAG:
         self.expression_cache[cache_key] = node_id
         return node_id
 
+    def add_texture_interpolation_operation(self, inputs, expr):
+        if len(inputs) != 6:
+            raise ValueError("Texture interpolation expects three colors and weights")
+        valid_expr = self._merge_valid_expr(
+            self.global_valid_expr,
+            *(self._input_valid_expr(sig) for sig in inputs),
+        )
+        cache_key = ("fx_texture_interpolate", expr, valid_expr)
+        if cache_key in self.expression_cache:
+            return self.expression_cache[cache_key]
+
+        node_id = self._new_node("fx_texture_interpolate", expr, valid_expr=valid_expr)
+        self._add_edges(node_id, tuple(inputs), tuple(self.control_dependencies))
+        self.expression_cache[cache_key] = node_id
+        return node_id
+
+    def add_color_interpolation_operation(self, inputs, expr):
+        if len(inputs) != 6:
+            raise ValueError("Color interpolation expects three colors and weights")
+        valid_expr = self._merge_valid_expr(
+            self.global_valid_expr,
+            *(self._input_valid_expr(sig) for sig in inputs),
+        )
+        cache_key = ("fx_color_interpolate", expr, valid_expr)
+        if cache_key in self.expression_cache:
+            return self.expression_cache[cache_key]
+
+        node_id = self._new_node("fx_color_interpolate", expr, valid_expr=valid_expr)
+        self._add_edges(node_id, tuple(inputs), tuple(self.control_dependencies))
+        self.expression_cache[cache_key] = node_id
+        return node_id
+
+    def add_color_channel_operation(self, color, channel, expr):
+        if channel not in ("a", "r", "g", "b"):
+            raise ValueError(f"Unsupported color channel: {channel}")
+        valid_expr = self._merge_valid_expr(
+            self.global_valid_expr,
+            self._input_valid_expr(color),
+        )
+        cache_key = ("fx_color_channel", expr, valid_expr, channel)
+        if cache_key in self.expression_cache:
+            return self.expression_cache[cache_key]
+
+        node_id = self._new_node(
+            "fx_color_channel", expr, valid_expr=valid_expr, channel=channel
+        )
+        self._add_edges(node_id, (color,), tuple(self.control_dependencies))
+        self.expression_cache[cache_key] = node_id
+        return node_id
+
     def add_unary_operation(self, op_type, src, expr):
         if op_type not in (
             "fp_recip",
             "fp_to_fx2_23",
-            "fx_color_to_u8",
         ):
             raise ValueError(f"Unsupported unary op type: {op_type}")
 
@@ -467,8 +518,8 @@ class HardwareDAG:
             op_type
             in (
                 "fp_fma",
-                "fx_color_fma",
-                "fx_texture_fma",
+                "fx_texture_interpolate",
+                "fx_color_interpolate",
             )
             and produced_inputs
         ):
@@ -480,10 +531,7 @@ class HardwareDAG:
             "fp_mul",
             "fp_recip",
             "mux",
-            "fx_color_mul",
-            "fx_texture_mul",
             "fp_to_fx2_23",
-            "fx_color_to_u8",
         ):
             if produced_inputs:
                 return produced_inputs[-1]
@@ -1071,55 +1119,38 @@ class HardwareDAG:
                     lines.append(f"    .a({a}), .b({b}),")
                     lines.append(f"    .result({out_wire}[0])")
                     lines.append(");")
-            elif info.op_type == "fx_color_mul":
-                a = input_ref_by_edge[(node, 0)]
-                b = input_ref_by_edge[(node, 1)]
-                lines.append(f"fx_color_mul u_{unit} (")
+            elif info.op_type == "fx_texture_interpolate":
+                colors = [input_ref_by_edge[(node, i)] for i in (0, 2, 4)]
+                weights = [input_ref_by_edge[(node, i)] for i in (1, 3, 5)]
+                lines.append(f"fx_texture_interpolator u_{unit} (")
                 lines.append("    .clk(clk), .clken(pipe_en_internal),")
-                lines.append(f"    .a({a}), .b({b}),")
-                lines.append(f"    .q({out_wire})")
+                lines.append(f"    .coord0({colors[0]}), .weight0({weights[0]}),")
+                lines.append(f"    .coord1({colors[1]}), .weight1({weights[1]}),")
+                lines.append(f"    .coord2({colors[2]}), .weight2({weights[2]}),")
+                lines.append(f"    .result({out_wire})")
                 lines.append(");")
-            elif info.op_type == "fx_color_fma":
-                a = input_ref_by_edge[(node, 0)]
-                b = input_ref_by_edge[(node, 1)]
-                c = input_ref_by_edge[(node, 2)]
-                lines.append(f"fx_color_fma u_{unit} (")
+            elif info.op_type == "fx_color_interpolate":
+                colors = [input_ref_by_edge[(node, i)] for i in (0, 2, 4)]
+                weights = [input_ref_by_edge[(node, i)] for i in (1, 3, 5)]
+                lines.append(f"fx_color_interpolator u_{unit} (")
                 lines.append("    .clk(clk), .clken(pipe_en_internal),")
-                lines.append(f"    .a({a}), .b({b}), .c({c}),")
-                lines.append(f"    .q({out_wire})")
+                lines.append(f"    .color0({colors[0]}), .weight0({weights[0]}),")
+                lines.append(f"    .color1({colors[1]}), .weight1({weights[1]}),")
+                lines.append(f"    .color2({colors[2]}), .weight2({weights[2]}),")
+                lines.append(f"    .result({out_wire})")
                 lines.append(");")
-            elif info.op_type == "fx_texture_mul":
-                a = input_ref_by_edge[(node, 0)]
-                b = input_ref_by_edge[(node, 1)]
-                lines.append(f"fx_texture_mul u_{unit} (")
-                lines.append("    .clk(clk), .clken(pipe_en_internal),")
-                lines.append(f"    .a({a}), .b({b}),")
-                lines.append(f"    .q({out_wire})")
-                lines.append(");")
-            elif info.op_type == "fx_texture_fma":
-                a = input_ref_by_edge[(node, 0)]
-                b = input_ref_by_edge[(node, 1)]
-                c = input_ref_by_edge[(node, 2)]
-                lines.append(f"fx_texture_fma u_{unit} (")
-                lines.append("    .clk(clk), .clken(pipe_en_internal),")
-                lines.append(f"    .a({a}), .b({b}), .c({c}),")
-                lines.append(f"    .q({out_wire})")
-                lines.append(");")
+            elif info.op_type == "fx_color_channel":
+                source = input_ref_by_edge[(node, 0)]
+                slices = {"a": "31:24", "r": "23:16", "g": "15:8", "b": "7:0"}
+                lines.append(f"assign {out_wire} = {source}[{slices[info.channel]}];")
             elif info.op_type == "fp_to_fx2_23":
                 a = input_ref_by_edge[(node, 0)]
-                lines.append(f"fp_to_fx2_23 u_{unit} (")
+                lines.append(f"fp_to_fx2_23 #(.LATENCY({info.latency})) u_{unit} (")
                 lines.append("    .aclk(clk), .aclken(pipe_en_internal),")
                 lines.append(f"    .s_axis_a_tvalid({valid_in}),")
                 lines.append(f"    .s_axis_a_tdata({a}),")
                 lines.append("    .m_axis_result_tvalid(),")
                 lines.append(f"    .m_axis_result_tdata({out_wire})")
-                lines.append(");")
-            elif info.op_type == "fx_color_to_u8":
-                a = input_ref_by_edge[(node, 0)]
-                lines.append(f"fx_color_to_u8 u_{unit} (")
-                lines.append("    .clk(clk), .clken(pipe_en_internal),")
-                lines.append(f"    .in_fx_color({a}),")
-                lines.append(f"    .out_u8({out_wire})")
                 lines.append(");")
         lines.append("")
 
@@ -1151,7 +1182,7 @@ class HardwareDAG:
             lines.append(f"localparam int OUTBUNDLEWIDTH = {bits_terms};")
             lines.append("logic [OUTBUNDLEWIDTH-1:0] output_bundle_tdata;")
             lines.append("logic output_bundle_tvalid;")
-            lines.append("logic output_bundle_s_axis_tready;")
+            lines.append("(*max_fanout = 250*) logic output_bundle_s_axis_tready;")
             lines.append("logic [OUTBUNDLEWIDTH-1:0] output_bundle_buf_tdata;")
             lines.append("logic output_bundle_buf_tvalid;")
             lines.append("logic output_bundle_buf_tready;")
@@ -1337,38 +1368,6 @@ class Signal:
             raise ValueError("Signals must belong to the same DAG")
         a_type = getattr(self, "type", "float_t")
         b_type = getattr(other, "type", "float_t")
-        if (a_type == "uint8_t" and b_type == "fx_2_23") or (
-            b_type == "uint8_t" and a_type == "fx_2_23"
-        ):
-            color = self if a_type == "uint8_t" else other
-            coeff = other if a_type == "uint8_t" else self
-            expr = f"({self.expr} * {other.expr})"
-            node_id = self.dag.add_binary_operation(
-                "fx_color_mul", color, coeff, expr, "*"
-            )
-            return Signal(
-                self.dag,
-                hw_id=node_id,
-                expr=expr,
-                type="fx_color",
-                valid_expr=self.dag.ops[node_id].valid_expr,
-            )
-        if (a_type == "fx_texture" and b_type == "fx_2_23") or (
-            b_type == "fx_texture" and a_type == "fx_2_23"
-        ):
-            texture = self if a_type == "fx_texture" else other
-            coeff = other if a_type == "fx_texture" else self
-            expr = f"({self.expr} * {other.expr})"
-            node_id = self.dag.add_binary_operation(
-                "fx_texture_mul", coeff, texture, expr, "*"
-            )
-            return Signal(
-                self.dag,
-                hw_id=node_id,
-                expr=expr,
-                type="fx_texture_accum",
-                valid_expr=self.dag.ops[node_id].valid_expr,
-            )
         if a_type != b_type:
             raise TypeError(f"Unsupported mul type combination: {a_type} * {b_type}")
         op, res_type = "fp_mul", a_type
@@ -1396,20 +1395,6 @@ class Signal:
             valid_expr=self.dag.ops[node_id].valid_expr,
         )
 
-    def as_u8(self):
-        """Convert UQ9.8 fixed-point to uint8 with rounding/clamp."""
-        if self.type != "fx_color":
-            raise TypeError("as_u8 is only supported for fx_color signals")
-        expr = f"fx_color_to_u8({self.expr})"
-        node_id = self.dag.add_unary_operation("fx_color_to_u8", self, expr)
-        return Signal(
-            self.dag,
-            hw_id=node_id,
-            expr=expr,
-            type="uint8_t",
-            valid_expr=self.dag.ops[node_id].valid_expr,
-        )
-
     def __rtruediv__(self, other):
         if self.type != "float_t":
             raise TypeError("Reciprocal is only supported for float_t signals")
@@ -1426,49 +1411,71 @@ class Signal:
         )
 
     @staticmethod
-    def fx_fma(a, b, c):
-        """Fixed-point FMA helper for supported fixed-point families."""
-        for sig in (a, b, c):
-            if not isinstance(sig, Signal):
-                raise TypeError("fx_fma requires Signal operands")
-        if a.dag is not b.dag or a.dag is not c.dag:
-            raise ValueError("fx_fma signals must belong to the same DAG")
-        a_type = getattr(a, "type", "")
-        b_type = getattr(b, "type", "")
-        c_type = getattr(c, "type", "")
-        if {a_type, b_type} == {"uint8_t", "fx_2_23"} and c_type == "fx_color":
-            color = a if a_type == "uint8_t" else b
-            coeff = b if a_type == "uint8_t" else a
-            expr = f"fx_fma({a.expr}, {b.expr}, {c.expr})"
-            node_id = a.dag.add_fma_operation(
-                color, coeff, c, expr, op_type="fx_color_fma"
-            )
-            return Signal(
-                a.dag,
-                hw_id=node_id,
-                expr=expr,
-                type="fx_color",
-                valid_expr=a.dag.ops[node_id].valid_expr,
-            )
-        if {a_type, b_type} == {
-            "fx_texture",
-            "fx_2_23",
-        } and c_type == "fx_texture_accum":
-            texture = a if a_type == "fx_texture" else b
-            coeff = b if a_type == "fx_texture" else a
-            expr = f"fx_fma({a.expr}, {b.expr}, {c.expr})"
-            node_id = a.dag.add_fma_operation(
-                coeff, texture, c, expr, op_type="fx_texture_fma"
-            )
-            return Signal(
-                a.dag,
-                hw_id=node_id,
-                expr=expr,
-                type="fx_texture_accum",
-                valid_expr=a.dag.ops[node_id].valid_expr,
-            )
-        raise TypeError(
-            f"Unsupported fx_fma type combination: {a_type} * {b_type} + {c_type}"
+    def texture_interpolate(color0, weight0, color1, weight1, color2, weight2):
+        colors = (color0, color1, color2)
+        weights = (weight0, weight1, weight2)
+        inputs = (color0, weight0, color1, weight1, color2, weight2)
+        if any(not isinstance(sig, Signal) for sig in inputs):
+            raise TypeError("texture_interpolate expects Signal operands")
+        if any(sig.dag is not color0.dag for sig in inputs):
+            raise ValueError("texture_interpolate signals must belong to the same DAG")
+        if any(sig.type != "fx_texture" for sig in colors):
+            raise TypeError("texture interpolation colors must be fx_texture")
+        if any(sig.type != "fx_2_23" for sig in weights):
+            raise TypeError("texture interpolation weights must be fx_2_23")
+
+        expr = (
+            f"texture_interpolate({color0.expr}, {weight0.expr}, "
+            f"{color1.expr}, {weight1.expr}, {color2.expr}, {weight2.expr})"
+        )
+        node_id = color0.dag.add_texture_interpolation_operation(inputs, expr)
+        return Signal(
+            color0.dag,
+            hw_id=node_id,
+            expr=expr,
+            type="fx_texture_accum",
+            valid_expr=color0.dag.ops[node_id].valid_expr,
+        )
+
+    @staticmethod
+    def color_interpolate(color0, weight0, color1, weight1, color2, weight2):
+        colors = (color0, color1, color2)
+        weights = (weight0, weight1, weight2)
+        inputs = (color0, weight0, color1, weight1, color2, weight2)
+        if any(not isinstance(sig, Signal) for sig in inputs):
+            raise TypeError("color_interpolate expects Signal operands")
+        if any(sig.dag is not color0.dag for sig in inputs):
+            raise ValueError("color_interpolate signals must belong to the same DAG")
+        if any(sig.type != "color_argb_t" for sig in colors):
+            raise TypeError("color interpolation inputs must be packed color_argb_t")
+        if any(sig.type != "fx_2_23" for sig in weights):
+            raise TypeError("color interpolation weights must be fx_2_23")
+
+        expr = (
+            f"color_interpolate({color0.expr}, {weight0.expr}, "
+            f"{color1.expr}, {weight1.expr}, {color2.expr}, {weight2.expr})"
+        )
+        node_id = color0.dag.add_color_interpolation_operation(inputs, expr)
+        return Signal(
+            color0.dag,
+            hw_id=node_id,
+            expr=expr,
+            type="color_argb_t",
+            valid_expr=color0.dag.ops[node_id].valid_expr,
+        )
+
+    @staticmethod
+    def color_channel(color, channel):
+        if not isinstance(color, Signal) or color.type != "color_argb_t":
+            raise TypeError("color_channel expects a packed color_argb_t Signal")
+        expr = f"{color.expr}.{channel}"
+        node_id = color.dag.add_color_channel_operation(color, channel, expr)
+        return Signal(
+            color.dag,
+            hw_id=node_id,
+            expr=expr,
+            type="uint8_t",
+            valid_expr=color.dag.ops[node_id].valid_expr,
         )
 
     @staticmethod
@@ -1482,40 +1489,6 @@ class Signal:
         if a.dag is not b.dag or a.dag is not c.dag:
             raise ValueError("fma signals must belong to the same DAG")
 
-        a_type = getattr(a, "type", "")
-        b_type = getattr(b, "type", "")
-        c_type = getattr(c, "type", "")
-        if {a_type, b_type} == {"uint8_t", "fx_2_23"} and c_type == "fx_color":
-            color = a if a_type == "uint8_t" else b
-            coeff = b if a_type == "uint8_t" else a
-            expr = f"fma({a.expr}, {b.expr}, {c.expr})"
-            node_id = a.dag.add_fma_operation(
-                color, coeff, c, expr, op_type="fx_color_fma"
-            )
-            return Signal(
-                a.dag,
-                hw_id=node_id,
-                expr=expr,
-                type="fx_color",
-                valid_expr=a.dag.ops[node_id].valid_expr,
-            )
-        if {a_type, b_type} == {
-            "fx_texture",
-            "fx_2_23",
-        } and c_type == "fx_texture_accum":
-            texture = a if a_type == "fx_texture" else b
-            coeff = b if a_type == "fx_texture" else a
-            expr = f"fma({a.expr}, {b.expr}, {c.expr})"
-            node_id = a.dag.add_fma_operation(
-                coeff, texture, c, expr, op_type="fx_texture_fma"
-            )
-            return Signal(
-                a.dag,
-                hw_id=node_id,
-                expr=expr,
-                type="fx_texture_accum",
-                valid_expr=a.dag.ops[node_id].valid_expr,
-            )
         if a.type != b.type or a.type != c.type:
             raise TypeError("fma requires matching signal types")
 
@@ -1664,18 +1637,24 @@ if __name__ == "__main__":
     v0_texture_v = Signal(dag, name="v0_texture_v", type="fx_texture")
     v1_texture_v = Signal(dag, name="v1_texture_v", type="fx_texture")
     v2_texture_v = Signal(dag, name="v2_texture_v", type="fx_texture")
-    v0_color_r = Signal(dag, name="v0_color_r", type="uint8_t")
-    v1_color_r = Signal(dag, name="v1_color_r", type="uint8_t")
-    v2_color_r = Signal(dag, name="v2_color_r", type="uint8_t")
-    v0_color_g = Signal(dag, name="v0_color_g", type="uint8_t")
-    v1_color_g = Signal(dag, name="v1_color_g", type="uint8_t")
-    v2_color_g = Signal(dag, name="v2_color_g", type="uint8_t")
-    v0_color_b = Signal(dag, name="v0_color_b", type="uint8_t")
-    v1_color_b = Signal(dag, name="v1_color_b", type="uint8_t")
-    v2_color_b = Signal(dag, name="v2_color_b", type="uint8_t")
-    v0_color_a = Signal(dag, name="v0_color_a", type="uint8_t")
-    v1_color_a = Signal(dag, name="v1_color_a", type="uint8_t")
-    v2_color_a = Signal(dag, name="v2_color_a", type="uint8_t")
+    color0_argb = Signal(
+        dag,
+        name="color0_argb",
+        type="color_argb_t",
+        sv_ref="{thread_data_buf.v0_color_a, thread_data_buf.v0_color_r, thread_data_buf.v0_color_g, thread_data_buf.v0_color_b}",
+    )
+    color1_argb = Signal(
+        dag,
+        name="color1_argb",
+        type="color_argb_t",
+        sv_ref="{thread_data_buf.v1_color_a, thread_data_buf.v1_color_r, thread_data_buf.v1_color_g, thread_data_buf.v1_color_b}",
+    )
+    color2_argb = Signal(
+        dag,
+        name="color2_argb",
+        type="color_argb_t",
+        sv_ref="{thread_data_buf.v2_color_a, thread_data_buf.v2_color_r, thread_data_buf.v2_color_g, thread_data_buf.v2_color_b}",
+    )
 
     inv_area = Signal(dag, name="inv_area")
 
@@ -1687,8 +1666,7 @@ if __name__ == "__main__":
     def interpolate(a, b, c, x, y, z):
         op1 = a * x
         op2 = Signal.fma(b, y, op1)
-        result = Signal.fma(c, z, op2)
-        return result
+        return Signal.fma(c, z, op2)
 
     invW = interpolate(v0_w, v1_w, v2_w, iw0, iw1, iw2)
     w = 1 / invW
@@ -1702,19 +1680,17 @@ if __name__ == "__main__":
     t2 = t2_fp.as_fx2_23()
 
     # Interpolate u, v
-    u = interpolate(v0_texture_u, v1_texture_u, v2_texture_u, t0, t1, t2)
-    v = interpolate(v0_texture_v, v1_texture_v, v2_texture_v, t0, t1, t2)
+    u = Signal.texture_interpolate(v0_texture_u, t0, v1_texture_u, t1, v2_texture_u, t2)
+    v = Signal.texture_interpolate(v0_texture_v, t0, v1_texture_v, t1, v2_texture_v, t2)
 
-    # Interpolate color channels
-    r_fx = interpolate(v0_color_r, v1_color_r, v2_color_r, t0, t1, t2)
-    g_fx = interpolate(v0_color_g, v1_color_g, v2_color_g, t0, t1, t2)
-    b_fx = interpolate(v0_color_b, v1_color_b, v2_color_b, t0, t1, t2)
-    a_fx = interpolate(v0_color_a, v1_color_a, v2_color_a, t0, t1, t2)
-
-    r = r_fx.as_u8()
-    g = g_fx.as_u8()
-    b = b_fx.as_u8()
-    a = a_fx.as_u8()
+    # Interpolate all four packed color channels in one fixed-latency unit.
+    interpolated_color = Signal.color_interpolate(
+        color0_argb, t0, color1_argb, t1, color2_argb, t2
+    )
+    r = Signal.color_channel(interpolated_color, "r")
+    g = Signal.color_channel(interpolated_color, "g")
+    b = Signal.color_channel(interpolated_color, "b")
+    a = Signal.color_channel(interpolated_color, "a")
 
     z = interpolate(v0_z, v1_z, v2_z, iw0, iw1, iw2)
     current_z = Signal.mem_read(addr, after=z, lead_cycles=1)
@@ -1759,7 +1735,12 @@ if __name__ == "__main__":
     result = dag.schedule(ii=1)
     dag.print_schedule(result)
 
-    out_svh = Path(__file__).with_name("thread_pipeline_autogen.svh")
+    out_svh = (
+        Path(__file__).resolve().parent.parent
+        / "rtl"
+        / "generated"
+        / "thread_pipeline_autogen.svh"
+    )
     dag.dump_thread_pipeline(result, out_svh)
 
     print(f"\nGenerated: {out_svh}")

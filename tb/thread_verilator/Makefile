@@ -20,11 +20,8 @@ SV_SRCS = verilator.vlt \
           ../../rtl/fp_cmp_le.sv \
           ../../rtl/axis_skid_buffer.sv \
           ../../rtl/delay_pipe.sv \
-          ../../rtl/fx_texture_mul.sv \
-          ../../rtl/fx_texture_fma.sv \
-          ../../rtl/fx_color_mul.sv \
-          ../../rtl/fx_color_fma.sv \
-          ../../rtl/fx_color_to_u8.sv \
+          ../../rtl/fx_texture_interpolator.sv \
+          ../../rtl/fx_color_interpolator.sv \
           ../../rtl/fragment_shader.sv \
           ../../rtl/blend_unit.sv \
           ../../rtl/z_buffer_ram.sv \
@@ -48,13 +45,14 @@ VERILATOR_CFLAGS = --CFLAGS -std=c++20 \
                    --CFLAGS -Wno-deprecated-enum-enum-conversion
 
 VERILATOR_WARNINGS = -Wno-SHORTREAL
+VERILATOR_INCLUDES = -I../../rtl/generated
 
 .PHONY: all compile run clean
 
 all: compile
 
 compile:
->mkdir -p $(BUILD_DIR) && mkdir -p $(OBJ_DIR) && $(VERILATOR) --cc --exe --build --top-module $(TOP) --Mdir $(OBJ_DIR) -o rasterizer_thread $(SV_SRCS) $(CPP_SRCS) $(VERILATOR_WARNINGS) $(VERILATOR_CFLAGS)
+>mkdir -p $(BUILD_DIR) && mkdir -p $(OBJ_DIR) && $(VERILATOR) --cc --exe --build --top-module $(TOP) --Mdir $(OBJ_DIR) -o rasterizer_thread $(VERILATOR_INCLUDES) $(SV_SRCS) $(CPP_SRCS) $(VERILATOR_WARNINGS) $(VERILATOR_CFLAGS)
 
 run: compile
 >$(OBJ_DIR)/rasterizer_thread $(RUN_ARGS)

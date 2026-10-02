@@ -44,22 +44,15 @@ module fragment_shader (
   logic [7:0] C_pass_a_s1, C_pass_r_s1, C_pass_g_s1, C_pass_b_s1;
   logic [7:0] add_pixel_r_s1, add_pixel_g_s1, add_pixel_b_s1;
   logic [7:0] add_texture_r_s1, add_texture_g_s1, add_texture_b_s1;
-  logic [8:0] add_sum_r_s1, add_sum_g_s1, add_sum_b_s1;
+  logic [8:0] add_sum_r_s3, add_sum_g_s3, add_sum_b_s3;
 
-  logic [7:0] m1_a_r, m1_b_r, m2_a_r, m2_b_r;
-  logic [7:0] m1_a_g, m1_b_g, m2_a_g, m2_b_g;
-  logic [7:0] m1_a_b, m1_b_b, m2_a_b, m2_b_b;
-  logic [7:0] m1_a_r_s3, m1_b_r_s3;
-  logic [7:0] m1_a_g_s3, m1_b_g_s3;
-  logic [7:0] m1_a_b_s3, m1_b_b_s3;
+  logic [7:0] m1_a_r_s2, m1_b_r_s2, m2_a_r_s2, m2_b_r_s2;
+  logic [7:0] m1_a_g_s2, m1_b_g_s2, m2_a_g_s2, m2_b_g_s2;
+  logic [7:0] m1_a_b_s2, m1_b_b_s2, m2_a_b_s2, m2_b_b_s2;
   logic [7:0] m2_a_r_s3, m2_b_r_s3;
   logic [7:0] m2_a_g_s3, m2_b_g_s3;
   logic [7:0] m2_a_b_s3, m2_b_b_s3;
-  logic [7:0] m2_a_r_s4, m2_b_r_s4;
-  logic [7:0] m2_a_g_s4, m2_b_g_s4;
-  logic [7:0] m2_a_b_s4, m2_b_b_s4;
-  logic [7:0] m_a_a, m_a_b;
-  logic [7:0] m_a_a_s3, m_a_b_s3;
+  logic [7:0] m_a_a_s2, m_a_b_s2;
 
   // --------------------------------------------------------
   // Stage 2: Multiplications
@@ -67,42 +60,23 @@ module fragment_shader (
   logic valid_s2;
   fragment_op_t op_s2;
   logic [7:0] C_pass_a_s2, C_pass_r_s2, C_pass_g_s2, C_pass_b_s2;
-
-  logic [15:0] prod1_r, prod2_r;
-  logic [15:0] prod1_g, prod2_g;
-  logic [15:0] prod1_b, prod2_b;
-  logic [15:0] prod_a;
-
-  // --------------------------------------------------------
-  // Stage 3: Additions
-  // --------------------------------------------------------
   logic valid_s3;
   fragment_op_t op_s3;
   logic [7:0] C_pass_a_s3, C_pass_r_s3, C_pass_g_s3, C_pass_b_s3;
   logic [7:0] add_r_s3, add_g_s3, add_b_s3;
 
+  logic [15:0] prod_a_s3;
+
   logic valid_s4;
   fragment_op_t op_s4;
   logic [7:0] C_pass_a_s4, C_pass_r_s4, C_pass_g_s4, C_pass_b_s4;
   logic [7:0] add_r_s4, add_g_s4, add_b_s4;
-
-  logic valid_s5;
-  fragment_op_t op_s5;
-  logic [7:0] C_pass_a_s5, C_pass_r_s5, C_pass_g_s5, C_pass_b_s5;
-  logic [7:0] add_r_s5, add_g_s5, add_b_s5;
-
-  logic valid_s6;
-  fragment_op_t op_s6;
-  logic [7:0] C_pass_a_s6, C_pass_r_s6, C_pass_g_s6, C_pass_b_s6;
-  logic [7:0] add_r_s6, add_g_s6, add_b_s6;
-
-  logic [16:0] src_sum_r_s4, src_sum_g_s4, src_sum_b_s4;
-  logic [15:0] prod2_r_s4, prod2_g_s4, prod2_b_s4;
+  logic [15:0] src_prod_r_s3, src_prod_g_s3, src_prod_b_s3;
+  logic [15:0] src_prod_r_s4, src_prod_g_s4, src_prod_b_s4;
+  logic [15:0] second_prod_r_s4, second_prod_g_s4, second_prod_b_s4;
   logic [16:0] sum_r_s5, sum_g_s5, sum_b_s5;
   logic [15:0] prod_a_s4;
   logic [15:0] prod_a_s5;
-  logic [16:0] sum_r_s6, sum_g_s6, sum_b_s6;
-  logic [15:0] prod_a_s6;
 
   always_ff @(posedge clk) begin
     if (!rst_n) begin
@@ -111,13 +85,11 @@ module fragment_shader (
       valid_s2 <= 1'b0;
       valid_s3 <= 1'b0;
       valid_s4 <= 1'b0;
-      valid_s5 <= 1'b0;
-      valid_s6 <= 1'b0;
       valid_out <= 1'b0;
       fragment_color <= '0;
     end else begin
       // ========================================================
-      // STAGE 1: Input buffer
+      // STAGE 0: Input buffer
       // ========================================================
       valid_s0 <= valid_in;
       op_s0 <= op;
@@ -127,7 +99,7 @@ module fragment_shader (
       env_color_s0 <= env_color;
 
       // ========================================================
-      // STAGE 2
+      // STAGE 1
       // ========================================================
       valid_s1 <= valid_s0;
       op_s1 <= op_s0;
@@ -153,58 +125,58 @@ module fragment_shader (
       add_texture_b_s1 <= texture_color_s0_b.b;
 
       // Setup Multipliers
-      m1_a_r <= pixel_color_s0.r;
-      m1_a_g <= pixel_color_s0.g;
-      m1_a_b <= pixel_color_s0.b;
+      m1_a_r_s2 <= pixel_color_s0.r;
+      m1_a_g_s2 <= pixel_color_s0.g;
+      m1_a_b_s2 <= pixel_color_s0.b;
 
       case (op_s0)
         DECAL: begin
-          m1_b_r <= ~texture_color_s0_a.a;  // 255 - A
-          m1_b_g <= ~texture_color_s0_a.a;  // 255 - A
-          m1_b_b <= ~texture_color_s0_a.a;  // 255 - A
+          m1_b_r_s2 <= ~texture_color_s0_a.a;  // 255 - A
+          m1_b_g_s2 <= ~texture_color_s0_a.a;  // 255 - A
+          m1_b_b_s2 <= ~texture_color_s0_a.a;  // 255 - A
 
-          m2_a_r <= texture_color_s0_a.r;
-          m2_a_g <= texture_color_s0_a.g;
-          m2_a_b <= texture_color_s0_a.b;
+          m2_a_r_s2 <= texture_color_s0_a.r;
+          m2_a_g_s2 <= texture_color_s0_a.g;
+          m2_a_b_s2 <= texture_color_s0_a.b;
 
-          m2_b_r <= texture_color_s0_a.a;
-          m2_b_g <= texture_color_s0_a.a;
-          m2_b_b <= texture_color_s0_a.a;
+          m2_b_r_s2 <= texture_color_s0_a.a;
+          m2_b_g_s2 <= texture_color_s0_a.a;
+          m2_b_b_s2 <= texture_color_s0_a.a;
         end
         BLEND: begin
-          m1_b_r <= ~texture_color_s0_a.r;
-          m1_b_g <= ~texture_color_s0_a.g;
-          m1_b_b <= ~texture_color_s0_a.b;
+          m1_b_r_s2 <= ~texture_color_s0_a.r;
+          m1_b_g_s2 <= ~texture_color_s0_a.g;
+          m1_b_b_s2 <= ~texture_color_s0_a.b;
 
-          m2_a_r <= env_color_s0.r;
-          m2_a_g <= env_color_s0.g;
-          m2_a_b <= env_color_s0.b;
+          m2_a_r_s2 <= env_color_s0.r;
+          m2_a_g_s2 <= env_color_s0.g;
+          m2_a_b_s2 <= env_color_s0.b;
 
-          m2_b_r <= texture_color_s0_a.r;
-          m2_b_g <= texture_color_s0_a.g;
-          m2_b_b <= texture_color_s0_a.b;
+          m2_b_r_s2 <= texture_color_s0_a.r;
+          m2_b_g_s2 <= texture_color_s0_a.g;
+          m2_b_b_s2 <= texture_color_s0_a.b;
         end
         default: begin
-          m1_b_r <= texture_color_s0_a.r;
-          m1_b_g <= texture_color_s0_a.g;
-          m1_b_b <= texture_color_s0_a.b;
+          m1_b_r_s2 <= texture_color_s0_a.r;
+          m1_b_g_s2 <= texture_color_s0_a.g;
+          m1_b_b_s2 <= texture_color_s0_a.b;
 
-          m2_a_r <= 8'd0;
-          m2_a_g <= 8'd0;
-          m2_a_b <= 8'd0;
+          m2_a_r_s2 <= 8'd0;
+          m2_a_g_s2 <= 8'd0;
+          m2_a_b_s2 <= 8'd0;
 
-          m2_b_r <= 8'd0;
-          m2_b_g <= 8'd0;
-          m2_b_b <= 8'd0;
+          m2_b_r_s2 <= 8'd0;
+          m2_b_g_s2 <= 8'd0;
+          m2_b_b_s2 <= 8'd0;
         end
       endcase
 
       // Setup Multiplier for A
-      m_a_a <= pixel_color_s0.a;
-      m_a_b <= texture_color_s0_a.a;
+      m_a_a_s2 <= pixel_color_s0.a;
+      m_a_b_s2 <= texture_color_s0_a.a;
 
       // ========================================================
-      // STAGE 3
+      // STAGE 2
       // ========================================================
       valid_s2 <= valid_s1;
       op_s2 <= op_s1;
@@ -212,30 +184,23 @@ module fragment_shader (
       C_pass_r_s2 <= C_pass_r_s1;
       C_pass_g_s2 <= C_pass_g_s1;
       C_pass_b_s2 <= C_pass_b_s1;
-      add_sum_r_s1 <= {1'b0, add_pixel_r_s1} + {1'b0, add_texture_r_s1};
-      add_sum_g_s1 <= {1'b0, add_pixel_g_s1} + {1'b0, add_texture_g_s1};
-      add_sum_b_s1 <= {1'b0, add_pixel_b_s1} + {1'b0, add_texture_b_s1};
+      add_sum_r_s3 <= {1'b0, add_pixel_r_s1} + {1'b0, add_texture_r_s1};
+      add_sum_g_s3 <= {1'b0, add_pixel_g_s1} + {1'b0, add_texture_g_s1};
+      add_sum_b_s3 <= {1'b0, add_pixel_b_s1} + {1'b0, add_texture_b_s1};
 
-      m1_a_r_s3 <= m1_a_r;
-      m1_b_r_s3 <= m1_b_r;
-      m2_a_r_s3 <= m2_a_r;
-      m2_b_r_s3 <= m2_b_r;
-
-      m1_a_g_s3 <= m1_a_g;
-      m1_b_g_s3 <= m1_b_g;
-      m2_a_g_s3 <= m2_a_g;
-      m2_b_g_s3 <= m2_b_g;
-
-      m1_a_b_s3 <= m1_a_b;
-      m1_b_b_s3 <= m1_b_b;
-      m2_a_b_s3 <= m2_a_b;
-      m2_b_b_s3 <= m2_b_b;
-
-      m_a_a_s3 <= m_a_a;
-      m_a_b_s3 <= m_a_b;
+      src_prod_r_s3 <= m1_a_r_s2 * m1_b_r_s2;
+      src_prod_g_s3 <= m1_a_g_s2 * m1_b_g_s2;
+      src_prod_b_s3 <= m1_a_b_s2 * m1_b_b_s2;
+      m2_a_r_s3 <= m2_a_r_s2;
+      m2_b_r_s3 <= m2_b_r_s2;
+      m2_a_g_s3 <= m2_a_g_s2;
+      m2_b_g_s3 <= m2_b_g_s2;
+      m2_a_b_s3 <= m2_a_b_s2;
+      m2_b_b_s3 <= m2_b_b_s2;
+      prod_a_s3 <= m_a_a_s2 * m_a_b_s2;
 
       // ========================================================
-      // STAGE 4
+      // STAGE 3
       // ========================================================
       valid_s3 <= valid_s2;
       op_s3 <= op_s2;
@@ -243,23 +208,20 @@ module fragment_shader (
       C_pass_r_s3 <= C_pass_r_s2;
       C_pass_g_s3 <= C_pass_g_s2;
       C_pass_b_s3 <= C_pass_b_s2;
-      add_r_s3 <= add_sum_r_s1[8] ? 8'd255 : add_sum_r_s1[7:0];
-      add_g_s3 <= add_sum_g_s1[8] ? 8'd255 : add_sum_g_s1[7:0];
-      add_b_s3 <= add_sum_b_s1[8] ? 8'd255 : add_sum_b_s1[7:0];
+      add_r_s3 <= add_sum_r_s3[8] ? 8'd255 : add_sum_r_s3[7:0];
+      add_g_s3 <= add_sum_g_s3[8] ? 8'd255 : add_sum_g_s3[7:0];
+      add_b_s3 <= add_sum_b_s3[8] ? 8'd255 : add_sum_b_s3[7:0];
 
-      prod1_r <= m1_a_r_s3 * m1_b_r_s3;
-      prod1_g <= m1_a_g_s3 * m1_b_g_s3;
-      prod1_b <= m1_a_b_s3 * m1_b_b_s3;
-      m2_a_r_s4 <= m2_a_r_s3;
-      m2_b_r_s4 <= m2_b_r_s3;
-      m2_a_g_s4 <= m2_a_g_s3;
-      m2_b_g_s4 <= m2_b_g_s3;
-      m2_a_b_s4 <= m2_a_b_s3;
-      m2_b_b_s4 <= m2_b_b_s3;
-      prod_a <= m_a_a_s3 * m_a_b_s3;
+      src_prod_r_s4 <= src_prod_r_s3 + 16'd128 ;
+      src_prod_g_s4 <= src_prod_g_s3 + 16'd128;
+      src_prod_b_s4 <= src_prod_b_s3 + 16'd128;
+      second_prod_r_s4 <= m2_a_r_s3 * m2_b_r_s3;
+      second_prod_g_s4 <= m2_a_g_s3 * m2_b_g_s3;
+      second_prod_b_s4 <= m2_a_b_s3 * m2_b_b_s3;
+      prod_a_s4 <= prod_a_s3 + 16'd128;
 
       // ========================================================
-      // STAGE 5
+      // STAGE 4: Accumulate products and align output controls.
       // ========================================================
       valid_s4 <= valid_s3;
       op_s4 <= op_s3;
@@ -270,62 +232,24 @@ module fragment_shader (
       add_r_s4 <= add_r_s3;
       add_g_s4 <= add_g_s3;
       add_b_s4 <= add_b_s3;
-
-      src_sum_r_s4 <= {1'b0, prod1_r} + 17'd128;
-      src_sum_g_s4 <= {1'b0, prod1_g} + 17'd128;
-      src_sum_b_s4 <= {1'b0, prod1_b} + 17'd128;
-      prod2_r_s4 <= m2_a_r_s4 * m2_b_r_s4;
-      prod2_g_s4 <= m2_a_g_s4 * m2_b_g_s4;
-      prod2_b_s4 <= m2_a_b_s4 * m2_b_b_s4;
-      prod_a_s4 <= prod_a + 16'd128;
-
-      // ========================================================
-      // STAGE 6: Add the two aligned products.
-      // ========================================================
-      valid_s5 <= valid_s4;
-      op_s5 <= op_s4;
-      C_pass_a_s5 <= C_pass_a_s4;
-      C_pass_r_s5 <= C_pass_r_s4;
-      C_pass_g_s5 <= C_pass_g_s4;
-      C_pass_b_s5 <= C_pass_b_s4;
-      add_r_s5 <= add_r_s4;
-      add_g_s5 <= add_g_s4;
-      add_b_s5 <= add_b_s4;
-      sum_r_s5 <= src_sum_r_s4 + {1'b0, prod2_r_s4};
-      sum_g_s5 <= src_sum_g_s4 + {1'b0, prod2_g_s4};
-      sum_b_s5 <= src_sum_b_s4 + {1'b0, prod2_b_s4};
+      sum_r_s5 <= src_prod_r_s4 + second_prod_r_s4;
+      sum_g_s5 <= src_prod_g_s4 + second_prod_g_s4;
+      sum_b_s5 <= src_prod_b_s4 + second_prod_b_s4;
       prod_a_s5 <= prod_a_s4;
 
       // ========================================================
-      // STAGE 7: Final alignment stage.
+      // STAGE 5: Final output selection.
       // ========================================================
-      valid_s6 <= valid_s5;
-      op_s6 <= op_s5;
-      C_pass_a_s6 <= C_pass_a_s5;
-      C_pass_r_s6 <= C_pass_r_s5;
-      C_pass_g_s6 <= C_pass_g_s5;
-      C_pass_b_s6 <= C_pass_b_s5;
-      add_r_s6 <= add_r_s5;
-      add_g_s6 <= add_g_s5;
-      add_b_s6 <= add_b_s5;
-      sum_r_s6 <= sum_r_s5;
-      sum_g_s6 <= sum_g_s5;
-      sum_b_s6 <= sum_b_s5;
-      prod_a_s6 <= prod_a_s5;
+      valid_out <= valid_s4;
 
-      // ========================================================
-      // STAGE 8: Final output selection.
-      // ========================================================
-      valid_out <= valid_s6;
-
-      case (op_s6)
-        REPLACE: fragment_color <= {C_pass_a_s6, C_pass_r_s6, C_pass_g_s6, C_pass_b_s6};
+      case (op_s4)
+        REPLACE: fragment_color <= {C_pass_a_s4, C_pass_r_s4, C_pass_g_s4, C_pass_b_s4};
         MODULATE:
-        fragment_color <= {prod_a_s6[15:8], sum_r_s6[15:8], sum_g_s6[15:8], sum_b_s6[15:8]};
-        DECAL: fragment_color <= {C_pass_a_s6, sum_r_s6[15:8], sum_g_s6[15:8], sum_b_s6[15:8]};
-        BLEND: fragment_color <= {prod_a_s6[15:8], sum_r_s6[15:8], sum_g_s6[15:8], sum_b_s6[15:8]};
-        ADD: fragment_color <= {prod_a_s6[15:8], add_r_s6, add_g_s6, add_b_s6};
-        COLOR: fragment_color <= {C_pass_a_s6, C_pass_r_s6, C_pass_g_s6, C_pass_b_s6};
+        fragment_color <= {prod_a_s5[15:8], sum_r_s5[15:8], sum_g_s5[15:8], sum_b_s5[15:8]};
+        DECAL: fragment_color <= {C_pass_a_s4, sum_r_s5[15:8], sum_g_s5[15:8], sum_b_s5[15:8]};
+        BLEND: fragment_color <= {prod_a_s5[15:8], sum_r_s5[15:8], sum_g_s5[15:8], sum_b_s5[15:8]};
+        ADD: fragment_color <= {prod_a_s5[15:8], add_r_s4, add_g_s4, add_b_s4};
+        COLOR: fragment_color <= {C_pass_a_s4, C_pass_r_s4, C_pass_g_s4, C_pass_b_s4};
         default: fragment_color <= '0;
       endcase
     end

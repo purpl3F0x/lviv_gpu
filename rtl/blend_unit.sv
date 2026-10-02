@@ -4,7 +4,7 @@
 
 import gpu_types_pkg::*;
 
-(* use_dsp = "simd" *)
+(* use_dsp = "yes" *)
 module blend_unit (
     input  logic        clk,
     input  blend_op_t   sfactor_op,
@@ -13,6 +13,20 @@ module blend_unit (
     input  color_argb_t dst_color,
     output color_argb_t blend_color
 );
+
+  typedef struct packed {
+    logic [16:0] a;
+    logic [16:0] r;
+    logic [16:0] g;
+    logic [16:0] b;
+  } color_product_t;
+
+  typedef struct packed {
+    logic [16:0] a;
+    logic [16:0] r;
+    logic [16:0] g;
+    logic [16:0] b;
+  } color_sum_t;
 
   blend_op_t   sfactor_op_s1;
   blend_op_t   dfactor_op_s1;
@@ -28,24 +42,9 @@ module blend_unit (
   color_argb_t dst_color_s3;
   color_argb_t dst_coeff_s4;
   color_argb_t dst_color_s4;
-
-  typedef struct packed {
-    logic [15:0] a;
-    logic [15:0] r;
-    logic [15:0] g;
-    logic [15:0] b;
-  } color_product_t;
-
-  typedef struct packed {
-    logic [16:0] a;
-    logic [16:0] r;
-    logic [16:0] g;
-    logic [16:0] b;
-  } color_sum_t;
-
   color_product_t src_product_s4;
   color_product_t dst_product_s5;
-  color_sum_t src_sum_s5;
+  color_product_t src_product_s5;
   color_sum_t color_sum_s6;
 
   // Stage 1: Register the blend controls and color inputs.
@@ -121,7 +120,7 @@ module blend_unit (
     dst_color_s2 <= dst_color_s1;
   end
 
-  // Stage 3: Buffer operands between coefficient generation and multiplication.
+  // Stage 3: Buffer the coefficient and color operands before multiplication.
   always_ff @(posedge clk) begin
     src_coeff_s3 <= src_coeff_s2;
     dst_coeff_s3 <= dst_coeff_s2;
@@ -129,37 +128,37 @@ module blend_unit (
     dst_color_s3 <= dst_color_s2;
   end
 
-  // Stage 4: Perform multiplication 1 (N+1).
+  // Stage 4: Register the first product and align the second multiply operands.
   always_ff @(posedge clk) begin
-    dst_coeff_s4 <= dst_coeff_s3;
-    dst_color_s4 <= dst_color_s3;
     src_product_s4.a <= src_color_s3.a * src_coeff_s3.a;
     src_product_s4.r <= src_color_s3.r * src_coeff_s3.r;
     src_product_s4.g <= src_color_s3.g * src_coeff_s3.g;
     src_product_s4.b <= src_color_s3.b * src_coeff_s3.b;
+    dst_coeff_s4 <= dst_coeff_s3;
+    dst_color_s4 <= dst_color_s3;
   end
 
-  // Stage 5: Add rounding bias and perform multiplication 2 (N+2).
+  // Stage 5: Round the first product and register the second product.
   always_ff @(posedge clk) begin
-    src_sum_s5.a <= {1'b0, src_product_s4.a} + 17'd128;
-    src_sum_s5.r <= {1'b0, src_product_s4.r} + 17'd128;
-    src_sum_s5.g <= {1'b0, src_product_s4.g} + 17'd128;
-    src_sum_s5.b <= {1'b0, src_product_s4.b} + 17'd128;
+    src_product_s5.a <= src_product_s4.a + 17'd128;
+    src_product_s5.r <= src_product_s4.r + 17'd128;
+    src_product_s5.g <= src_product_s4.g + 17'd128;
+    src_product_s5.b <= src_product_s4.b + 17'd128;
     dst_product_s5.a <= dst_color_s4.a * dst_coeff_s4.a;
     dst_product_s5.r <= dst_color_s4.r * dst_coeff_s4.r;
     dst_product_s5.g <= dst_color_s4.g * dst_coeff_s4.g;
     dst_product_s5.b <= dst_color_s4.b * dst_coeff_s4.b;
   end
 
-  // Stage 6: Add the two products (N+3).
+  // Stage 6: Add the rounded first product and second product.
   always_ff @(posedge clk) begin
-    color_sum_s6.a <= src_sum_s5.a + {1'b0, dst_product_s5.a};
-    color_sum_s6.r <= src_sum_s5.r + {1'b0, dst_product_s5.r};
-    color_sum_s6.g <= src_sum_s5.g + {1'b0, dst_product_s5.g};
-    color_sum_s6.b <= src_sum_s5.b + {1'b0, dst_product_s5.b};
+    color_sum_s6.a <= src_product_s5.a + dst_product_s5.a;
+    color_sum_s6.r <= src_product_s5.r + dst_product_s5.r;
+    color_sum_s6.g <= src_product_s5.g + dst_product_s5.g;
+    color_sum_s6.b <= src_product_s5.b + dst_product_s5.b;
   end
 
-  // Stage 7: Convert the sum to 8-bit saturated ARGB (N+4).
+  // Stage 7: Convert the sum to 8-bit saturated ARGB.
   always_ff @(posedge clk) begin
     blend_color.a <= color_sum_s6.a[16] ? 8'hff : color_sum_s6.a[15:8];
     blend_color.r <= color_sum_s6.r[16] ? 8'hff : color_sum_s6.r[15:8];

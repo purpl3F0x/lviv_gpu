@@ -5,6 +5,8 @@ import gpu_types_pkg::*;
 module thread_verilator_wrap (
     input  logic                     clk,
     input  logic                     rst_n,
+  input  logic                     apb_clk,
+  input  logic                     apb_rst_n,
     input  logic                     valid_in,
     output logic                     ready_out,
 
@@ -94,8 +96,8 @@ module thread_verilator_wrap (
   logic [3:0] lut_size;
 
   ApbLutRam u_lut_ram (
-      .clk(clk),
-      .resetn(rst_n),
+      .clk(apb_clk),
+      .resetn(apb_rst_n),
       .s_apb_PADDR(s_apb_PADDR),
       .s_apb_PSEL(s_apb_PSEL),
       .s_apb_PENABLE(s_apb_PENABLE),
@@ -392,6 +394,8 @@ module thread_verilator_wrap (
   thread u_thread (
       .clk(clk),
       .rst_n(rst_n),
+      .apb_clk(apb_clk),
+      .apb_rst_n(apb_rst_n),
       .valid_in(valid_in),
       .ready_out(ready_out),
       .in_data(in_data),

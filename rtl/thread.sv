@@ -22,6 +22,8 @@ module thread (
     input  color_argb_t                           in_fb_rd_color,
 
     // APB Slave Interface
+    input  logic        apb_clk,
+    input  logic        apb_rst_n,
     input  logic [ 7:0] s_apb_PADDR,
     input  logic [ 0:0] s_apb_PSEL,
     input  logic        s_apb_PENABLE,
@@ -81,8 +83,8 @@ module thread (
       .zbuf_clear(zbuf_clear),
       .thread_soft_reset(thread_soft_reset),
       .cache_flush(cache_flush),
-      .clk(clk),
-      .resetn(rst_n),
+      .clk(apb_clk),
+      .resetn(apb_rst_n),
       .thread_clk(clk)
   );
 
@@ -151,7 +153,7 @@ module thread (
 
   /** END OF AUTO-GENERATED PIPELINE LOGIC **/
 
-  localparam int FRAGMENT_SHADER_LATENCY_STAGES = 7;
+  localparam int FRAGMENT_SHADER_LATENCY_STAGES = 6;
   localparam int FRAME_BUFFER_READ_LATECNY = 3;
   localparam int BLEND_UNIT_LATENCY_STAGES = 7;
   localparam int FRAGMENT_OUTPUT_LATENCY_STAGES = FRAGMENT_SHADER_LATENCY_STAGES + BLEND_UNIT_LATENCY_STAGES;

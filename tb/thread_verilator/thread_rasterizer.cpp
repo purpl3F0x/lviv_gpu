@@ -183,6 +183,9 @@ class ThreadRasterCore {
         for (int t = 0; t < HW_THREADS; ++t) {
             dut_[t]->clk = 0;
             dut_[t]->rst_n = 0;
+            dut_[t]->apb_clk = 0;
+            dut_[t]->apb_rst_n = 0;
+            apb_clock_divider_[t] = 0;
             dut_[t]->valid_in = 0;
             dut_[t]->s_apb_PADDR = 0;
             dut_[t]->s_apb_PWDATA = 0;
@@ -207,6 +210,7 @@ class ThreadRasterCore {
 
         for (int t = 0; t < HW_THREADS; ++t) {
             dut_[t]->rst_n = 1;
+            dut_[t]->apb_rst_n = 1;
         }
         for (int i = 0; i < 4; ++i) {
             tickHalf(0);
@@ -238,24 +242,6 @@ class ThreadRasterCore {
         int uvMismatch = 0;
 
         for (int tid = 0; tid < HW_THREADS; ++tid) {
-            size_t zready_guard = 0;
-            while (dut_[tid]->z_buf_ready == 0) {
-                tickHalfSingle(tid, 0);
-                dut_[tid]->valid_in = 0;
-                clearInputToken(tid);
-                driveZReadData(tid);
-                driveFramebufferRead(tid, tileColor);
-                tickHalfSingle(tid, 1);
-                captureWrites(tid, tileColor, tileDepth, fb_writes);
-
-                zready_guard++;
-                if (zready_guard > 300000) {
-                    std::cerr << "[THREAD_CMP][ERROR] z_buffer_ram not ready after reset (tid=" << tid << ")"
-                              << std::endl;
-                    break;
-                }
-            }
-
             size_t idx = 0;
             size_t stall_guard = 0;
             size_t sentCount = 0;
@@ -405,6 +391,7 @@ class ThreadRasterCore {
 
   private:
     std::array<Vthread_verilator_wrap*, HW_THREADS> dut_{};
+        std::array<uint8_t, HW_THREADS> apb_clock_divider_{};
     static constexpr size_t kFramebufferReadLatency = 3;
     std::array<std::array<uint32_t, kFramebufferReadLatency>, HW_THREADS> framebuffer_read_pipe_{};
         std::array<uint8_t, HW_THREADS> prev_out_fb_we_{};
@@ -422,6 +409,15 @@ class ThreadRasterCore {
     {
         for (int t = 0; t < HW_THREADS; ++t) {
             dut_[t]->clk = clk;
+            if (clk) {
+                apb_clock_divider_[t]++;
+                if (apb_clock_divider_[t] == 4) {
+                    dut_[t]->apb_clk = 1;
+                } else if (apb_clock_divider_[t] == 8) {
+                    apb_clock_divider_[t] = 0;
+                    dut_[t]->apb_clk = 0;
+                }
+            }
             dut_[t]->eval();
         }
     }
@@ -429,6 +425,15 @@ class ThreadRasterCore {
     void tickHalfSingle(int tid, int clk)
     {
         dut_[tid]->clk = clk;
+        if (clk) {
+            apb_clock_divider_[tid]++;
+            if (apb_clock_divider_[tid] == 4) {
+                dut_[tid]->apb_clk = 1;
+            } else if (apb_clock_divider_[tid] == 8) {
+                apb_clock_divider_[tid] = 0;
+                dut_[tid]->apb_clk = 0;
+            }
+        }
         dut_[tid]->eval();
 
         // Latch output-side signals on the active edge; consumers use the
@@ -444,75 +449,82 @@ class ThreadRasterCore {
         }
     }
 
+    void waitApbPosedge(int tid)
+    {
+        for (unsigned cycle = 0; cycle < 64; ++cycle) {
+            const bool apb_was_high = dut_[tid]->apb_clk != 0;
+            tickHalfSingle(tid, 0);
+            tickHalfSingle(tid, 1);
+            if (!apb_was_high && dut_[tid]->apb_clk) {
+                return;
+            }
+        }
+        throw std::runtime_error("APB clock edge timed out");
+    }
+
     uint32_t transferLutApb(int tid, uint32_t address, bool write, uint32_t data = 0)
     {
-        tickHalfSingle(tid, 0);
         dut_[tid]->s_apb_PADDR = address;
         dut_[tid]->s_apb_PWDATA = data;
         dut_[tid]->s_apb_PWRITE = write;
         dut_[tid]->s_apb_PSEL = 1;
         dut_[tid]->s_apb_PENABLE = 0;
-        tickHalfSingle(tid, 1);
-        tickHalfSingle(tid, 0);
+        waitApbPosedge(tid);
         dut_[tid]->s_apb_PENABLE = 1;
-
-        for (unsigned cycle = 0; cycle < 1000; ++cycle) {
-            tickHalfSingle(tid, 0);
-            const bool ready = dut_[tid]->s_apb_PREADY != 0;
-            const bool error = dut_[tid]->s_apb_PSLVERROR != 0;
-            const uint32_t result = dut_[tid]->s_apb_PRDATA;
-            tickHalfSingle(tid, 1);
-            if (ready) {
-                tickHalfSingle(tid, 0);
-                dut_[tid]->s_apb_PSEL = 0;
-                dut_[tid]->s_apb_PENABLE = 0;
-                dut_[tid]->s_apb_PWRITE = 0;
-                tickHalfSingle(tid, 1);
-                if (error) {
-                    throw std::runtime_error("LUT APB slave error");
-                }
-                return result;
-            }
+        waitApbPosedge(tid);
+        const bool error = dut_[tid]->s_apb_PSLVERROR != 0;
+        const uint32_t result = dut_[tid]->s_apb_PRDATA;
+        dut_[tid]->s_apb_PSEL = 0;
+        dut_[tid]->s_apb_PENABLE = 0;
+        dut_[tid]->s_apb_PWRITE = 0;
+        if (error) {
+            throw std::runtime_error("LUT APB slave error");
         }
-        throw std::runtime_error("LUT APB transfer timed out");
+        return result;
     }
 
     uint32_t transferThreadApb(int tid, uint32_t address, bool write, uint32_t data = 0)
     {
-        tickHalfSingle(tid, 0);
         dut_[tid]->thread_apb_PADDR = address;
         dut_[tid]->thread_apb_PWDATA = data;
         dut_[tid]->thread_apb_PWRITE = write;
         dut_[tid]->thread_apb_PSEL = 1;
         dut_[tid]->thread_apb_PENABLE = 0;
-        tickHalfSingle(tid, 1);
-        tickHalfSingle(tid, 0);
+        waitApbPosedge(tid);
         dut_[tid]->thread_apb_PENABLE = 1;
-
-        for (unsigned cycle = 0; cycle < 1000; ++cycle) {
-            tickHalfSingle(tid, 0);
-            const bool ready = dut_[tid]->thread_apb_PREADY != 0;
-            const bool error = dut_[tid]->thread_apb_PSLVERROR != 0;
-            const uint32_t result = dut_[tid]->thread_apb_PRDATA;
-            tickHalfSingle(tid, 1);
-            if (ready) {
-                tickHalfSingle(tid, 0);
-                dut_[tid]->thread_apb_PSEL = 0;
-                dut_[tid]->thread_apb_PENABLE = 0;
-                dut_[tid]->thread_apb_PWRITE = 0;
-                tickHalfSingle(tid, 1);
-                if (error) {
-                    throw std::runtime_error("thread APB slave error");
-                }
-                return result;
-            }
+        waitApbPosedge(tid);
+        const bool error = dut_[tid]->thread_apb_PSLVERROR != 0;
+        const uint32_t result = dut_[tid]->thread_apb_PRDATA;
+        dut_[tid]->thread_apb_PSEL = 0;
+        dut_[tid]->thread_apb_PENABLE = 0;
+        dut_[tid]->thread_apb_PWRITE = 0;
+        if (error) {
+            throw std::runtime_error("thread APB slave error");
         }
-        throw std::runtime_error("thread APB transfer timed out");
+        return result;
     }
 
     void clearZBufferApb(int tid)
     {
         transferThreadApb(tid, 0x04, true, 1);
+        dut_[tid]->valid_in = 0;
+        clearInputToken(tid);
+
+        bool saw_clear_busy = dut_[tid]->z_buf_ready == 0;
+        constexpr size_t kClearTimeoutCycles = 300000;
+        for (size_t cycle = 0; cycle < kClearTimeoutCycles; ++cycle) {
+            tickHalfSingle(tid, 0);
+            driveZReadData(tid);
+            tickHalfSingle(tid, 1);
+
+            if (dut_[tid]->z_buf_ready == 0) {
+                saw_clear_busy = true;
+            } else if (saw_clear_busy) {
+                return;
+            }
+        }
+
+        throw std::runtime_error("z_buffer_ram clear did not complete (tid=" + std::to_string(tid) + ")");
     }
 
     void writeLutAddr(int tid, uint32_t idx, uint32_t addr)

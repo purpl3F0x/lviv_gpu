@@ -363,7 +363,7 @@ delay_pipe #(.WIDTH($bits(blend_op_t)), .STAGES(94)) u_align_sfactor_op_to_outpu
 logic [$bits(blend_op_t)-1:0] dfactor_op_bundle_tdata;
 delay_pipe #(.WIDTH($bits(blend_op_t)), .STAGES(94)) u_align_dfactor_op_to_output_bundle_d94 (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(dfactor_op_tdata), .data_out(dfactor_op_bundle_tdata));
 logic comp_z_bundle_tdata;
-delay_pipe #(.WIDTH(1), .STAGES(42)) u_align_comp_z_to_output_bundle_d42 (.clk(clk), .rst_n(rst_n), .clken(pipe_en_internal), .data_in(comp_z_tdata), .data_out(comp_z_bundle_tdata));
+delay_pipe #(.WIDTH(1), .STAGES(42)) u_align_comp_z_to_output_bundle_d42 (.clk(clk), .rst_n(rst_reg), .clken(pipe_en_internal), .data_in(comp_z_tdata), .data_out(comp_z_bundle_tdata));
 
 assign output_bundle_tdata = {texcoord_u_tdata, texcoord_v_tdata, addr_bundle_tdata, tex_id_bundle_tdata, texture_mode_u_bundle_tdata, texture_mode_v_bundle_tdata, texture_function_bundle_tdata, sfactor_op_bundle_tdata, dfactor_op_bundle_tdata, color_r_tdata, color_g_tdata, color_b_tdata, color_a_tdata, comp_z_bundle_tdata};
 assign output_bundle_tvalid = valid_pipe[94];
@@ -371,7 +371,7 @@ assign output_bundle_tvalid = valid_pipe[94];
 axis_skid_buffer #(
     .WIDTH(OUTBUNDLEWIDTH)
 ) u_output_bundle_skid (
-    .aclk(clk), .aresetn(rst_n),
+    .aclk(clk), .aresetn(rst_reg),
     .s_axis_tdata(output_bundle_tdata),
     .s_axis_tvalid(output_bundle_tvalid),
     .s_axis_tready(output_bundle_s_axis_tready),

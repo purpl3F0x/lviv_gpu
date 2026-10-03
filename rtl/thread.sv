@@ -69,6 +69,12 @@ module thread (
   logic thread_soft_reset;
   logic cache_flush;
 
+  // Reset register (HW && SW reset)
+  (* dont_touch = "true" *) reg rst_reg;
+  always_ff @(posedge clk) begin
+    rst_reg <= !(!rst_n | thread_soft_reset);  // keep active low behavior
+  end
+
   ApbThreadRegs u_apb_thread_regs (
       .s_apb_PADDR(s_apb_PADDR),
       .s_apb_PSEL(s_apb_PSEL),
@@ -92,7 +98,7 @@ module thread (
       .ADDR_WIDTH(THREAD_ADDR_W)
   ) u_z_buffer_ram (
       .clk(clk),
-      .rst_n(rst_n && !zbuf_clear),
+      .rst_n(!zbuf_clear),
       .ready(zbuf_ready),
       .wr_en(z_wr_en),
       .wr_addr(z_wr_addr),
@@ -124,7 +130,7 @@ module thread (
       .WIDTH(INBUNDLEWIDTH)
   ) u_input_bundle_skid (
       .aclk(clk),
-      .aresetn(rst_n),
+      .aresetn(rst_reg),
       .s_axis_tdata(in_data),
       .s_axis_tvalid(skid_valid_in),
       .s_axis_tready(input_bundle_s_axis_tready),
@@ -143,7 +149,7 @@ module thread (
   logic [ValidPipeDepth:0] valid_pipe;
   assign valid_pipe[0] = input_bundle_buf_tvalid;
   always_ff @(posedge clk) begin
-    if (~rst_n) valid_pipe[ValidPipeDepth:1] <= '0;
+    if (~rst_reg) valid_pipe[ValidPipeDepth:1] <= '0;
     else if (pipe_en_internal) valid_pipe[ValidPipeDepth:1] <= valid_pipe[ValidPipeDepth-1:0];
   end
 
@@ -153,7 +159,7 @@ module thread (
 
   /** END OF AUTO-GENERATED PIPELINE LOGIC **/
 
-  localparam int FRAGMENT_SHADER_LATENCY_STAGES = 6;
+  localparam int FRAGMENT_SHADER_LATENCY_STAGES = 7;
   localparam int FRAME_BUFFER_READ_LATECNY = 3;
   localparam int BLEND_UNIT_LATENCY_STAGES = 7;
   localparam int FRAGMENT_OUTPUT_LATENCY_STAGES = FRAGMENT_SHADER_LATENCY_STAGES + BLEND_UNIT_LATENCY_STAGES;
@@ -327,7 +333,7 @@ module thread (
       .STAGES(TextureAddressLatencyStages)
   ) u_fragment_token_to_address_stage (
       .clk(clk),
-      .rst_n(1'b1),
+      .rst_n(rst_reg),
       .clken(address_step),
       .data_in(post_skid_token),
       .data_out(address_token_s3.token)
@@ -338,7 +344,7 @@ module thread (
       .STAGES(TextureAddressLatencyStages)
   ) u_fragment_control_to_address_stage (
       .clk(clk),
-      .rst_n(rst_n),
+      .rst_n(rst_reg),
       .clken(address_step),
       .data_in(address_control_input),
       .data_out(address_control_s3)
@@ -432,7 +438,7 @@ module thread (
       .WIDTH($bits(fragment_request_token_t))
   ) u_fragment_request_skid_buffer (
       .aclk(clk),
-      .aresetn(rst_n),
+      .aresetn(rst_reg),
       .s_axis_tdata(fragment_request_input),
       .s_axis_tvalid(fragment_request_input_valid),
       .s_axis_tready(fragment_request_input_ready),
@@ -479,7 +485,7 @@ module thread (
       .STAGES(L1_TEXTURE_HIT_LATENCY_STAGES)
   ) u_fragment_control_to_l1_response_stage (
       .clk(clk),
-      .rst_n(rst_n),
+      .rst_n(rst_reg),
       .clken(!delayed_texture_wait),
       .data_in(fragment_request_control_input),
       .data_out(fragment_request_control_output)
@@ -502,7 +508,7 @@ module thread (
   end
 
   always_ff @(posedge clk) begin
-    if (!rst_n) begin
+    if (!rst_reg) begin
       texture_response_queue_wr_ptr <= '0;
       texture_response_queue_rd_ptr <= '0;
       texture_response_queue_count  <= '0;
@@ -530,7 +536,7 @@ module thread (
 
   fragment_shader u_fragment_shader (
       .clk(clk),
-      .rst_n(rst_n),
+      .rst_n(1'b1),
       .pixel_color(fragment_request_delay_output.pixel_color),
       .texture_color(color_argb_t'(texture_response_data)),
       .env_color('0),
@@ -545,7 +551,7 @@ module thread (
       .STAGES(FRAGMENT_OUTPUT_LATENCY_STAGES)
   ) u_fragment_valid_to_output (
       .clk(clk),
-      .rst_n(rst_n),
+      .rst_n(rst_reg),
       .clken(1'b1),
       .data_in(fragment_shader_input_valid),
       .data_out(fragment_valid_tdata)
@@ -567,7 +573,7 @@ module thread (
       .STAGES(FRAGMENT_OUTPUT_LATENCY_STAGES)
   ) u_align_compare_to_fragment_output (
       .clk(clk),
-      .rst_n(rst_n),
+      .rst_n(rst_reg),
       .clken(1'b1),
       .data_in(fragment_request_control_output.comp_z),
       .data_out(cmp_pass_fragment_out_tdata)
@@ -578,7 +584,7 @@ module thread (
       .STAGES(DST_READ_REQUEST_DELAY_STAGES)
   ) u_align_dst_read_valid (
       .clk(clk),
-      .rst_n(rst_n),
+      .rst_n(rst_reg),
       .clken(1'b1),
       .data_in(fragment_shader_input_valid),
       .data_out(out_fb_rd_en)
@@ -630,7 +636,7 @@ module thread (
   logic input_bundle_fire;
   assign input_bundle_fire = skid_valid_in && ready_out;
   always_ff @(posedge clk) begin
-    if (!rst_n) begin
+    if (!rst_reg) begin
       emptiness_counter <= 0;
     end else begin
 

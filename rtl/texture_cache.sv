@@ -94,11 +94,11 @@ module texture_cache_tags #(
     if (!rst_n) begin
       hit_oh_reg <= '0;
     end else begin
-      if (flush) begin
-        hit_oh_reg <= '0;
-      end else begin
-        hit_oh_reg <= hit_oh;
-      end
+      // if (flush) begin
+      //   hit_oh_reg <= '0;
+      // end else begin
+      hit_oh_reg <= hit_oh;
+      // end
     end
   end
 
@@ -119,10 +119,10 @@ module texture_cache_tags #(
         // tag_mem[way]   <= '0;
         valid_mem[way] <= 1'b0;
       end
-    end else if (flush) begin
-      for (int way = 0; way < NUM_LINES; way++) begin
-        valid_mem[way] <= 1'b0;
-      end
+      // end else if (flush) begin
+      //   for (int way = 0; way < NUM_LINES; way++) begin
+      //     valid_mem[way] <= 1'b0;
+      //   end
     end else begin
       if (clear_en) begin
         valid_mem[clear_way] <= 1'b0;
@@ -214,6 +214,12 @@ module texture_cache #(
     end
   end
 
+  // Reset register
+  (*dont_touch = "true" *) reg rst_reg;
+  always_ff @(posedge clk) begin
+    rst_reg <= !(!rst_n | flush);
+  end
+
   typedef enum logic [2:0] {
     REFILL_IDLE,
     REFILL_SELECT,
@@ -244,7 +250,7 @@ module texture_cache #(
   refill_state_t                      refill_state;
   logic          [       WayBits-1:0] refill_way;
   logic          [       WayBits-1:0] victim_way_next;
-  logic          [   PlruNodeBits-1:0] victim_node;
+  logic          [  PlruNodeBits-1:0] victim_node;
   logic          [       WayBits-1:0] victim_level;
   logic                               victim_direction;
   logic          [    ADDR_WIDTH-1:0] refill_base_addr;
@@ -253,27 +259,27 @@ module texture_cache #(
   logic          [      BeatBits-1:0] refill_beat;
 
   assign victim_direction = plru_tree[victim_node];
-  assign victim_way_next = WayBits'((refill_way << 1) | victim_direction);
+  assign victim_way_next  = WayBits'((refill_way << 1) | victim_direction);
 
-  logic                               tag_lookup_hit_found;
-  logic          [       WayBits-1:0] tag_lookup_hit_way;
-  logic          [  BramReadBits-1:0] cache_read_addr;
-  logic                               cache_read_en;
-  logic                               tag_clear_en;
-  logic          [       WayBits-1:0] tag_clear_way;
-  logic                               tag_fill_en;
-  logic          [       WayBits-1:0] tag_fill_way;
-  logic          [    ADDR_WIDTH-1:0] req_byte_addr;
-  logic                               axi_rresp_error;
-  logic                               req_accepted;
-  logic                               lookup_fire;
-  logic                               stage0_miss_active;
-  logic                               stage1_miss_active;
-  logic          [              31:0] perf_total_req_q;
-  logic          [              31:0] perf_hit_req_q;
-  logic          [              31:0] perf_miss_req_q;
-  logic          [              31:0] perf_rdata_q;
-  logic                               perf_rvalid_q;
+  logic                    tag_lookup_hit_found;
+  logic [     WayBits-1:0] tag_lookup_hit_way;
+  logic [BramReadBits-1:0] cache_read_addr;
+  logic                    cache_read_en;
+  logic                    tag_clear_en;
+  logic [     WayBits-1:0] tag_clear_way;
+  logic                    tag_fill_en;
+  logic [     WayBits-1:0] tag_fill_way;
+  logic [  ADDR_WIDTH-1:0] req_byte_addr;
+  logic                    axi_rresp_error;
+  logic                    req_accepted;
+  logic                    lookup_fire;
+  logic                    stage0_miss_active;
+  logic                    stage1_miss_active;
+  logic [            31:0] perf_total_req_q;
+  logic [            31:0] perf_hit_req_q;
+  logic [            31:0] perf_miss_req_q;
+  logic [            31:0] perf_rdata_q;
+  logic                    perf_rvalid_q;
 
   localparam logic [2:0] PerfAddrTotal = 3'd0;
   localparam logic [2:0] PerfAddrHit   = 3'd1;
@@ -355,9 +361,9 @@ module texture_cache #(
   // External interface wiring and top-level flow-control.
   assign stage0_miss_active = stage0_valid && !tag_lookup_hit_found;
   assign stage1_miss_active = stage1_valid && !stage1_hit_found;
-  assign req_ready = !flush && (refill_state == REFILL_IDLE) &&
+  assign req_ready = !rst_reg && (refill_state == REFILL_IDLE) &&
       !stage0_miss_active && !stage1_miss_active;
-  assign lookup_fire = request_stage_valid && (refill_state == REFILL_IDLE) &&
+  assign lookup_fire = request_stage_valid && !rst_reg && (refill_state == REFILL_IDLE) &&
       !stage0_miss_active && !stage1_miss_active;
   assign m_axi_araddr = {{AxiAddrPadBits{1'b0}}, refill_base_addr};
   assign m_axi_arlen = 8'(BeatsPerLine - 1);
@@ -379,8 +385,9 @@ module texture_cache #(
       .WAY_WIDTH(WayBits)
   ) u_cache_tags (
       .clk(clk),
-      .rst_n(rst_n),
-      .flush(flush),
+      .rst_n(rst_reg),
+      // .flush(flush),
+      .flush(0),  // temp fix
       .lookup_en(lookup_fire),
       .lookup_tag(request_stage_tag),
       .lookup_hit_found(tag_lookup_hit_found),
@@ -419,7 +426,7 @@ module texture_cache #(
   // - Miss/refill FSM
   // ---------------------------------------------------------------------------
   always_ff @(posedge clk) begin
-    if (!rst_n) begin
+    if (!rst_reg) begin
       request_stage_valid          <= 1'b0;
       request_stage_tag            <= '0;
       request_stage_pixel_index    <= '0;
@@ -466,33 +473,34 @@ module texture_cache #(
       tag_fill_way  <= '0;
       perf_rvalid_q <= 1'b0;
 
-      if (flush) begin
-        request_stage_valid          <= 1'b0;
-        request_stage_tag            <= '0;
-        request_stage_pixel_index    <= '0;
-        request_stage_line_base_addr <= '0;
-        stage0_valid                 <= 1'b0;
-        stage0_tag                   <= '0;
-        stage0_pixel_index           <= '0;
-        stage0_line_base_addr        <= '0;
-        stage1_valid                 <= 1'b0;
-        stage2_valid                 <= 1'b0;
-        stage3_valid                 <= 1'b0;
-        stage1_hit_found             <= 1'b0;
-        stage1_hit_way               <= '0;
-        stage1_tag                   <= '0;
-        stage1_pixel_index           <= '0;
-        stage1_line_base_addr        <= '0;
-        refill_state                 <= REFILL_IDLE;
-        refill_way                   <= '0;
-        victim_node                  <= '0;
-        victim_level                 <= '0;
-        refill_base_addr             <= '0;
-        refill_tag                   <= '0;
-        refill_pixel_index           <= '0;
-        refill_beat                  <= '0;
-        axi_rresp_error              <= 1'b0;
-        plru_tree                    <= '0;
+      if (0) begin
+        // if (flush) begin
+        // request_stage_valid          <= 1'b0;
+        // request_stage_tag            <= '0;
+        // request_stage_pixel_index    <= '0;
+        // request_stage_line_base_addr <= '0;
+        // stage0_valid                 <= 1'b0;
+        // stage0_tag                   <= '0;
+        // stage0_pixel_index           <= '0;
+        // stage0_line_base_addr        <= '0;
+        // stage1_valid                 <= 1'b0;
+        // stage2_valid                 <= 1'b0;
+        // stage3_valid                 <= 1'b0;
+        // stage1_hit_found             <= 1'b0;
+        // stage1_hit_way               <= '0;
+        // stage1_tag                   <= '0;
+        // stage1_pixel_index           <= '0;
+        // stage1_line_base_addr        <= '0;
+        // refill_state                 <= REFILL_IDLE;
+        // refill_way                   <= '0;
+        // victim_node                  <= '0;
+        // victim_level                 <= '0;
+        // refill_base_addr             <= '0;
+        // refill_tag                   <= '0;
+        // refill_pixel_index           <= '0;
+        // refill_beat                  <= '0;
+        // axi_rresp_error              <= 1'b0;
+        // plru_tree                    <= '0;
       end else begin
         if (ENABLE_PERF_COUNTERS) begin
           if (lookup_fire) begin
@@ -576,12 +584,11 @@ module texture_cache #(
           REFILL_SELECT: begin
             refill_way <= victim_way_next;
             if (victim_level == WayBits'(WayBits - 1)) begin
-              refill_state <= REFILL_AR;
-              tag_clear_en <= 1'b1;
+              refill_state  <= REFILL_AR;
+              tag_clear_en  <= 1'b1;
               tag_clear_way <= victim_way_next;
             end else begin
-              victim_node <= PlruNodeBits'((int'(victim_node) << 1)
-                                  + (victim_direction ? 2 : 1));
+              victim_node  <= PlruNodeBits'((int'(victim_node) << 1) + (victim_direction ? 2 : 1));
               victim_level <= victim_level + 1'b1;
             end
           end

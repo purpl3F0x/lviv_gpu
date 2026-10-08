@@ -1,413 +1,392 @@
-// Thread Orchestrator Module
-// Copyright (c) 2026 Stavros Avramidis
-//
-// Performs a snake-like traversal of 2x2 pixel quads across the bounding box of a triangle,
-// updating edge functions incrementally and distributing them to 4 parallel thread execution units.
-
-
 `timescale 1ns / 1ns
 
 import gpu_types_pkg::*;
 
-
-module thread_orchestrator (
+module thread_orchestrator #(
+) (
     input logic clk,
     input logic rst_n,
 
-    // Frontend Handshake
-    input  logic valid_in,
+    input logic thread_clk,
+    input logic thread_rst_n,
+
+    input logic valid_in,
     output logic ready_out,
-
-    // Backend Handshake (one per thread)
-    input  logic ready_in [4],
+    input orchestrator_data_in_t in_data,
+    input logic ready_in[4],
     output logic valid_out[4],
-
-    // Initial inputs from Frontend (floats)
-    input logic [31:0] init_e0[4],
-    input logic [31:0] init_e1[4],
-    input logic [31:0] init_e2[4],
-
-    input logic [31:0] e0_dx_2x,
-    input logic [31:0] e0_dy_2x,
-    input logic [31:0] e1_dx_2x,
-    input logic [31:0] e1_dy_2x,
-    input logic [31:0] e2_dx_2x,
-    input logic [31:0] e2_dy_2x,
-
-    input logic [7:0] minX_local,
-    input logic [7:0] minY_local,
-    input logic [7:0] width,
-    input logic [7:0] height,
-
-    input logic    [31:0] invArea,
-    input vertex_t        v0,
-    input vertex_t        v1,
-    input vertex_t        v2,
-
-    // Outputs to Threads (one per thread)
-    output logic [31:0] out_e0[4],
-    output logic [31:0] out_e1[4],
-    output logic [31:0] out_e2[4],
-    output logic [PIXEL_ADDR_W-1:0] out_pixel_id[4],
-
-    output logic    [31:0] out_invArea,
-    output vertex_t        out_v0,
-    output vertex_t        out_v1,
-    output vertex_t        out_v2
+    output thread_data_in_t out_data[4]
 );
 
-  localparam int ADD_SUB_LATENCY = 8;
+  localparam int AccumulatorLatency = 3;
+  localparam int Fx48Tof32Latency = 7;
+  localparam int PipeLatency = AccumulatorLatency + Fx48Tof32Latency;
+  localparam int ThreadFifoDepth = 32;
 
-  // States
-  typedef enum logic {
-    ST_IDLE,
-    ST_TRAVERSE
+  // Triangle Stack
+  localparam int TriangleSlots = 4;
+  localparam int SlotW = $clog2(TriangleSlots);
+
+  // ALU Definitions
+  localparam logic [2:0] Hold = 3'd0, Load = 3'd1, AddX = 3'd2, SubX = 3'd3, AddXY = 3'd4,
+                         AddY = 3'd5, Clear = 3'd6;
+
+  typedef enum logic [1:0] {
+    IDLE,
+    LOAD,
+    INITIALIZE,
+    TRAVERSE
   } state_t;
+  state_t state;
 
-  state_t        state;
+  (* ram_style = "distributed" *) orchestrator_data_in_t triangle_slots[TriangleSlots];
 
-  // Traversal coordinates & limits
-  logic   [ 7:0] num_quads_x;
-  logic   [ 7:0] num_quads_y;
-  logic   [ 7:0] curr_qx;  // Horizontal quad index
-  logic   [ 7:0] curr_qy;  // Vertical quad index
-  logic          dir_right;  // 1: Right, 0: Left
+  typedef struct packed {
+    edge_fixed_t init_e0, init_e1, init_e2;
+    edge_fixed_t e0_dx, e0_dy, e1_dx, e1_dy, e2_dx, e2_dy;
+    logic [TILE_ADDR_X-1:0] minX_local;
+    logic [TILE_ADDR_Y-1:0] minY_local;
+    logic [TILE_ADDR_X:0] width;
+    logic [TILE_ADDR_Y:0] height;
+    logic empty_box;
+  } alu_triangle_t;
 
-  // Pixel coordinates tracking
-  logic   [ 7:0] qx_coord;
-  logic   [ 7:0] qy_coord;
+  orchestrator_data_in_t triangle_read;
+  alu_triangle_t triangle, prefetched_triangle;
 
-  // Local bounding box registers
-  logic   [ 7:0] r_minX;
-  logic   [ 7:0] r_minY;
-  logic   [ 7:0] r_width;
-  logic   [ 7:0] r_height;
+  logic [SlotW:0] wr_ptr, trav_ptr, rd_ptr;
+  logic [SlotW:0] fetch_ptr;
+  logic prefetch_valid, prefetch_fill, prefetch_take;
+  logic [SlotW:0] triangle_count;
+  logic triangle_push, triangle_pop, skip_empty;
+  logic dir_right, issue_valid, issue_last;
+  logic advance;
+  // pixel_x/y hold the group issued this cycle; row_end/issue_last/arrive_down describe it.
+  logic [TILE_ADDR_X-1:0] pixel_x;
+  logic [TILE_ADDR_Y-1:0] pixel_y;
+  logic [TILE_ADDR_X-1:0] columns_left;
+  logic [TILE_ADDR_Y-1:0] rows_left;
+  logic [TILE_ADDR_X-1:0] columns_per_row;
 
-  // Edge function registers
-  logic   [31:0] e0_reg                            [4];
-  logic   [31:0] e1_reg                            [4];
-  logic   [31:0] e2_reg                            [4];
+  logic row_end, arrive_down;
+  edge_fixed_t edges[4][3];
 
-  // Pass-through registers
-  logic   [31:0] r_invArea;
-  vertex_t r_v0, r_v1, r_v2;
-
-  // Handshake stalling logic
-  // Stall if any thread is supposed to receive valid data but is not ready
-  logic stall;
-  logic thread_ready;
-  assign thread_ready = ~ready_in[0] || ~ready_in[1] || ~ready_in[2] || ~ready_in[3];
-  assign stall = (state == ST_TRAVERSE) && !thread_ready;
-
-  // Ready out to frontend
-  assign ready_out = (state == ST_IDLE);
-
-  // Snake traversal movement controls
-  logic move_down;
-  logic move_horizontal;
-  logic step_done;
+  logic [2:0] accumulator_op[4];
+  edge_fixed_t concat_operand[4][3], c_operand[4][3];
+  logic [3:0][2:0][31:0] results;
+  logic [3:0] fifo_almost_full;
+  logic out_valid, out_fire;
+  thread_data_in_t out_template;
+  thread_data_in_t fifo_wdata[4];
+  logic [PipeLatency-1:0] valid_pipe, last_pipe;
+  logic [PipeLatency-1:0][PIXEL_ADDR_W_THREAD-1:0] addr_pipe;
+  logic [PIXEL_ADDR_W_THREAD-1:0] issue_addr;
 
   always_comb begin
-    move_down = 1'b0;
-    move_horizontal = 1'b0;
-    step_done = 1'b0;
-
-    if (state == ST_TRAVERSE && !stall) begin
-      if (dir_right) begin
-        if (curr_qx < num_quads_x) begin
-          move_horizontal = 1'b1;
-        end else if (curr_qy < num_quads_y) begin
-          move_down = 1'b1;
-        end else begin
-          step_done = 1'b1;
-        end
-      end else begin
-        if (curr_qx > 0) begin
-          move_horizontal = 1'b1;
-        end else if (curr_qy < num_quads_y) begin
-          move_down = 1'b1;
-        end else begin
-          step_done = 1'b1;
-        end
-      end
-    end
+    triangle_read = triangle_slots[fetch_ptr[SlotW-1:0]];
   end
 
-  // Floating-point adder control signals
-  logic        fp_op_sub;
-  logic [31:0] fp_e0_b;
-  logic [31:0] fp_e1_b;
-  logic [31:0] fp_e2_b;
-  logic        fp_valid_in;
+  assign prefetch_take = prefetch_valid
+      && ((state == IDLE) || skip_empty || (issue_valid && issue_last));
 
-  assign fp_op_sub = (state == ST_TRAVERSE) && !dir_right && move_horizontal; // Subtract if moving left
-  assign fp_e0_b = move_down ? e0_dy_2x : e0_dx_2x;
-  assign fp_e1_b = move_down ? e1_dy_2x : e1_dx_2x;
-  assign fp_e2_b = move_down ? e2_dy_2x : e2_dx_2x;
-  assign fp_valid_in = (state == ST_TRAVERSE) && !stall && (move_horizontal || move_down);
-
-  // Registered adder inputs for timing closure/fmax
-  logic        fp_op_sub_reg;
-  logic        fp_valid_in_reg;
-  logic [31:0] fp_e0_b_reg;
-  logic [31:0] fp_e1_b_reg;
-  logic [31:0] fp_e2_b_reg;
-  logic [31:0] e0_reg_reg      [4];
-  logic [31:0] e1_reg_reg      [4];
-  logic [31:0] e2_reg_reg      [4];
+  always_ff @(posedge clk) begin
+    if (!rst_n) prefetch_fill <= 1'b0;
+    else if (prefetch_fill) prefetch_fill <= 1'b0;
+    else
+      prefetch_fill <= ((fetch_ptr != wr_ptr) || triangle_push)
+          && (!prefetch_valid || (advance && prefetch_take));
+  end
 
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      fp_op_sub_reg   <= 1'b0;
-      fp_valid_in_reg <= 1'b0;
-      fp_e0_b_reg     <= 32'b0;
-      fp_e1_b_reg     <= 32'b0;
-      fp_e2_b_reg     <= 32'b0;
-      for (int i = 0; i < 4; i++) begin
-        e0_reg_reg[i] <= 32'b0;
-        e1_reg_reg[i] <= 32'b0;
-        e2_reg_reg[i] <= 32'b0;
-      end
-    end else if (!stall) begin
-      fp_op_sub_reg   <= fp_op_sub;
-      fp_valid_in_reg <= fp_valid_in;
-      fp_e0_b_reg     <= fp_e0_b;
-      fp_e1_b_reg     <= fp_e1_b;
-      fp_e2_b_reg     <= fp_e2_b;
-      for (int i = 0; i < 4; i++) begin
-        e0_reg_reg[i] <= e0_reg[i];
-        e1_reg_reg[i] <= e1_reg[i];
-        e2_reg_reg[i] <= e2_reg[i];
-      end
-    end
-  end
-
-  // Floating-point adders outputs
-  logic [31:0] e0_next[4];
-  logic [31:0] e1_next[4];
-  logic [31:0] e2_next[4];
-  logic fp_valid_out_e0[4];
-
-  // Instantiate 12 floating-point add_sub units (4 threads x 3 edge functions)
-  generate
-    for (genvar i = 0; i < 4; i++) begin : g_fp_adders
-      fp_add_sub #(
-          .LATENCY(ADD_SUB_LATENCY)
-      ) u_fp_add_sub_e0 (
-          .aclk     (clk),
-          .aresetn  (rst_n),
-          .aclken   (!stall),
-          .op_sub   (fp_op_sub_reg),
-          .valid_in (fp_valid_in_reg),
-          .a        (e0_reg_reg[i]),
-          .b        (fp_e0_b_reg),
-          .valid_out(fp_valid_out_e0[i]),
-          .result   (e0_next[i])
-      );
-
-      fp_add_sub #(
-          .LATENCY(ADD_SUB_LATENCY)
-      ) u_fp_add_sub_e1 (
-          .aclk     (clk),
-          .aresetn  (rst_n),
-          .aclken   (!stall),
-          .op_sub   (fp_op_sub_reg),
-          .valid_in (fp_valid_in_reg),
-          .a        (e1_reg_reg[i]),
-          .b        (fp_e1_b_reg),
-          .valid_out(),
-          .result   (e1_next[i])
-      );
-
-      fp_add_sub #(
-          .LATENCY(ADD_SUB_LATENCY)
-      ) u_fp_add_sub_e2 (
-          .aclk     (clk),
-          .aresetn  (rst_n),
-          .aclken   (!stall),
-          .op_sub   (fp_op_sub_reg),
-          .valid_in (fp_valid_in_reg),
-          .a        (e2_reg_reg[i]),
-          .b        (fp_e2_b_reg),
-          .valid_out(),
-          .result   (e2_next[i])
-      );
-    end
-  endgenerate
-
-  // State Machine and Traversal Logic
-  always_ff @(posedge clk) begin
-    if (!rst_n) begin
-      state       <= ST_IDLE;
-      curr_qx     <= '0;
-      curr_qy     <= '0;
-      dir_right   <= 1'b1;
-      qx_coord    <= '0;
-      qy_coord    <= '0;
-      num_quads_x <= '0;
-      num_quads_y <= '0;
-      r_minX      <= '0;
-      r_minY      <= '0;
-      r_width     <= '0;
-      r_height    <= '0;
-      r_invArea   <= '0;
-      r_v0        <= '0;
-      r_v1        <= '0;
-      r_v2        <= '0;
-
-      for (int i = 0; i < 4; i++) begin
-        e0_reg[i] <= '0;
-        e1_reg[i] <= '0;
-        e2_reg[i] <= '0;
-      end
+      fetch_ptr <= '0;
+      prefetch_valid <= 1'b0;
     end else begin
-      unique case (state)
-        ST_IDLE: begin
-          if (valid_in) begin
-            state       <= ST_TRAVERSE;
-            curr_qx     <= '0;
-            curr_qy     <= '0;
-            dir_right   <= 1'b1;
+      if (prefetch_fill) begin
+        fetch_ptr <= fetch_ptr + 1'b1;
+        prefetch_valid <= 1'b1;
+      end else if (advance && prefetch_take) prefetch_valid <= 1'b0;
+    end
+  end
 
-            // Bounding box start coordinates
-            qx_coord    <= minX_local;
-            qy_coord    <= minY_local;
+  always_ff @(posedge clk) begin
+    if (!rst_n) begin
+      prefetched_triangle <= '0;
+    end else if (prefetch_fill) begin
+      prefetched_triangle.init_e0 <= triangle_read.init_e0;
+      prefetched_triangle.init_e1 <= triangle_read.init_e1;
+      prefetched_triangle.init_e2 <= triangle_read.init_e2;
+      prefetched_triangle.e0_dx <= triangle_read.e0_dx;
+      prefetched_triangle.e0_dy <= triangle_read.e0_dy;
+      prefetched_triangle.e1_dx <= triangle_read.e1_dx;
+      prefetched_triangle.e1_dy <= triangle_read.e1_dy;
+      prefetched_triangle.e2_dx <= triangle_read.e2_dx;
+      prefetched_triangle.e2_dy <= triangle_read.e2_dy;
+      prefetched_triangle.minX_local <= triangle_read.minX_local;
+      prefetched_triangle.minY_local <= triangle_read.minY_local;
+      prefetched_triangle.width <= triangle_read.width;
+      prefetched_triangle.height <= triangle_read.height;
+      prefetched_triangle.empty_box <= (triangle_read.width == 0) || (triangle_read.height == 0);
+    end
+  end
 
-            r_minX      <= minX_local;
-            r_minY      <= minY_local;
-            r_width     <= width;
-            r_height    <= height;
+  always_ff @(posedge clk) begin
+    if (!rst_n) triangle <= '0;
+    else if (advance) begin
+      if (prefetch_take) triangle <= prefetched_triangle;
+    end
+  end
 
-            // Calculate number of quads covering the bounding box
-            num_quads_x <= (width >> 1) - 1;
-            num_quads_y <= (height >> 1) - 1;
+  assign triangle_push = valid_in && ready_out;
 
-            // Pass-through parameters
-            r_invArea   <= invArea;
-            r_v0        <= v0;
-            r_v1        <= v1;
-            r_v2        <= v2;
+  assign triangle_pop = advance && last_pipe[PipeLatency-2];
+  assign skip_empty = (state == LOAD) && triangle.empty_box;
 
-            // Load initial edge functions
-            for (int i = 0; i < 4; i++) begin
-              e0_reg[i] <= init_e0[i];
-              e1_reg[i] <= init_e1[i];
-              e2_reg[i] <= init_e2[i];
-            end
-          end
-        end
-
-        ST_TRAVERSE: begin
-          if (!stall) begin
-            if (move_horizontal) begin
-              if (dir_right) begin
-                curr_qx  <= curr_qx + 1;
-                qx_coord <= qx_coord + 2;
-              end else begin
-                curr_qx  <= curr_qx - 1;
-                qx_coord <= qx_coord - 2;
-              end
-              for (int i = 0; i < 4; i++) begin
-                e0_reg[i] <= e0_next[i];
-                e1_reg[i] <= e1_next[i];
-                e2_reg[i] <= e2_next[i];
-              end
-            end else if (move_down) begin
-              curr_qy   <= curr_qy + 1;
-              qy_coord  <= qy_coord + 2;
-              dir_right <= ~dir_right;
-              for (int i = 0; i < 4; i++) begin
-                e0_reg[i] <= e0_next[i];
-                e1_reg[i] <= e1_next[i];
-                e2_reg[i] <= e2_next[i];
-              end
-            end else if (step_done) begin
-              state <= ST_IDLE;
-            end
-          end
-        end
+  always_ff @(posedge clk) begin
+    if (!rst_n) begin
+      triangle_count <= '0;
+    end else begin
+      case ({
+        triangle_push, triangle_pop
+      })
+        2'b10:   triangle_count <= triangle_count + 1'b1;
+        2'b01:   triangle_count <= triangle_count - 1'b1;
+        default: ;
       endcase
     end
   end
 
-  // logic [3:0] in_bb_mask;
+  always_ff @(posedge clk) begin
+    if (!rst_n) ready_out <= 1'b0;
+    // Equivalent to triangle_count < TriangleSlots - 1 for power-of-two TriangleSlots.
+    else
+      ready_out <= !(triangle_count[SlotW] || (&triangle_count[SlotW-1:0]));
+  end
 
-  // Bounding box pixel validity checking & masking
-  // always_comb begin
-  //   for (int i = 0; i < 4; i++) begin
-  //     in_bb_mask[i] = (state == ST_TRAVERSE);
-  //   end
-  // end
+  assign issue_valid = (state == INITIALIZE) || (state == TRAVERSE);
 
-  // Delay pipelines for valid mask and pass-through metadata
-  // Latency is ADD_SUB_LATENCY + 1 (for input registration)
-  localparam int TOTAL_LATENCY = ADD_SUB_LATENCY + 1;
 
-  logic    [ 7:0] qx_coord_pipe[TOTAL_LATENCY];
-  logic    [ 7:0] qy_coord_pipe[TOTAL_LATENCY];
-  // logic    [ 3:0] in_bb_mask_pipe[TOTAL_LATENCY];
-  logic    [31:0] invArea_pipe [TOTAL_LATENCY];
-  vertex_t        v0_pipe      [TOTAL_LATENCY];
-  vertex_t        v1_pipe      [TOTAL_LATENCY];
-  vertex_t        v2_pipe      [TOTAL_LATENCY];
+  assign out_valid = valid_pipe[PipeLatency-1];
+  assign out_fire = out_valid && advance;
+
+  // Registered one cycle early off almost-full, so the write in the next cycle always has room.
+  always_ff @(posedge clk) begin
+    if (!rst_n) advance <= 1'b0;
+    else advance <= !(|fifo_almost_full);
+  end
+
+  assign issue_addr = {pixel_y, pixel_x};
+
+
+  always_comb begin
+    concat_operand = '{default: '{default: '0}};
+    c_operand = '{default: '{default: '0}};
+    accumulator_op = '{4{Clear}};
+
+    unique case (state)
+
+      IDLE: begin
+      end
+      LOAD: begin
+        if (triangle.empty_box == 1'b0) begin
+          accumulator_op = '{4{Load}};
+          c_operand = '{default: '{triangle.init_e0, triangle.init_e1, triangle.init_e2}};
+          concat_operand[3] = '{triangle.e0_dx, triangle.e1_dx, triangle.e2_dx};
+        end
+      end
+      INITIALIZE: begin
+        concat_operand = '{
+            default: '{triangle.e0_dx << 1, triangle.e1_dx << 1, triangle.e2_dx << 1}
+        };
+        c_operand[0] = '{default: '0};
+        c_operand[1] = '{triangle.e0_dx, triangle.e1_dx, triangle.e2_dx};
+        c_operand[2] = '{triangle.e0_dy, triangle.e1_dy, triangle.e2_dy};
+        c_operand[3] = '{triangle.e0_dy, triangle.e1_dy, triangle.e2_dy};
+        accumulator_op = '{Hold, AddY, AddY, AddXY};
+      end
+      TRAVERSE: begin
+        concat_operand = '{
+            default: '{triangle.e0_dx << 1, triangle.e1_dx << 1, triangle.e2_dx << 1}
+        };
+        c_operand = '{default: '{triangle.e0_dy << 1, triangle.e1_dy << 1, triangle.e2_dy << 1}};
+        if (arrive_down) accumulator_op = '{4{AddY}};
+        else begin
+          if (dir_right) accumulator_op = '{4{AddX}};
+          else accumulator_op = '{4{SubX}};
+        end
+      end
+    endcase
+  end
+
+  for (genvar lane = 0; lane < 4; lane++) begin : g_lane
+    for (genvar edge_idx = 0; edge_idx < 3; edge_idx++) begin : g_edge
+      fx16_32_accumulator u_accumulator (
+          .clk(clk),
+          .rst_n(rst_n),
+          .clken(advance),
+          .op(accumulator_op[lane]),
+          .concat_operand($signed(concat_operand[lane][edge_idx])),
+          .c_operand($signed(c_operand[lane][edge_idx])),
+          .result(edges[lane][edge_idx])
+      );
+
+      fx16_32_to_fp32 #(
+          .LATENCY(Fx48Tof32Latency)
+      ) u_converter (
+          .aclk(clk),
+          .aclken(advance),
+          .valid_in(valid_pipe[AccumulatorLatency-1]),
+          .a(edges[lane][edge_idx]),
+          .result(results[lane][edge_idx])
+      );
+    end
+  end
 
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      for (int i = 0; i < TOTAL_LATENCY; i++) begin
-        // in_bb_mask_pipe[i] <= '0;
-        qx_coord_pipe[i] <= '0;
-        qy_coord_pipe[i] <= '0;
-        invArea_pipe[i]  <= '0;
-        v0_pipe[i]       <= '0;
-        v1_pipe[i]       <= '0;
-        v2_pipe[i]       <= '0;
-      end
-    end else if (!stall) begin
-      // in_bb_mask_pipe[0] <= in_bb_mask;
-      qx_coord_pipe[0] <= qx_coord;
-      qy_coord_pipe[0] <= qy_coord;
-      invArea_pipe[0]  <= r_invArea;
-      v0_pipe[0]       <= r_v0;
-      v1_pipe[0]       <= r_v1;
-      v2_pipe[0]       <= r_v2;
-      for (int i = 1; i < TOTAL_LATENCY; i++) begin
-        // in_bb_mask_pipe[i] <= in_bb_mask_pipe[i-1];
-        qx_coord_pipe[i] <= qx_coord_pipe[i-1];
-        qy_coord_pipe[i] <= qy_coord_pipe[i-1];
-        invArea_pipe[i]  <= invArea_pipe[i-1];
-        v0_pipe[i]       <= v0_pipe[i-1];
-        v1_pipe[i]       <= v1_pipe[i-1];
-        v2_pipe[i]       <= v2_pipe[i-1];
+      wr_ptr <= '0;
+    end else if (triangle_push) begin
+      triangle_slots[wr_ptr[SlotW-1:0]] <= in_data;
+      wr_ptr <= wr_ptr + 1'b1;
+    end
+  end
+
+  always_ff @(posedge clk) begin
+    if (!rst_n) rd_ptr <= '0;
+    else if (triangle_pop) rd_ptr <= rd_ptr + 1'b1;
+  end
+
+  always_ff @(posedge clk) begin
+    if (!rst_n) begin
+      valid_pipe <= '0;
+      last_pipe  <= '0;
+      addr_pipe  <= '0;
+    end else if (advance) begin
+      valid_pipe <= {valid_pipe[PipeLatency-2:0], issue_valid};
+      last_pipe  <= {last_pipe[PipeLatency-2:0], (issue_valid && issue_last) || skip_empty};
+      addr_pipe  <= {addr_pipe[PipeLatency-2:0], issue_addr};
+    end
+  end
+
+  always_ff @(posedge clk) begin
+    if (!rst_n) begin
+      state <= IDLE;
+      trav_ptr <= '0;
+      dir_right <= 1'b1;
+      pixel_x <= '0;
+      pixel_y <= '0;
+      columns_left <= '0;
+      rows_left <= '0;
+      columns_per_row <= '0;
+      row_end <= 1'b0;
+      issue_last <= 1'b0;
+      arrive_down <= 1'b0;
+    end else begin
+      if (advance) begin
+        case (state)
+          IDLE:
+          if (prefetch_valid) begin
+            state <= LOAD;
+          end
+          LOAD:
+          if (skip_empty) begin
+            trav_ptr <= trav_ptr + 1'b1;
+            state <= prefetch_valid ? LOAD : IDLE;
+          end else begin
+            pixel_x <= triangle.minX_local;
+            pixel_y <= triangle.minY_local;
+            columns_per_row <= TILE_ADDR_X'(triangle.width - 1'b1);
+            columns_left <= TILE_ADDR_X'(triangle.width - 1'b1);
+            rows_left <= TILE_ADDR_Y'(triangle.height - 1'b1);
+            dir_right <= 1'b1;
+            row_end <= triangle.width == 1;
+            issue_last <= triangle.width == 1 && triangle.height == 1;
+            arrive_down <= 1'b0;
+            state <= INITIALIZE;
+          end
+          INITIALIZE, TRAVERSE: begin
+            if (row_end) begin
+              pixel_y <= pixel_y + TILE_ADDR_Y'(1);
+              dir_right <= !dir_right;
+              columns_left <= columns_per_row;
+              rows_left <= rows_left - TILE_ADDR_Y'(1);
+              arrive_down <= 1'b1;
+              row_end <= columns_per_row == 0;
+              issue_last <= columns_per_row == 0 && rows_left == TILE_ADDR_Y'(1);
+            end else begin
+              pixel_x <= dir_right ? pixel_x + TILE_ADDR_X'(1) : pixel_x - TILE_ADDR_X'(1);
+              columns_left <= columns_left - TILE_ADDR_X'(1);
+              arrive_down <= 1'b0;
+              row_end <= columns_left == TILE_ADDR_X'(1);
+              issue_last <= columns_left == TILE_ADDR_X'(1) && rows_left == 0;
+            end
+            if (issue_last) begin
+              trav_ptr <= trav_ptr + 1'b1;
+              state <= prefetch_valid ? LOAD : IDLE;
+            end else state <= TRAVERSE;
+          end
+          default: state <= IDLE;
+        endcase
       end
     end
+  end
+
+  //
+  // Output FIFOs
+  //
+
+  always_ff @(posedge clk) begin
+    if (advance) out_template <= triangle_slots[rd_ptr[SlotW-1:0]].thread_data;
   end
 
   always_comb begin
-    for (int i = 0; i < 4; i++) begin
-      // valid_out[i] = fp_valid_out_e0[0] && in_bb_mask_pipe[TOTAL_LATENCY-1][i];
-      valid_out[i] = fp_valid_out_e0[0];
-    end
+    fifo_wdata[0] = out_template;
+    fifo_wdata[0].e0 = results[0][0];
+    fifo_wdata[0].e1 = results[0][1];
+    fifo_wdata[0].e2 = results[0][2];
+    fifo_wdata[0].addr = addr_pipe[PipeLatency-1];
+    fifo_wdata[1] = out_template;
+    fifo_wdata[1].e0 = results[1][0];
+    fifo_wdata[1].e1 = results[1][1];
+    fifo_wdata[1].e2 = results[1][2];
+    fifo_wdata[1].addr = addr_pipe[PipeLatency-1];
+    fifo_wdata[2] = out_template;
+    fifo_wdata[2].e0 = results[2][0];
+    fifo_wdata[2].e1 = results[2][1];
+    fifo_wdata[2].e2 = results[2][2];
+    fifo_wdata[2].addr = addr_pipe[PipeLatency-1];
+    fifo_wdata[3] = out_template;
+    fifo_wdata[3].e0 = results[3][0];
+    fifo_wdata[3].e1 = results[3][1];
+    fifo_wdata[3].e2 = results[3][2];
+    fifo_wdata[3].addr = addr_pipe[PipeLatency-1];
   end
 
-  // Assignments to output ports
-  assign out_e0 = e0_reg;
-  assign out_e1 = e1_reg;
-  assign out_e2 = e2_reg;
-  assign out_pixel_id[0] =
-      (qy_coord_pipe[TOTAL_LATENCY-1] * TILE_SIZE_X) +
-      qx_coord_pipe[TOTAL_LATENCY-1];
-  assign out_pixel_id[1] =
-      (qy_coord_pipe[TOTAL_LATENCY-1] * TILE_SIZE_X) +
-      qx_coord_pipe[TOTAL_LATENCY-1] + 1;
-  assign out_pixel_id[2] =
-      ((qy_coord_pipe[TOTAL_LATENCY-1] + 1) * TILE_SIZE_X) +
-      qx_coord_pipe[TOTAL_LATENCY-1];
-  assign out_pixel_id[3] =
-      ((qy_coord_pipe[TOTAL_LATENCY-1] + 1) * TILE_SIZE_X) +
-      qx_coord_pipe[TOTAL_LATENCY-1] + 1;
-  assign out_invArea = invArea_pipe[TOTAL_LATENCY-1];
-  assign out_v0 = v0_pipe[TOTAL_LATENCY-1];
-  assign out_v1 = v1_pipe[TOTAL_LATENCY-1];
-  assign out_v2 = v2_pipe[TOTAL_LATENCY-1];
+  for (genvar lane = 0; lane < 4; lane++) begin : g_thread_fifo
+    logic fifo_empty;
+    logic [$bits(thread_data_in_t)-1:0] rdata;
+
+    async_fifo #(
+        .DATA_WIDTH($bits(thread_data_in_t)),
+        .FIFO_DEPTH(ThreadFifoDepth)
+    ) u_fifo (
+        .clk(clk),
+        .rst_n(rst_n),
+        .data_i(fifo_wdata[lane]),
+        .wr_en(out_fire),
+        .rd_clk(thread_clk),
+        .rd_rst_n(thread_rst_n),
+        .rd_en(ready_in[lane]),
+        .data_o(rdata),
+        .fill_cnt(),
+        .rd_fill_cnt(),
+        .fifo_full(),
+        .fifo_almost_full(fifo_almost_full[lane]),
+        .fifo_empty(fifo_empty)
+    );
+
+    assign valid_out[lane] = !fifo_empty;
+    assign out_data[lane]  = thread_data_in_t'(rdata);
+  end
 
 endmodule

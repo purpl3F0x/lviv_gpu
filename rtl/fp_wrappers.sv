@@ -31,6 +31,43 @@ import "DPI-C" function int unsigned dpi_float_to_bits(input shortreal val);
 // ============================================================================
 // Floating-Point Adder
 // ============================================================================
+module fx16_32_to_fp32 #(
+    parameter int LATENCY = 5
+) (
+    input logic aclk,
+    input logic aclken,
+    input logic valid_in,
+    input logic signed [47:0] a,
+    output logic [31:0] result
+);
+`ifdef SIM_MODE
+  logic [31:0] pipeline [LATENCY];
+  logic [31:0] res_bits;
+  shortreal converted;
+
+  assign converted = real'($signed(a)) / 4294967296.0;
+  assign res_bits = `SHORTREALTOBITS(converted);
+
+  always_ff @(posedge aclk) begin
+    if (aclken) begin
+      pipeline[0] <= res_bits;
+      for (int stage = 1; stage < LATENCY; stage++)
+        pipeline[stage] <= pipeline[stage-1];
+    end
+  end
+  assign result = pipeline[LATENCY-1];
+`else
+  xil_fx16_32_to_fp32 u_convert (
+      .aclk(aclk),
+      .aclken(aclken),
+      .s_axis_a_tvalid(valid_in),
+      .s_axis_a_tdata(a),
+      .m_axis_result_tvalid(),
+      .m_axis_result_tdata(result)
+  );
+`endif
+endmodule
+
 module fp_add #(
     parameter int LATENCY = 11  // Default latency for Xilinx FP Add
 ) (

@@ -340,8 +340,23 @@ module fp_to_fx5_13 #(
   real scaled;
   longint signed converted;
   logic [17:0] res_bits;
+
+  function automatic longint signed round_nearest_even(input real value);
+    real magnitude;
+    real fraction;
+    longint signed integral;
+    begin
+      magnitude = value < 0.0 ? -value : value;
+      integral = longint'($floor(magnitude));
+      fraction = magnitude - real'(integral);
+      if ((fraction > 0.5) || ((fraction == 0.5) && integral[0]))
+        integral++;
+      return value < 0.0 ? -integral : integral;
+    end
+  endfunction
+
   assign scaled = real'(`BITSTOSHORTREAL(s_axis_a_tdata)) * 8192.0;
-  assign converted = longint'(scaled < 0.0 ? $ceil(scaled) : $floor(scaled));
+  assign converted = round_nearest_even(scaled);
   assign res_bits = converted[17:0];
   delay_pipe #(.WIDTH(19), .STAGES(LATENCY)) u_pipeline (
       .clk(aclk), .rst_n(1'b1), .clken(aclken),
@@ -376,16 +391,25 @@ module fp_to_fx2_23 #(
   logic [24:0] res_bits;
   logic [24:0] pipeline [LATENCY];
   logic        valid_pipe [LATENCY];
-  integer scaled;
+  longint signed scaled;
+
+  function automatic longint signed round_nearest_even(input real value);
+    real magnitude;
+    real fraction;
+    longint signed integral;
+    begin
+      magnitude = value < 0.0 ? -value : value;
+      integral = longint'($floor(magnitude));
+      fraction = magnitude - real'(integral);
+      if ((fraction > 0.5) || ((fraction == 0.5) && integral[0]))
+        integral++;
+      return value < 0.0 ? -integral : integral;
+    end
+  endfunction
 
   always_comb begin
     a_real = `BITSTOSHORTREAL(s_axis_a_tdata);
-    // Round to nearest instead of truncating toward zero.
-    if (a_real >= 0.0) begin
-      scaled = $rtoi((a_real * 8388608.0) + 0.5);  // 2^23
-    end else begin
-      scaled = $rtoi((a_real * 8388608.0) - 0.5);  // 2^23
-    end
+    scaled = round_nearest_even(real'(a_real) * 8388608.0);
     res_bits = scaled[24:0];
   end
 

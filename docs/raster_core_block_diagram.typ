@@ -1,598 +1,376 @@
-#import "@preview/circuiteria:0.2.0"
-#import "@preview/cetz:0.3.2": draw
+#import "@preview/fletcher:0.5.8" as fletcher: diagram, node, edge
+#import "@preview/splash:0.5.0": gruvbox, google
 
-#set page(width: auto, height: auto, margin: (left: 2.5cm, right: 1.5cm, top: 1.5cm, bottom: 1.5cm))
+#set text(font: "DejaVu Sans Mono", size: 9pt, fill: black)
+
+// #import "@preview/meshpad:0.1.2": grid-paper
+
+// #let back = grid-paper(size: (100, 100), kind: "dot", step: 0.5, major-every: 2)
+
+// #set page(background: back)
+#set page(width: auto, height: auto, margin: 10mm, fill: white)
+
+// Color palette
+#let colors = (
+  forest: rgb("44aa99"),
+  yellow:gruvbox.bright-yellow,
+  green: gruvbox.bright-aqua,
+  purple: gruvbox.bright-purple,
+  blue: gruvbox.bright-blue,
+  red: gruvbox.bright-red.lighten(20%),
+  orange: gruvbox.bright-orange,
+)
+
+#let colors = (
+  forest: rgb("34a089"),
+  yellow: google.dark-yellow-1,
+  green: google.light-green-1,
+  purple: google.light-magenta-1,
+  blue: google.light-cyan-1,
+  red: google.light-red-berry-2,
+  orange: google.light-orange-1.darken(5%)
+)
+
+
 
 #align(center)[
-  // #text(size: 24pt, weight: "bold")[Lviv GPU Block Diagram]
-  // #v(1em)
-  #circuiteria.circuit({
-    import circuiteria: *
+  #text([Lviv GPU Block Diagram], size: 4em, weight: "bold", spacing: 0.5em)
+  #v(-2em)
 
-    // 0a. Control Unit (CU) Block (Top-Left)
-    element.block(
-      x: -9,
-      y: 13,
-      w: 5,
-      h: 4,
-      id: "CP",
-      fill: red.lighten(40%),
-      name: [ #text("Control Unit\n(CU)", size: 13pt, weight: "bold") ],
-      ports: (
-        west: (
-          (id: "host_in", name: "", vertical: false),
-        ),
-        east: (
-          (id: "to_ctrl", name: "", vertical: false),
-        ),
-      ),
-    )
-
-    // 0b. Triangle FIFO (Top)
-    element.block(
-      x: 3.5,
-      y: 9,
-      w: 8,
-      h: 3,
-      id: "TriFIFO",
-      fill: rgb("#FDBA6F"),
-      name: [ #text("Triangle FIFO", size: 16pt, weight: "bold") ],
-      ports: (
-        west: (
-          (id: "from_dma", name: "", vertical: false),
-        ),
-        south: (
-          (id: "to_frontend", name: "", vertical: true),
-        ),
-      ),
-    )
-
-    // 0c. Triangle DMA (Top-Left)
-    element.block(
-      x: -9,
-      y: 9,
-      w: 5,
-      h: 3,
-      id: "TriDMA",
-      fill: silver.darken(10%),
-      name: [ #text("Triangle DMA", size: 12pt, weight: "bold") ],
-      ports: (
-        west: (
-          (id: "to_ddr", name: "", vertical: false),
-        ),
-        south: (
-          (id: "from_selector", name: "", vertical: true),
-        ),
-        east: (
-          (id: "to_fifo", name: "", vertical: false),
-        ),
-      ),
-    )
-
-    // 0d. Triangle Selector (Top-Left, below Triangle DMA)
-    element.block(
-      x: -9,
-      y: 5,
-      w: 5,
-      h: 3,
-      id: "TriSelector",
-      fill: util.colors.yellow.lighten(40%),
-      name: [ #text("Triangle\nSelector", size: 12pt, weight: "bold") ],
-      ports: (
-        south: (
-          (id: "from_vis_dma", name: "", vertical: true),
-        ),
-        north: (
-          (id: "to_tri_dma", name: "", vertical: true),
-        ),
-      ),
-    )
-
-    // 0e. Visibility DMA (Top-Left, below Triangle Selector)
-    element.block(
-      x: -9,
-      y: 1,
-      w: 5,
-      h: 3,
-      id: "VisDMA",
-      fill: silver.darken(10%),
-      name: [ #text("Visibility DMA", size: 12pt, weight: "bold") ],
-      ports: (
-        west: (
-          (id: "to_ddr", name: "", vertical: false),
-        ),
-        north: (
-          (id: "to_selector", name: "", vertical: true),
-        ),
-        east: (
-          (id: "from_cu", name: "", vertical: false),
-        ),
-      ),
-    )
-
-    // 1. Raster Frontend Block (Top)
-    element.block(
-      x: 0,
-      y: -0.5,
-      w: 15,
-      h: 6,
-      id: "frontend",
-      fill: util.colors.blue,
-      name: [
-        #text("Raster Frontend", size: 18pt, weight: "bold") \ \
-        #text("Initial per Triangle Setup\nand Bounding Box calculation & aligment", size: 10pt, weight: "regular")
-      ],
-      ports: (
-        north: (
-          (id: "vertex_in", name: "", vertical: true),
-        ),
-        south: (
-          (id: "data_out", name: "", vertical: true),
-        ),
-        west: (
-          (id: "from_cp", name: "", vertical: false),
-        ),
-      ),
-    )
-
-    // 2. Thread Orchestrator Block (Middle)
-    element.block(
-      x: 0,
-      y: -9,
-      w: 15,
-      h: 6,
-      id: "orchestrator",
-      fill: util.colors.pink,
-      name: [
-        #text("Thread Orchestrator", size: 18pt, weight: "bold") \ \
-        #text(
-          "Traverses the bounding box in a snake pattern\ninterpolating the per-pixel (per-thread) coeeficients\n and synchronizes the threads\n",
-          size: 9pt,
-          weight: "regular",
-        )
-
-        #text(
-          [Pixel regection ($e_(0,1,2)>=0$ and Z) is done on threads],
-          size: 9pt,
-          weight: "regular",
-        )
-      ],
-      ports: (
-        north: (
-          (id: "data_in", name: "", vertical: true),
-        ),
-        south: (
-          (id: "thread_data", name: "", vertical: true),
-        ),
-      ),
-    )
-
-    // Control Unit (CU) has been moved to the top left column
-
-    // 3. Parallel Threads (Bottom)
-    for i in range(4) {
-      element.block(
-        x: i * 4,
-        y: -20,
-        w: 3,
-        h: 8,
-        id: "thread" + str(i),
-        fill: util.colors.green,
-        name: [ #text("Thread " + str(i) + "\n\n\n\n", size: 13pt, weight: "bold") ],
-        ports: (
-          north: (
-            (id: "data_in", name: "", vertical: true),
-            (id: "ctrl_in", name: "", vertical: true),
-          ),
-          south: (
-            (id: "to_fb", name: "", vertical: true),
-            (id: "to_zb", name: "", vertical: true),
-          ),
-        ),
-      )
-
-      element.block(
-        x: i * 4 + 0.5,
-        y: -19.25,
-        w: 2,
-        h: 2,
-        id: "L1Cache" + str(i),
-        fill: util.colors.orange,
-        name: [ #text("L1\nCache", size: 12pt, weight: "bold") ],
-        ports: (
-          north: (
-            (id: "to_l2", name: "", vertical: false),
-          ),
-        ),
-      )
-    }
-
-    // Command Stream input is now defined at the top CU height
-
-    // CP Control Bus and connections are defined at the end of the file after block definitions to ensure coordinate resolution
-
-    // Top-Level inputs to Frontend (North)
-    // wire.stub("frontend-port-vertex_in", "north", name: "Vertex In", length: 2em)
-
-    // Connect Frontend (South) to Orchestrator (North) (Bold combined data bus)
-    draw.line(
-      "frontend-port-data_out",
-      "orchestrator-port-data_in",
-      stroke: (thickness: 2.5pt, paint: black),
-      mark: (end: ">", fill: black, size: 0.6),
-    )
-    draw.content(
-      (7.5, -1.75),
-      text(box(fill: white, inset: 2pt)[Coefficients, BB Data, invArea, Vertex], size: 10pt, weight: "bold"),
-    )
-
-    // Connect Orchestrator (South) to Threads (North) with a split bus
-    let split-y = -10.5
-    draw.line(
-      "orchestrator-port-thread_data",
-      (7.5, split-y),
-      stroke: (thickness: 2pt, paint: black),
-    )
-    draw.line(
-      (0.95, split-y),
-      (13.05, split-y),
-      stroke: (thickness: 2pt, paint: black),
-    )
-    for i in range(4) {
-      let thread-x = i * 4 + 1.0
-      draw.line(
-        (thread-x, split-y),
-        "thread" + str(i) + "-port-data_in",
-        stroke: (thickness: 2pt, paint: black),
-        mark: (end: ">", fill: black, size: 0.6),
-      )
-    }
-    draw.content(
-      (8, -9.7),
-      anchor: "west",
-      text("per-thread data", size: 9.5pt, weight: "bold"),
-    )
-
-    // L2 Cache Block on the left side (centered vertically to Thread blocks)
-    element.block(
-      x: -7,
-      y: -18,
-      w: 3,
-      h: 4,
-      id: "L2Cache",
-      fill: util.colors.yellow,
-      name: [ #text("L2\nCache", size: 14pt, weight: "bold") ],
-      ports: (
-        east: (
-          (id: "to_l1", name: "", vertical: false),
-        ),
-        west: (
-          (id: "to_ddr", name: "", vertical: false),
-        ),
-      ),
-    )
-
-    // Connect L1 Caches to L2 Cache with a bus that runs horizontally through the threads
-    let l2-bus-y = -16.0
-    draw.line(
-      "L2Cache-port-to_l1",
-      (13.5, l2-bus-y),
-      stroke: (thickness: 1pt, paint: black),
-    )
-    for i in range(4) {
-      let branch-x = i * 4 + 1.5
-      draw.line(
-        (branch-x, l2-bus-y),
-        "L1Cache" + str(i) + "-port-to_l2",
-        stroke: (thickness: 1pt, paint: black),
-        mark: (end: ">", fill: black, size: 0.5),
-      )
-    }
-
-    // 2D DMA Engine Block (Left side)
-    element.block(
-      x: -7,
-      y: -27.5,
-      w: 3,
-      h: 5,
-      id: "DMA",
-      fill: silver.darken(30%),
-      name: [ #text("2D DMA", size: 13pt, weight: "bold") ],
-      ports: (
-        west: (
-          (id: "to_ddr", name: "", vertical: false),
-        ),
-        east: (
-          (id: "to_buf", name: "", vertical: false),
-          (id: "from_cp", name: "", vertical: false),
-        ),
-      ),
-    )
-
-    // Tile Frame Buffer Block (Bottom, left aligned)
-    element.block(
-      x: 0.5,
-      y: -27.5,
-      w: 6,
-      h: 5,
-      id: "FrameBuffer",
-      fill: eastern,
-      name: [ #text("Tile Frame Buffer", size: 12pt, weight: "bold") ],
-      ports: (
-        north: (
-          (id: "fb_in", name: "", vertical: true),
-        ),
-        west: (
-          (id: "from_dma", name: "", vertical: false),
-          (id: "from_cp", name: "", vertical: false),
-        ),
-      ),
-    )
-
-    // Tile Z-Buffer Block (Bottom, right aligned)
-    element.block(
-      x: 8.5,
-      y: -27.5,
-      w: 6,
-      h: 5,
-      id: "ZBuffer",
-      fill: util.colors.purple,
-      name: [ #text("Tile Z-Buffer", size: 12pt, weight: "bold") ],
-      ports: (
-        north: (
-          (id: "zb_in", name: "", vertical: true),
-        ),
-      ),
-    )
-
-    // Connect L2 Cache to DDR (L2 goes in, thick arrow)
-    draw.line(
-      (-10.0, -16.0),
-      "L2Cache-port-to_ddr",
-      stroke: (thickness: 2.5pt, paint: black),
-      mark: (end: ">", fill: black, size: 0.6),
-    )
-    draw.content(
-      (-10.2, -16.0),
-      anchor: "east",
-      text("DDR", size: 16pt, weight: 500),
-    )
-
-    // Connect 2D DMA Engine to DDR (DMA goes out to DDR, thick arrow)
-    draw.line(
-      "DMA-port-to_ddr",
-      (-10.0, -25.0),
-      stroke: (thickness: 2.5pt, paint: black),
-      mark: (end: ">", fill: black, size: 0.6),
-    )
-    draw.content(
-      (-10.2, -25.0),
-      anchor: "east",
-      text("DDR", size: 16pt, weight: 500),
-    )
-
-    // Connect Threads (South) to Tile Frame Buffer (North) - FB Bus
-    let fb-bus-y = -21.0
-    draw.line(
-      "FrameBuffer-port-fb_in",
-      (3.5, fb-bus-y),
-      stroke: (thickness: 1.5pt, paint: black),
-      mark: (start: ">", fill: black, size: 0.5),
-    )
-    draw.line(
-      (1.0, fb-bus-y),
-      (13.0, fb-bus-y),
-      stroke: (thickness: 1.5pt, paint: black),
-    )
-    for i in range(4) {
-      let branch-x = i * 4 + 1.0
-      draw.line(
-        "thread" + str(i) + "-port-to_fb",
-        (branch-x, fb-bus-y),
-        stroke: (thickness: 1.5pt, paint: black),
-        mark: (start: ">", fill: black, size: 0.5),
-      )
-    }
-
-    // Connect Threads (South) to Tile Z-Buffer (North) - ZB Bus
-    let zb-bus-y = -21.5
-    draw.line(
-      "ZBuffer-port-zb_in",
-      (11.5, zb-bus-y),
-      stroke: (thickness: 1.5pt, paint: black),
-      mark: (start: ">", fill: black, size: 0.5),
-    )
-    draw.line(
-      (2.0, zb-bus-y),
-      (14.0, zb-bus-y),
-      stroke: (thickness: 1.5pt, paint: black),
-    )
-    for i in range(4) {
-      let branch-x = i * 4 + 2.0
-      draw.line(
-        "thread" + str(i) + "-port-to_zb",
-        (branch-x, zb-bus-y),
-        stroke: (thickness: 1.5pt, paint: black),
-        mark: (start: ">", fill: black, size: 0.5),
-      )
-    }
-
-    // Connect 2D DMA Engine (East) directly to Tile Frame Buffer (West)
-    draw.line(
-      "DMA-port-to_buf",
-      "FrameBuffer-port-from_dma",
-      stroke: (thickness: 1.5pt, paint: black),
-      mark: (start: ">", fill: black, size: 0.6),
-    )
-
-    // Host Config/Cmd Input to CP (at new top height)
-    draw.line(
-      (-12.0, 15.0),
-      "CP-port-host_in",
-      stroke: (thickness: 1.5pt, paint: black),
-      mark: (end: ">", fill: black, size: 0.5),
-    )
-    draw.content(
-      (-12.2, 15.0),
-      anchor: "east",
-      text("Command Stream", size: 10pt, weight: "bold"),
-    )
-
-    // CP control connections using circuiteria wires (single fanning-out bus)
-    let ctrl-bus-x = -1.5
-    let ctrl-thread-y = -11.0
-
-    // Vertical Control Bus Trunk
-    wire.wire(
-      "w_ctrl_trunk",
-      (
-        (horizontal: (ctrl-bus-x, 0), vertical: "CP-port-to_ctrl"),
-        (horizontal: (ctrl-bus-x, 0), vertical: "DMA-port-from_cp"),
-      ),
-      style: "direct",
-      dashed: true,
-    )
-
-    // Branch from CP to Trunk
-    wire.wire(
-      "w_cp_to_trunk",
-      ("CP-port-to_ctrl", (horizontal: (ctrl-bus-x, 0), vertical: "CP-port-to_ctrl")),
-      style: "direct",
-      dashed: true,
-    )
-
-    // Branch to Frontend
-    wire.wire(
-      "w_trunk_to_fe",
-      ((horizontal: (ctrl-bus-x, 0), vertical: "frontend-port-from_cp"), "frontend-port-from_cp"),
-      style: "direct",
-      directed: true,
-      dashed: true,
-    )
-
-    // Horizontal control line above threads
-    wire.wire(
-      "w_thread_ctrl_bus",
-      ((ctrl-bus-x, ctrl-thread-y), (14.0, ctrl-thread-y)),
-      style: "direct",
-      dashed: true,
-    )
-
-    // Thread branches
-    for i in range(4) {
-      let branch-x = i * 4 + 2.0
-      wire.wire(
-        "w_trunk_to_t" + str(i),
-        ((branch-x, ctrl-thread-y), "thread" + str(i) + "-port-ctrl_in"),
-        style: "direct",
-        directed: true,
-        dashed: true,
-      )
-    }
-
-    // Branch to Tile Frame Buffer
-    wire.wire(
-      "w_trunk_to_fb",
-      ((horizontal: (ctrl-bus-x, 0), vertical: "FrameBuffer-port-from_cp"), "FrameBuffer-port-from_cp"),
-      style: "direct",
-      directed: true,
-      dashed: true,
-    )
-
-    // Branch to 2D DMA
-    wire.wire(
-      "w_trunk_to_dma",
-      ((horizontal: (ctrl-bus-x, 0), vertical: "DMA-port-from_cp"), "DMA-port-from_cp"),
-      style: "direct",
-      directed: true,
-      dashed: true,
-    )
-
-    // Visibility DMA DDR Stub (DDR input)
-    draw.line(
-      (-12.0, 2.5),
-      "VisDMA-port-to_ddr",
-      stroke: (thickness: 2.5pt, paint: black),
-      mark: (end: ">", fill: black, size: 0.6),
-    )
-    draw.content(
-      (-12.2, 2.5),
-      anchor: "east",
-      text("DDR", size: 16pt, weight: 500),
-    )
-
-    // Triangle DMA DDR Stub (DDR input)
-    draw.line(
-      (-12.0, 10.5),
-      "TriDMA-port-to_ddr",
-      stroke: (thickness: 2.5pt, paint: black),
-      mark: (end: ">", fill: black, size: 0.6),
-    )
-    draw.content(
-      (-12.2, 10.5),
-      anchor: "east",
-      text("DDR", size: 16pt, weight: 500),
-    )
-
-    // Connect Visibility DMA to Triangle Selector (Visibility Stream)
-    wire.wire(
-      "w_vis_dma_to_selector",
-      ("VisDMA-port-to_selector", "TriSelector-port-from_vis_dma"),
-      style: "direct",
-      directed: true,
-    )
-    draw.content(
-      (-8.5, 4.5),
-      anchor: "west",
-      text(box(fill: white, inset: 2pt)[*Visibility Stream*], size: 10pt),
-    )
-
-    // Connect Triangle Selector to Triangle DMA (no label)
-    wire.wire(
-      "w_selector_to_tri_dma",
-      ("TriSelector-port-to_tri_dma", "TriDMA-port-from_selector"),
-      style: "direct",
-      directed: true,
-    )
-
-    // Branch to Visibility DMA
-    wire.wire(
-      "w_trunk_to_vis_dma",
-      ((horizontal: (ctrl-bus-x, 0), vertical: "VisDMA-port-from_cu"), "VisDMA-port-from_cu"),
-      style: "direct",
-      directed: true,
-      dashed: true,
-    )
-
-    // Connect Triangle DMA to Triangle FIFO (Bold data path)
-    draw.line(
-      "TriDMA-port-to_fifo",
-      "TriFIFO-port-from_dma",
-      stroke: (thickness: 2.5pt, paint: black),
-      mark: (end: ">", fill: black, size: 0.6),
-    )
-    draw.content(
-      (0.5, 10.8),
-      anchor: "south",
-      text("Triangles", size: 10pt, weight: "bold"),
-    )
-
-    // Connect Triangle FIFO to Frontend (Bold data path)
-    draw.line(
-      "TriFIFO-port-to_frontend",
-      "frontend-port-vertex_in",
-      stroke: (thickness: 2.5pt, paint: black),
-      mark: (end: ">", fill: black, size: 0.6),
-    )
-    draw.content(
-      (7.5, 7.25),
-      text(box(fill: white, inset: 2pt)[Vertex In], size: 10pt, weight: "bold"),
-    )
-
-
-    // Control bus junction dots
-    draw.circle((horizontal: (ctrl-bus-x, 0), vertical: "VisDMA-port-from_cu"), radius: 0.09, fill: black, stroke: none)
-    draw.circle((ctrl-bus-x, -11.0), radius: 0.09, fill: black, stroke: none)
-    draw.circle((horizontal: (ctrl-bus-x, 0), vertical: "DMA-port-from_cp"), radius: 0.09, fill: black, stroke: none)
-  })
+  #line(length: 600pt, stroke: 3pt+black)
 ]
+
+#v(5em)
+
+#diagram(
+  node-stroke: 1pt + black,
+  node-corner-radius: 1pt,
+  edge-corner-radius: 0.5pt,
+  edge-stroke: 1.6pt + black,
+  mark-scale: 60%,
+  spacing: (40pt, 30pt),
+
+  //
+
+
+  //
+  // Triagle DMA
+  //
+  node(
+    (-1, 2),
+    fill: colors.forest,
+    width: 110pt,
+    height: 60pt,
+    name: <vis_dma>,
+    [
+      #align(center)[
+        #text(size: 12pt, weight: "bold")[Visibility DMA]
+
+      ]
+    ]
+  ),
+  edge(<vis_dma>, <tri_dma>, "->", label: [#text("Datamover Command Stream", weight: 700)], label-side: center, label-size: 8pt,),
+  node((-2.5, 2), [#text("PS DDR", weight: "bold", 14pt)], name: <DDR_VIS_DMA>, stroke: 0pt, ),
+  edge(<DDR_VIS_DMA>, <vis_dma>, "->", label:  "/128b", label-side: center ),
+
+  //
+  // Triagle DMA
+  //
+  node(
+    (-1, 1),
+    fill: colors.forest,
+    width: 110pt,
+    height: 60pt,
+    name: <tri_dma>,
+    [
+      #align(center)[
+        #text(size: 12pt, weight: "bold")[Triangle DMA]
+
+      ]
+    ]
+  ),
+  node((-2.5, 1), [#text("PL DDR", weight: "bold", 14pt)], name: <DDR_TRI_DMA>, stroke: 0pt, ),
+  edge(<DDR_TRI_DMA>, <tri_dma>, "->", label:  "/512b", label-side: center ),
+
+  //
+  // Control Unit
+  //
+  node(
+    (-1,3),
+    fill: colors.red,
+    width: 110pt,
+    height: 100pt,
+    name: <cu>,
+    [
+      #align(center)[
+        #text(size: 12pt, weight: "bold")[Control Unit]
+
+      ]
+    ]
+  ),
+  let cu_stroke = stroke(paint: black.lighten(50%), dash: (2pt, 8pt)),
+  
+  edge( (0,2), <vis_dma>, "-|>", stroke: cu_stroke),
+  edge((0, 3), (0, 1.10), (rel: (0, 0.1), to: <tri_fifo.west>), "-|>", shift: 0%, stroke: cu_stroke, corner: right),
+  edge( (0,2), <front.west>, "-|>", stroke: cu_stroke),
+  edge( (0,4.9), "d,d,d,l", <tile_dma>, "-|>", stroke: cu_stroke),
+  
+  edge( <cu>, (0,3), (0,4.9),(0.2,4.9), (rel: (-0.05, 0), to:<thread-0.north>), "<|-|>", stroke: cu_stroke),
+  edge((0.2,4.9),(0.7,4.9), (rel: (-0.05, 0), to:<thread-1.north>), "-|>", stroke: cu_stroke),
+  edge((0.7,4.9),(1.2,4.9), (rel: (-0.05, 0), to:<thread-2.north>), "-|>", stroke: cu_stroke),
+  edge( (1.2,4.9),(1.7,4.9), (rel: (-0.05, 0), to:<thread-3.north>), "-|>", stroke: cu_stroke),
+
+
+
+  //
+  // Triagle Fifo
+  //
+  node(
+    (1, 1),
+    fill: colors.blue,
+    inset: 20pt,
+    // width: 250pt,
+    name: <tri_fifo>,
+    [
+      #align(center)[
+        #text(size: 12pt, weight: "bold")[Triangle FIFO]
+
+      ]
+    ]
+  ),
+
+  edge( <tri_dma>, <tri_fifo>, "-|||->", label: "300MHz  500MHz"),
+
+
+  //
+  // Thread Orchestrator
+  //
+  node(
+    (1, 2),
+    fill: colors.blue,
+    inset: 30pt,
+    width: 250pt,
+    name: <front>,
+    [
+      #align(center)[
+        #text(size: 12pt, weight: "bold")[Thread Frontend]
+
+        // #v(6pt)
+        // #text(size: 8.5pt)[
+        //   Initial per Triangle Setup\
+        //   and bounding box calculation
+        // ]
+      ]
+    ]
+  ),
+  edge(<tri_fifo>, <front>, "->", label: "Triangle in", label-side: center, label-size: 8pt),
+
+  node(
+    (1, 3.3),
+    inset: 4pt,
+    fill: colors.yellow,
+    layer: 100000,
+    name: <orch_fifo>,
+    [#text(size: 12pt, weight: "bold")[Thread Fifos]]
+  ),
+  //
+  // Thread Orchestrator
+  //
+  node(
+    (1, 3),
+    fill: colors.blue,
+    inset: 40pt,
+    width: 250pt,
+    name: <orch>,
+    [
+      #align(center)[
+        #text(size: 12pt, weight: "bold")[Thread Orchestrator]
+
+        // #v(6pt)
+        // #text(size: 8.5pt)[
+        //   Traverses the bounding box in a snake pattern\
+        //   interpolating the per-pixel (per-thread) coefficients\
+        //   and synchronizes the threads
+
+        //   #v(4pt)
+        //   Pixel rejection ($e_(0,1,2) >= 0$ and $Z$) is done on threads
+        // ]
+      ]
+    ]
+  ),
+
+  edge(<front>, <orch>, "->"),
+
+  //
+  // Upper per-thread Data Bus
+  //
+  edge(<orch.south>, (1, 4.5), "-", label: [per-thread data], label-side: center),
+  edge((0.25, 4.5), (1.75, 4.5), "-"),
+
+
+  node(
+    (0.5, 3.8),
+    fill: colors.orange,
+    inset: 0pt,
+    width: 55pt,
+    height: 32pt,
+    name: <tex_lut>,
+    [
+      #align(center)[
+        #text(size: 12pt, weight: "bold")[Texture LUT]
+      ]
+    ]
+  ),
+  edge((0.5, 4.9), <tex_lut>, "-|>", stroke: cu_stroke),
+
+
+
+  //
+  // THREADS WITH ENCLOSED L1 CACHE NODES
+  //
+  ..range(4).map(i => {
+    let x = 0.25 + i * 0.5
+    let head-name = label("head-" + str(i))
+    let l1-name = label("l1-" + str(i))
+    let thread-name = label("thread-" + str(i))
+
+    (
+      // 1. Internal Thread Title Node
+      node(
+        (x, 5.7),
+        [#v(60pt)#text(weight: 700, size: 10pt)[Thread #i]],
+        name: head-name,
+        stroke: 0pt,
+        inset: -20pt,
+        fill: none,
+      ),
+
+      // 2. Internal L1 Cache Node (Now an explicit node)
+      node(
+        (x, 7),
+        [#text(weight: "bold", size: 8.5pt)[L1\ Cache]],
+        fill: colors.yellow,
+        width: 40pt,
+        height: 35pt,
+        name: l1-name,
+      ),
+
+      // 3. Green Outer Container Enclosing Title + L1 Cache
+      node(
+        enclose: (head-name, l1-name),
+        fill: colors.green,
+        inset: 8pt,
+        name: thread-name,
+      ),
+
+      // Top bus dropping into the Thread Container
+      edge((x, 4.5), label("thread-" + str(i) + ".north"), "->"),
+
+      // Direct connection from BOTTOM of L1 Cache out to the L2 Bus
+      edge(l1-name , (x, 6.5), "<|-", stroke: 0.75pt, mark-scale: 120%),
+
+    )
+  }).flatten(),
+
+  //
+  // L2 Cache
+  //
+  node(
+    (-1, 6.5),
+    fill: colors.yellow,
+    height: 80pt,
+    width: 60pt,
+    name: <l2>,
+    [
+      #align(center)[
+        #text(size: 12pt, weight: "bold")[L2\ Cache]
+      ]
+    ]
+  ),
+
+  // Shared L2 Bus Line connecting L2 Cache directly to each L1 Cache
+  edge(<l2.east>, (1.75, 6.5), "-", stroke: 0.75pt),
+  edge((1.61, 6.5), (1.75, 6.5), "-", stroke: 0.75pt),
+
+  // DDR to L2
+  node((-2.5, 6.5), [#text("PL DDR", weight: "bold", 14pt)], name: <DDR_L2>, stroke: 0pt ),
+  edge(<DDR_L2>, <l2>, "->", label:  "/512b", label-side: center ),
+
+
+  //
+  // Tile Frame-buffer
+  //
+  node(
+    (0.5, 9),
+    fill: colors.purple,
+    height: 120pt,
+    width: 120pt,
+    name: <tile_buffer>,
+    [
+      #align(center)[
+        #text(size: 12pt, weight: "bold")[Tile Frame Buffer]
+      ]
+    ]
+  ),
+
+  //
+  // Tile Z-buffer
+  //
+  node(
+    (1.5, 9),
+    fill: colors.purple,
+    height: 120pt,
+    width: 120pt,
+    name: <z_buffer>,
+    [
+      #align(center)[
+        #text(size: 12pt, weight: "bold")[Tile Z-Buffer]
+      ]
+    ]
+  ),
+
+
+  // ORDER MATTERS - don't fix it if ain't broken
+  edge(<tile_buffer.north>, (0.5, 8.1), "<-"),
+  edge( (0.5, 8.1),(0.2, 8.1), "-"),
+  edge((0.2, 8.121), (rel: (-0.05, 0), to:<thread-0.south>), "*->"),
+  edge((0.489, 8.1), (0.7, 8.1),  (rel: (-0.05, 0), to:<thread-1.south>), "*->"),
+  edge( (0.689, 8.1), (1.2, 8.1), (rel: (-0.05, 0), to:<thread-2.south>), "*->"),
+  edge( (1.7, 8.12), (rel: (-0.05, 0), to:<thread-3.south>), "*->", ),
+
+
+  edge( (0.3, 7.9), (1.8, 7.9), "-", crossing: true),
+  edge((1.5, 7.865), <z_buffer.north>, "*->"),edge((1.5, 7.865), (1.5, 8.2), "*-"),
+  edge((0.3, 7.935), (rel: (0.05, 0), to:<thread-0.south>), "*->"),
+  edge((0.8, 7.935), (rel: (0.05, 0), to:<thread-1.south>), "*->"),
+  edge((1.3, 7.935), (rel: (0.05, 0), to:<thread-2.south>), "*->"),
+  edge((1.8, 7.935), (rel: (0.05, 0), to:<thread-3.south>), "*->"),
+
+  edge( (1.4, 8.1), (1.6, 8.1), "-", crossing: true),
+  edge( (1.189, 8.1), (1.7, 8.1), "*-"),
+
+
+  //
+  // Tile DMA
+  //
+  node(
+    (-1, 9),
+    fill: colors.forest,
+    height: 80pt,
+    width: 60pt,
+    name: <tile_dma>,
+    [
+      #align(center)[
+        #text(size: 12pt, weight: "bold")[2D\ DMA]
+      ]
+    ]
+  ),
+  
+  // DDR to 2D DMA
+  node((-2.5, 9), [#text("PS DDR", weight: "bold", 14pt)], name: <DDR_2D_DMA>, stroke: 0pt),
+  edge(<DDR_2D_DMA>, <tile_dma>, "<-", label:  "/128b", label-side: center ),
+  // 2D DMA to Frame Buffer
+  edge(<tile_dma>, <tile_buffer>, "<-|||->", text("300MHz  500MHz") ),
+
+  
+) 

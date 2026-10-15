@@ -2,12 +2,11 @@
 
 module fp_min_max_3 (
     input  logic        clk,
+    input  logic        clken,
     input  logic        rst_n,
-    input  logic        valid_in,
     input  logic [31:0] f_a,
     input  logic [31:0] f_b,
     input  logic [31:0] f_c,
-    output logic        valid_out,
     output logic [31:0] f_min,
     output logic [31:0] f_max
 );
@@ -38,19 +37,16 @@ module fp_min_max_3 (
   //-----------------------------------------------------------------
   // Pipeline Stage 1 Registers
   //-----------------------------------------------------------------
-  logic        valid_s1;
   logic [31:0] s1_min_ab;
   logic [31:0] s1_max_ab;
   logic [31:0] s1_f_c;
 
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      valid_s1  <= 1'b0;
       s1_min_ab <= 32'd0;
       s1_max_ab <= 32'd0;
       s1_f_c    <= 32'd0;
-    end else begin
-      valid_s1 <= valid_in;
+    end else if (clken) begin
 
       // Compare A and B
       if (fp_lt(f_a, f_b)) begin
@@ -71,11 +67,9 @@ module fp_min_max_3 (
   //-----------------------------------------------------------------
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      valid_out <= 1'b0;
       f_min     <= 32'd0;
       f_max     <= 32'd0;
-    end else begin
-      valid_out <= valid_s1;
+    end else if (clken) begin
 
       // Final Min Calculation: Min( Min(A,B), C )
       if (fp_lt(s1_min_ab, s1_f_c)) begin

@@ -6,19 +6,11 @@
 // =========================================================================
 module fp_add_half_fast (
     input  logic        clk,
+    input  logic        clken,
     input  logic        rst_n,
-    input  logic        valid_in,
     input  logic [31:0] f_in,
-    output logic        valid_out,
     output logic [31:0] f_out
 );
-
-  logic v_pipe;
-
-  always_ff @(posedge clk) begin
-    if (!rst_n) v_pipe <= 1'b0;
-    else v_pipe <= valid_in;
-  end
 
   // =========================================================================
   // STAGE 1: Exponent Evaluation and Classification
@@ -28,9 +20,11 @@ module fp_add_half_fast (
   logic        s1_is_zero;
 
   always_ff @(posedge clk) begin
-    s1_exp     <= f_in[30:23];
-    s1_mant    <= f_in[22:0];
-    s1_is_zero <= (f_in[30:23] < 8'd127);
+    if (clken) begin
+      s1_exp     <= f_in[30:23];
+      s1_mant    <= f_in[22:0];
+      s1_is_zero <= (f_in[30:23] < 8'd127);
+    end
   end
 
   // =========================================================================
@@ -55,10 +49,8 @@ module fp_add_half_fast (
 
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      valid_out <= 1'b0;
       f_out     <= '0;
-    end else begin
-      valid_out <= v_pipe;
+    end else if (clken) begin
       f_out     <= final_output;
     end
   end

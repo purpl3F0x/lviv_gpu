@@ -5,11 +5,10 @@
 // =========================================================================
 module fp_min_2 (
     input  logic        clk,
+    input  logic        clken,
     input  logic        rst_n,
-    input  logic        valid_in,
     input  logic [31:0] f_a,
     input  logic [31:0] f_b,
-    output logic        valid_out,
     output logic [31:0] f_min
 );
 
@@ -28,10 +27,8 @@ module fp_min_2 (
   // Register output (1-cycle latency)
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      valid_out <= 1'b0;
       f_min     <= '0;
-    end else begin
-      valid_out <= valid_in;
+    end else if (clken) begin
       f_min     <= a_lt_b ? f_a : f_b;
     end
   end
@@ -44,11 +41,10 @@ endmodule
 // =========================================================================
 module fp_max_2 (
     input  logic        clk,
+    input  logic        clken,
     input  logic        rst_n,
-    input  logic        valid_in,
     input  logic [31:0] f_a,
     input  logic [31:0] f_b,
-    output logic        valid_out,
     output logic [31:0] f_max
 );
 
@@ -67,10 +63,8 @@ module fp_max_2 (
   // Register output (1-cycle latency)
   always_ff @(posedge clk) begin
     if (!rst_n) begin
-      valid_out <= 1'b0;
       f_max     <= '0;
-    end else begin
-      valid_out <= valid_in;
+    end else if (clken) begin
       f_max     <= a_lt_b ? f_b : f_a;
     end
   end

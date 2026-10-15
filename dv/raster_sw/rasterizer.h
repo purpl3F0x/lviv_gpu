@@ -1,8 +1,14 @@
 #pragma once
 
 #include "pipeline_types.h"
+#include <ap_fixed.h>
 #include <array>
+#include <cstdint>
+#include <string>
 #include <vector>
+
+typedef ap_fixed<28+20, 28, AP_RND_CONV> edge_type;
+typedef ap_fixed<14+10, 14, AP_RND_CONV> dx_type;
 
 // -----------------------------------------------------------------------------
 // Framebuffer
@@ -33,6 +39,19 @@ struct Bin
     float lrz_val;
 };
 
+struct FrontendVector
+{
+    std::array<float, 16> inputs;
+    struct ExpectedOutputs
+    {
+        float inv_area;
+        edge_type w0, w1, w2;
+        dx_type dx0, dx1, dx2, dy0, dy1, dy2;
+        uint32_t bb_width, bb_height, min_x_local, min_y_local;
+        edge_type v0_u, v0_v, v1_u, v1_v, v2_u, v2_v; // This needs fix
+    } expected_outputs;
+};
+
 // -----------------------------------------------------------------------------
 // Rasterizer Context
 // -----------------------------------------------------------------------------
@@ -51,6 +70,7 @@ class Rasterizer
     int num_bins_y;
     std::vector<std::vector<Bin>> bins;
     std::vector<std::array<Vertex_ScreenSpace, 3>> triangle_list;
+    std::vector<FrontendVector> frontend_vectors;
 
     Rasterizer(Framebuffer *framebuffer) : fb(framebuffer)
     {
@@ -79,12 +99,19 @@ class Rasterizer
         triangle_list.push_back({s0, s1, s2});
     }
 
+    void dumpFrontendInputCsv(const std::string &path) const;
+    void dumpFrontendExpectedCsv(const std::string &path) const;
+
     // Execute the binned pipeline
     void flush(bool dump_bins);
 
   private:
     void binningPass();
     void rasterizeBins(bool dump_bins);
+    void recordFrontendVector(const Vertex_ScreenSpace &v0, const Vertex_ScreenSpace &v1, const Vertex_ScreenSpace &v2,
+                              int binMinX, int binMinY, int binMaxX, int binMaxY, int bbMinX, int bbMinY, int bbMaxX,
+                              int bbMaxY, float invArea, edge_type w0, edge_type w1, edge_type w2, dx_type dx0,
+                              dx_type dx1, dx_type dx2, dx_type dy0, dx_type dy1, dx_type dy2);
 
     void rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_ScreenSpace &v1, const Vertex_ScreenSpace &v2,
                            int minX, int minY, int maxX, int maxY, uint32_t *tileColor, float *tileDepth);

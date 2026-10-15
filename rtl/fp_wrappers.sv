@@ -68,104 +68,46 @@ module fx16_32_to_fp32 #(
 `endif
 endmodule
 
-module fp_add #(
-    parameter int LATENCY = 11  // Default latency for Xilinx FP Add
+module fx28_20_to_fp32 #(
+  parameter int LATENCY = 7
 ) (
-    input  logic        aclk,
-    input  logic        aclken,
-    input  logic        valid_in,
-    input  logic [31:0] a,
-    input  logic [31:0] b,
-    output logic [31:0] result
+    input logic aclk,
+    input logic aclken,
+    input logic s_axis_a_tvalid,
+    input logic signed [47:0] s_axis_a_tdata,
+    output logic m_axis_result_tvalid,
+    output logic [31:0] m_axis_result_tdata
 );
-
 `ifdef SIM_MODE
-  shortreal a_real, b_real, res_real;
+  shortreal converted;
   logic [31:0] res_bits;
   logic [31:0] pipeline [LATENCY];
+  logic valid_pipe [LATENCY];
 
-  assign a_real   = `BITSTOSHORTREAL(a);
-  assign b_real   = `BITSTOSHORTREAL(b);
-  assign res_real = a_real + b_real;
-  assign res_bits = `SHORTREALTOBITS(res_real);
+  assign converted = real'($signed(s_axis_a_tdata)) / 1048576.0;
+  assign res_bits = `SHORTREALTOBITS(converted);
 
   always_ff @(posedge aclk) begin
     if (aclken) begin
       pipeline[0] <= res_bits;
+      valid_pipe[0] <= s_axis_a_tvalid;
       for (int i = 1; i < LATENCY; i++) begin
         pipeline[i] <= pipeline[i-1];
+        valid_pipe[i] <= valid_pipe[i-1];
       end
     end
   end
 
-  assign result = pipeline[LATENCY-1];
-
+  assign m_axis_result_tdata = pipeline[LATENCY-1];
+  assign m_axis_result_tvalid = valid_pipe[LATENCY-1];
 `else
-  // Xilinx IP instantiation for Synthesis
-  // Ensure IP is configured as AXI4-Stream, non-blocking, with aclken.
-  xil_fp_add xil_fp_add_inst (
-      .aclk                (aclk),
-      .aclken              (aclken),
-      .s_axis_a_tvalid     (valid_in),
-      .s_axis_a_tdata      (a),
-      .s_axis_b_tvalid     (valid_in),
-      .s_axis_b_tdata      (b),
-      .m_axis_result_tvalid(),          // Non-blocking, so valid output is ignored
-      .m_axis_result_tdata (result)
+  xil_fx28_20_to_fp32 u_convert (
+      .aclk(aclk), .aclken(aclken),
+      .s_axis_a_tvalid(s_axis_a_tvalid), .s_axis_a_tdata(s_axis_a_tdata),
+      .m_axis_result_tvalid(m_axis_result_tvalid),
+      .m_axis_result_tdata(m_axis_result_tdata)
   );
 `endif
-
-endmodule
-
-// ============================================================================
-// Floating-Point Subtractor
-// ============================================================================
-module fp_sub #(
-    parameter int LATENCY = 11  // Default latency for Xilinx FP Sub
-) (
-    input  logic        aclk,
-    input  logic        aclken,
-    input  logic        valid_in,
-    input  logic [31:0] a,
-    input  logic [31:0] b,
-    output logic [31:0] result
-);
-
-`ifdef SIM_MODE
-  shortreal a_real, b_real, res_real;
-  logic [31:0] res_bits;
-  logic [31:0] pipeline [LATENCY];
-
-  assign a_real   = `BITSTOSHORTREAL(a);
-  assign b_real   = `BITSTOSHORTREAL(b);
-  assign res_real = a_real - b_real;
-  assign res_bits = `SHORTREALTOBITS(res_real);
-
-  always_ff @(posedge aclk) begin
-    if (aclken) begin
-      pipeline[0] <= res_bits;
-      for (int i = 1; i < LATENCY; i++) begin
-        pipeline[i] <= pipeline[i-1];
-      end
-    end
-  end
-
-  assign result = pipeline[LATENCY-1];
-
-`else
-  // Xilinx IP instantiation for Synthesis
-  xil_fp_sub xil_fp_sub_inst (
-      .aclk                (aclk),
-      .aclken              (aclken),
-      .s_axis_a_tvalid     (valid_in),
-      .s_axis_a_tdata      (a),
-      .s_axis_b_tvalid     (valid_in),
-      .s_axis_b_tdata      (b),
-      .m_axis_result_tvalid(),
-      .m_axis_result_tdata (result)
-  );
-`endif
-
 endmodule
 
 // ============================================================================
@@ -322,115 +264,102 @@ module fp_recip #(
 
 endmodule
 
-// ============================================================================
-// Floating-Point Adder/Subtractor
-// ============================================================================
-module fp_add_sub #(
-    parameter int LATENCY = 11
+module fp_to_fx14_10 #(
+    parameter int LATENCY = 6
 ) (
-    input  logic        aclk,
-    input  logic        aclken,
-    input  logic        op_sub, // 0 for add, 1 for sub
-    input  logic        valid_in,
-    input  logic [31:0] a,
-    input  logic [31:0] b,
-    output logic        valid_out,
-    output logic [31:0] result
+    input logic aclk,
+    input logic aclken,
+    input logic s_axis_a_tvalid,
+    input logic [31:0] s_axis_a_tdata,
+    output logic m_axis_result_tvalid,
+    output logic signed [23:0] m_axis_result_tdata
 );
-
 `ifdef SIM_MODE
-  shortreal a_real, b_real, res_real;
-  logic [31:0] res_bits;
-  logic [31:0] pipeline [LATENCY];
-  logic        valid_pipe [LATENCY];
+  real scaled;
+  longint signed converted;
+  logic signed [23:0] res_bits;
+  logic signed [23:0] pipeline [LATENCY];
+  logic valid_pipe [LATENCY];
 
-  assign a_real   = `BITSTOSHORTREAL(a);
-  assign b_real   = `BITSTOSHORTREAL(b);
-  assign res_real = op_sub ? (a_real - b_real) : (a_real + b_real);
-  assign res_bits = `SHORTREALTOBITS(res_real);
+  function automatic longint signed round_nearest_even(input real value);
+    real magnitude;
+    real fraction;
+    longint signed integral;
+    begin
+      magnitude = value < 0.0 ? -value : value;
+      integral = longint'($floor(magnitude));
+      fraction = magnitude - real'(integral);
+      if ((fraction > 0.5) || ((fraction == 0.5) && integral[0]))
+        integral++;
+      return value < 0.0 ? -integral : integral;
+    end
+  endfunction
+
+  always_comb begin
+    scaled = real'(`BITSTOSHORTREAL(s_axis_a_tdata)) * 1024.0;
+    converted = round_nearest_even(scaled);
+    res_bits = converted[23:0];
+  end
 
   always_ff @(posedge aclk) begin
     if (aclken) begin
-      pipeline[0]   <= res_bits;
-      valid_pipe[0] <= valid_in;
+      pipeline[0] <= res_bits;
+      valid_pipe[0] <= s_axis_a_tvalid;
       for (int i = 1; i < LATENCY; i++) begin
-        pipeline[i]   <= pipeline[i-1];
+        pipeline[i] <= pipeline[i-1];
         valid_pipe[i] <= valid_pipe[i-1];
       end
     end
   end
 
-  assign result    = pipeline[LATENCY-1];
-  assign valid_out = valid_pipe[LATENCY-1];
-
+  assign m_axis_result_tdata = pipeline[LATENCY-1];
+  assign m_axis_result_tvalid = valid_pipe[LATENCY-1];
 `else
-  // Xilinx IP instantiation for Synthesis
-  xil_fp_add_sub xil_fp_add_sub_inst (
-      .aclk                (aclk),
-      .aclken              (aclken),
-      .s_axis_a_tvalid     (valid_in),
-      .s_axis_a_tdata      (a),
-      .s_axis_b_tvalid     (valid_in),
-      .s_axis_b_tdata      (b),
-      .s_axis_operation_tvalid(valid_in),
-      .s_axis_operation_tdata({7'b0, op_sub}),
-      .m_axis_result_tvalid(valid_out),
-      .m_axis_result_tdata (result)
+  logic [31:0] result_padded;
+  xil_fp_to_fx14_10 u_convert (
+      .aclk(aclk), .aclken(aclken),
+      .s_axis_a_tvalid(s_axis_a_tvalid), .s_axis_a_tdata(s_axis_a_tdata),
+      .m_axis_result_tvalid(m_axis_result_tvalid),
+      .m_axis_result_tdata(result_padded)
   );
+  assign m_axis_result_tdata = result_padded[23:0];
 `endif
-
 endmodule
 
-// ============================================================================
-// Floating-Point to 16-bit Signed Integer (2-cycle latency)
-// ============================================================================
-module fp32_to_int16 #(
-    parameter int LATENCY = 2
+module fp_to_fx5_13 #(
+    parameter int LATENCY = 6
 ) (
-    input  logic        aclk,
-    input  logic        aclken,
-    input  logic        valid_in,
-    input  logic [31:0] a,
-    output logic [15:0] result
+    input logic aclk,
+    input logic aclken,
+    input logic s_axis_a_tvalid,
+    input logic [31:0] s_axis_a_tdata,
+    output logic m_axis_result_tvalid,
+    output logic signed [17:0] m_axis_result_tdata
 );
-
 `ifdef SIM_MODE
-  shortreal a_real;
-  logic [15:0] res_bits;
-  logic [15:0] pipeline [LATENCY];
-
-  assign a_real   = `BITSTOSHORTREAL(a);
-  assign res_bits = 16'(int'(a_real));
-
-  always_ff @(posedge aclk) begin
-    if (aclken) begin
-      pipeline[0] <= res_bits;
-      for (int i = 1; i < LATENCY; i++) begin
-        pipeline[i] <= pipeline[i-1];
-      end
-    end
-  end
-
-  assign result = pipeline[LATENCY-1];
-
-`else
-  // Xilinx IP instantiation for Synthesis
-  xil_fp32_to_int16 xil_fp32_to_int16_inst (
-      .aclk                (aclk),
-      .aclken              (aclken),
-      .s_axis_a_tvalid     (valid_in),
-      .s_axis_a_tdata      (a),
-      .m_axis_result_tvalid(),
-      .m_axis_result_tdata (result)
+  real scaled;
+  longint signed converted;
+  logic [17:0] res_bits;
+  assign scaled = real'(`BITSTOSHORTREAL(s_axis_a_tdata)) * 8192.0;
+  assign converted = longint'(scaled < 0.0 ? $ceil(scaled) : $floor(scaled));
+  assign res_bits = converted[17:0];
+  delay_pipe #(.WIDTH(19), .STAGES(LATENCY)) u_pipeline (
+      .clk(aclk), .rst_n(1'b1), .clken(aclken),
+      .data_in({s_axis_a_tvalid, res_bits}),
+      .data_out({m_axis_result_tvalid, m_axis_result_tdata})
   );
+`else
+  logic [23:0] result_padded;
+  xil_fp_to_fx5_13 u_convert (
+      .aclk(aclk), .aclken(aclken),
+      .s_axis_a_tvalid(s_axis_a_tvalid), .s_axis_a_tdata(s_axis_a_tdata),
+      .m_axis_result_tvalid(m_axis_result_tvalid),
+      .m_axis_result_tdata(result_padded)
+  );
+  assign m_axis_result_tdata = result_padded[17:0];
 `endif
-
 endmodule
 
-// ============================================================================
-// Floating-Point to Fixed-Point Q2.23 (2-cycle latency)
-// Wrapper name is fp_to_fx2_23, synthesis backend is xil_fp_to_fx2_23
-// ============================================================================
 module fp_to_fx2_23 #(
     parameter int LATENCY = 2
 ) (
@@ -487,57 +416,3 @@ module fp_to_fx2_23 #(
 
 endmodule
 
-// ============================================================================
-// Floating-Point to Fixed-Point Q2.8 (2-cycle latency)
-// Wrapper name is fp_to_fx2_8, synthesis backend is xil_fp_to_fx2_8
-// ============================================================================
-module fp_to_fx2_8 #(
-    parameter int LATENCY = 2
-) (
-    input  logic        aclk,
-    input  logic        aclken,
-    input  logic        s_axis_a_tvalid,
-    input  logic [31:0] s_axis_a_tdata,
-    output logic        m_axis_result_tvalid,
-    output logic [15:0] m_axis_result_tdata
-);
-
-`ifdef SIM_MODE
-  shortreal a_real;
-  logic [15:0] res_bits;
-  logic [15:0] pipeline [LATENCY];
-  logic        valid_pipe [LATENCY];
-  integer scaled;
-
-  always_comb begin
-    a_real = `BITSTOSHORTREAL(s_axis_a_tdata);
-    scaled = $rtoi(a_real * 256.0);  // 2^8
-    res_bits = scaled[15:0];
-  end
-
-  always_ff @(posedge aclk) begin
-    if (aclken) begin
-      pipeline[0] <= res_bits;
-      valid_pipe[0] <= s_axis_a_tvalid;
-      for (int i = 1; i < LATENCY; i++) begin
-        pipeline[i] <= pipeline[i-1];
-        valid_pipe[i] <= valid_pipe[i-1];
-      end
-    end
-  end
-
-  assign m_axis_result_tdata = pipeline[LATENCY-1];
-  assign m_axis_result_tvalid = valid_pipe[LATENCY-1];
-
-`else
-  xil_fp_to_fx2_8 xil_fp_to_fx2_8_inst (
-      .aclk                (aclk),
-      .aclken              (aclken),
-      .s_axis_a_tvalid     (s_axis_a_tvalid),
-      .s_axis_a_tdata      (s_axis_a_tdata),
-      .m_axis_result_tvalid(m_axis_result_tvalid),
-      .m_axis_result_tdata (m_axis_result_tdata)
-  );
-`endif
-
-endmodule

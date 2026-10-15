@@ -1,0 +1,20 @@
+# Vivado xsim flow for the raster frontend, using the real Xilinx FP IP (see scripts/vivado/xsim.mk).
+# Usage: make -f Makefile.vivado [simple|csv|gui_simple|gui_csv|ip|clean|distclean]
+
+RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/int_modules.sv ../../rtl/delay_pipe.sv ../../rtl/axis_skid_buffer.sv ../../rtl/fp_wrappers.sv ../../rtl/raster_frontend.sv
+
+.DEFAULT_GOAL := simple
+include ../../scripts/vivado/xsim.mk
+
+.PHONY: simple csv gui_simple gui_csv
+
+simple gui_simple: TOP = tb_raster_frontend_smoke
+simple gui_simple: TB_SRCS = tb_raster_frontend_smoke.sv
+
+# xsim runs in the work dir, so point the tb at the CSVs in this folder.
+csv gui_csv: TOP = tb_raster_frontend_csv
+csv gui_csv: TB_SRCS = tb_raster_frontend_csv.sv
+csv gui_csv: SIM_ARGS = --testplusarg INPUTS=$(CURDIR)/frontend_inputs_float.csv --testplusarg EXPECTED=$(CURDIR)/frontend_expected.csv
+
+simple csv: run
+gui_simple gui_csv: gui

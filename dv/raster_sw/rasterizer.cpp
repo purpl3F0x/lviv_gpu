@@ -1,6 +1,11 @@
 #include "rasterizer.h"
 #include <algorithm>
+#include <cmath>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <limits>
+#include <stdexcept>
 
 #include <ap_fixed.h>
 #include <ap_int.h>
@@ -16,6 +21,65 @@ uint32_t packU8(const ColorU8 &c);
 // Helper forward declarations
 Vec4 unpackColor(uint32_t c);
 uint32_t packColor(const Vec4 &c);
+
+namespace
+{
+} // namespace
+
+void Rasterizer::dumpFrontendInputCsv(const std::string &path) const
+{
+    static constexpr std::array<const char *, 16> columns = {
+        "v0_x",      "v0_y",      "v1_x", "v1_y", "v2_x", "v2_y", "bin_min_x", "bin_min_y",
+        "bin_max_x", "bin_max_y", "v0_u", "v0_v", "v1_u", "v1_v", "v2_u",      "v2_v",
+    };
+    std::ofstream csv(path);
+    if (!csv)
+        throw std::runtime_error("Could not open frontend input CSV: " + path);
+
+    csv << "transaction_id";
+    for (const char *column : columns)
+        csv << ',' << column;
+    csv << '\n';
+
+    csv << std::setprecision(std::numeric_limits<float>::max_digits10);
+    for (size_t index = 0; index < frontend_vectors.size(); ++index)
+    {
+        csv << index;
+        for (float value : frontend_vectors[index].inputs)
+            csv << ',' << value;
+        csv << '\n';
+    }
+}
+
+void Rasterizer::dumpFrontendExpectedCsv(const std::string &path) const
+{
+    static constexpr std::array<const char *, 20> columns = {
+        "invArea",    "w0",         "w1",         "w2",         "dx0_fx",     "dx1_fx",     "dx2_fx",
+        "dy0_fx",     "dy1_fx",     "dy2_fx",     "bb_width",   "bb_height",  "minX_local", "minY_local",
+        "v0_u_fixed", "v0_v_fixed", "v1_u_fixed", "v1_v_fixed", "v2_u_fixed", "v2_v_fixed",
+    };
+    std::ofstream csv(path);
+    if (!csv)
+        throw std::runtime_error("Could not open frontend expected-output CSV: " + path);
+
+    csv << "transaction_id";
+    for (const char *column : columns)
+        csv << ',' << column;
+    csv << '\n';
+
+    csv << std::setprecision(std::numeric_limits<float>::max_digits10);
+    for (size_t index = 0; index < frontend_vectors.size(); ++index)
+    {
+        csv << index;
+        const auto &outputs = frontend_vectors[index].expected_outputs;
+        csv << ',' << outputs.inv_area << ',' << outputs.w0 << ',' << outputs.w1 << ',' << outputs.w2 << ','
+            << outputs.dx0 << ',' << outputs.dx1 << ',' << outputs.dx2 << ',' << outputs.dy0 << ',' << outputs.dy1
+            << ',' << outputs.dy2 << ',' << outputs.bb_width << ',' << outputs.bb_height << ',' << outputs.min_x_local
+            << ',' << outputs.min_y_local << ',' << outputs.v0_u << ',' << outputs.v0_v << ',' << outputs.v1_u << ','
+            << outputs.v1_v << ',' << outputs.v2_u << ',' << outputs.v2_v;
+        csv << '\n';
+    }
+}
 
 // -----------------------------------------------------------------------------
 // STEP 4: Tile Binning
@@ -90,6 +154,11 @@ void Rasterizer::binningPass()
             for (int bx = startBinX; bx <= endBinX; ++bx)
             {
                 Bin &bin = bins[by][bx];
+
+                const int binMinX = bx * BIN_SIZE;
+                const int binMinY = by * BIN_SIZE;
+                const int binMaxX = std::min(fb->width - 1, binMinX + BIN_SIZE - 1);
+                const int binMaxY = std::min(fb->height - 1, binMinY + BIN_SIZE - 1);
 
                 // 1. LRZ Early Rejection
                 if (minZ > bin.lrz_val)
@@ -219,6 +288,67 @@ void Rasterizer::rasterizeBins(bool dump_bins)
 // -----------------------------------------------------------------------------
 // STEP 4: Rasterization (Edge Equations & Perspective-Correct Barycentric)
 // -----------------------------------------------------------------------------
+void Rasterizer::recordFrontendVector(const Vertex_ScreenSpace &v0, const Vertex_ScreenSpace &v1,
+                                      const Vertex_ScreenSpace &v2, int binMinX, int binMinY, int binMaxX, int binMaxY,
+                                      int bbMinX, int bbMinY, int bbMaxX, int bbMaxY, float invArea, edge_type w0,
+                                      edge_type w1, edge_type w2, dx_type dx0, dx_type dx1, dx_type dx2, dx_type dy0,
+                                      dx_type dy1, dx_type dy2)
+{
+    constexpr int addressBits = std::bit_width(static_cast<unsigned>(BIN_SIZE / 2 - 1));
+    constexpr uint32_t addressMask = (uint32_t{1} << addressBits) - 1;
+    const uint32_t minX = static_cast<uint32_t>(bbMinX) & 0xfff;
+    const uint32_t minY = static_cast<uint32_t>(bbMinY) & 0xfff;
+    const uint32_t maxX = static_cast<uint32_t>(bbMaxX) & 0xfff;
+    const uint32_t maxY = static_cast<uint32_t>(bbMaxY) & 0xfff;
+    const uint32_t minXLocal = (minX >> 1) & addressMask;
+    const uint32_t minYLocal = (minY >> 1) & addressMask;
+    const uint32_t maxXLocal = (maxX >> 1) & addressMask;
+    const uint32_t maxYLocal = (maxY >> 1) & addressMask;
+
+    FrontendVector vector{};
+    vector.inputs = {
+        v0.position.x,
+        v0.position.y,
+        v1.position.x,
+        v1.position.y,
+        v2.position.x,
+        v2.position.y,
+        static_cast<float>(binMinX),
+        static_cast<float>(binMinY),
+        static_cast<float>(binMaxX),
+        static_cast<float>(binMaxY),
+        v0.texcoord_over_w.x,
+        v0.texcoord_over_w.y,
+        v1.texcoord_over_w.x,
+        v1.texcoord_over_w.y,
+        v2.texcoord_over_w.x,
+        v2.texcoord_over_w.y,
+    };
+    vector.expected_outputs = {
+        invArea,
+        w0,
+        w1,
+        w2,
+        dx0,
+        dx1,
+        dx2,
+        dy0,
+        dy1,
+        dy2,
+        (maxXLocal - minXLocal) & addressMask,
+        (maxYLocal - minYLocal) & addressMask,
+        minXLocal,
+        minYLocal,
+        v0.texcoord_over_w.x,
+        v0.texcoord_over_w.y,
+        v1.texcoord_over_w.x,
+        v1.texcoord_over_w.y,
+        v2.texcoord_over_w.x,
+        v2.texcoord_over_w.y,
+    };
+    frontend_vectors.push_back(vector);
+}
+
 #ifndef RASTERIZER_EXTERNAL_RASTERIZE_TRIANGLE
 void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_ScreenSpace &v1,
                                    const Vertex_ScreenSpace &v2, int binMinX, int binMinY, int binMaxX, int binMaxY,
@@ -231,9 +361,10 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_Sc
     // typedef ap_fixed<38, 14> bb_type;
 
     // --- STEP 1: Edge Equations Setup ---
-    const tvec2<interp_type> p0(v0.position.x, v0.position.y);
-    const tvec2<interp_type> p1(v1.position.x, v1.position.y);
-    const tvec2<interp_type> p2(v2.position.x, v2.position.y);
+    // This is incorrect cause we need to snap to grid, to do this properly
+    const tvec2<edge_type> p0((dx_type)v0.position.x, (dx_type)v0.position.y);
+    const tvec2<edge_type> p1((dx_type)v1.position.x, (dx_type)v1.position.y);
+    const tvec2<edge_type> p2((dx_type)v2.position.x, (dx_type)v2.position.y);
 
     // Extract colors and pre-divide by w (using position.w which holds 1/w) for perspective-correct interpolation
     const ColorU8 uc0 = unpackU8(v0.color);
@@ -244,23 +375,16 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_Sc
     const tvec4<ap_fixed<17, 9, AP_RND>> c2(uc2.r, uc2.g, uc2.b, uc2.a);
 
     // Triangle Area (for Barycentric normalization)
-    interp_type area = edgeFunction(p0, p1, p2);
+    edge_type area = edgeFunction(p0, p1, p2);
     // if (area == 0) return;
     // Calculate invArea precisely using the chosen interpolation type (done once per triangle)
-    interp_type invArea = interp_type(1.0f) / (interp_type)area;
-
-    typedef float bb_type;
-    typedef int p_min_type;
+    float invArea = interp_type(1.0f) / (float)area;
 
     // Calculate the triangle's bounding box in screen space
-    p_min_type triMinX = std::min(
-        {math_floor((bb_type)v0.position.x), math_floor((bb_type)v1.position.x), math_floor((bb_type)v2.position.x)});
-    p_min_type triMinY = std::min(
-        {math_floor((bb_type)v0.position.y), math_floor((bb_type)v1.position.y), math_floor((bb_type)v2.position.y)});
-    p_min_type triMaxX = std::max(
-        {math_ceil((bb_type)v0.position.x), math_ceil((bb_type)v1.position.x), math_ceil((bb_type)v2.position.x)});
-    p_min_type triMaxY = std::max(
-        {math_ceil((bb_type)v0.position.y), math_ceil((bb_type)v1.position.y), math_ceil((bb_type)v2.position.y)});
+    int triMinX = std::min({p0.x, p1.x, p2.x});
+    int triMinY = std::min({p0.y, p1.y, p2.y});
+    int triMaxX = std::max({p0.x, p1.x, p2.x});
+    int triMaxY = std::max({p0.y, p1.y, p2.y});
 
     // Align to 2x2 blocks: min is even (0, 2, 4...), max is odd (1, 3, 5...)
     triMinX = triMinX & ~1;
@@ -269,70 +393,61 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_Sc
     triMaxY = triMaxY | 1;
 
     // Intersect the triangle's bounding box with the tile's bounding box
-    int minX = std::max(binMinX, triMinX);
-    int minY = std::max(binMinY, triMinY);
-    int maxX = std::min(binMaxX, triMaxX);
-    int maxY = std::min(binMaxY, triMaxY);
+    ap_uint<14> minX = std::max(binMinX, triMinX);
+    ap_uint<14> minY = std::max(binMinY, triMinY);
+    ap_uint<14> maxX = std::min(binMaxX, triMaxX);
+    ap_uint<14> maxY = std::min(binMaxY, triMaxY);
 
-    // No Bounding Box Logic
-    minX = binMinX;
-    minY = binMinY;
-    maxX = binMaxX;
-    maxY = binMaxY;
-
-    // auto x_size = maxX - minX;
-    // auto y_size = maxY - minY;
-    // auto x_start = minY % BIN_SIZE;
-    // auto y_start = minX % BIN_SIZE;
+    // // No Bounding Box Logic
+    // minX = binMinX;
+    // minY = binMinY;
+    // maxX = binMaxX;
+    // maxY = binMaxY;
 
     // Calculate initial edge functions at the center of the top-left pixel of the intersected bounding box
-    tvec2<interp_type> p_min(p_min_type(minX) + p_min_type(0.5f), p_min_type(minY) + p_min_type(0.5f));
-    // tvec2<interp_type> p_min_left(p_min_type(minX) + p_min_type(1.5f), p_min_type(minY) + p_min_type(0.5f));
-    // tvec2<interp_type> p_min_bottom(p_min_type(minX) + p_min_type(0.5f), p_min_type(minY) + p_min_type(1.5f));
-    // tvec2<interp_type> p_min_bottom_left(p_min_type(minX) + p_min_type(1.5f), p_min_type(minY) + p_min_type(1.5f));
+    tvec2<edge_type> p_min(dx_type(minX) + dx_type(0.5f), dx_type(minY) + dx_type(0.5f));
 
     // Track EXACT edge functions (unnormalized) to avoid precision loss across scanlines
-    interp_type e0_row = edgeFunction(p1, p2, p_min);
-    interp_type e1_row = edgeFunction(p2, p0, p_min);
-    interp_type e2_row = edgeFunction(p0, p1, p_min);
+    edge_type e0_row = edgeFunction(p1, p2, p_min);
+    edge_type e1_row = edgeFunction(p2, p0, p_min);
+    edge_type e2_row = edgeFunction(p0, p1, p_min);
 
     // Step increments for each step in X
-    interp_type e0_dx = (p2.y - p1.y);
-    interp_type e1_dx = (p0.y - p2.y);
-    interp_type e2_dx = (p1.y - p0.y);
+    dx_type e0_dx = (p2.y - p1.y);
+    dx_type e1_dx = (p0.y - p2.y);
+    dx_type e2_dx = (p1.y - p0.y);
 
     // Step increments for each step in Y
-    interp_type e0_dy = (p1.x - p2.x);
-    interp_type e1_dy = (p2.x - p0.x);
-    interp_type e2_dy = (p0.x - p1.x);
+    dx_type e0_dy = (p1.x - p2.x);
+    dx_type e1_dy = (p2.x - p0.x);
+    dx_type e2_dy = (p0.x - p1.x);
 
-    interp_type e0_00 = e0_row;
-    interp_type e1_00 = e1_row;
-    interp_type e2_00 = e2_row;
+    recordFrontendVector(v0, v1, v2, binMinX, binMinY, binMaxX, binMaxY, minX, minY, maxX, maxY, invArea, e0_row,
+                         e1_row, e2_row, e0_dx, e1_dx, e2_dx, e0_dy, e1_dy, e2_dy);
 
-    interp_type e0_10 = e0_row + e0_dx;
-    interp_type e1_10 = e1_row + e1_dx;
-    interp_type e2_10 = e2_row + e2_dx;
+    edge_type e0_00 = e0_row;
+    edge_type e1_00 = e1_row;
+    edge_type e2_00 = e2_row;
 
-    interp_type e0_01 = e0_row + e0_dy;
-    interp_type e1_01 = e1_row + e1_dy;
-    interp_type e2_01 = e2_row + e2_dy;
+    // edge_type e0_10 = e0_row + (edge_type)e0_dx;
+    // edge_type e1_10 = e1_row + (edge_type)e1_dx;
+    // edge_type e2_10 = e2_row + (edge_type)e2_dx;
 
-    interp_type e0_11 = e0_row + e0_dx + e0_dy;
-    interp_type e1_11 = e1_row + e1_dx + e1_dy;
-    interp_type e2_11 = e2_row + e2_dx + e2_dy;
+    // edge_type e0_01 = e0_row + (edge_type)e0_dy;
+    // edge_type e1_01 = e1_row + (edge_type)e1_dy;
+    // edge_type e2_01 = e2_row + (edge_type)e2_dy;
 
-    // std::cout << e0_row << " " << e1_row << " " << e2_row << " " << e0_dx << " " << e1_dx << " " << e2_dx << " "
-    //           << e0_dy << " " << e1_dy << " " << e2_dy << " " << minX % BIN_SIZE << " " << minY % BIN_SIZE <<
-    //           "\n";
+    // edge_type e0_11 = e0_row + (edge_type)e0_dx + (edge_type)e0_dy;
+    // edge_type e1_11 = e1_row + (edge_type)e1_dx + (edge_type)e1_dy;
+    // edge_type e2_11 = e2_row + (edge_type)e2_dx + (edge_type)e2_dy;
 
     // --- HW STEP 2: Scanline Traversal / Rasterization ---
     // Rasterize within the intersected bounding box
     for (int y = minY; y <= maxY; ++y)
     {
-        interp_type e0 = e0_row;
-        interp_type e1 = e1_row;
-        interp_type e2 = e2_row;
+        edge_type e0 = e0_row;
+        edge_type e1 = e1_row;
+        edge_type e2 = e2_row;
 
         for (int x = minX; x <= maxX; ++x)
         {
@@ -375,7 +490,6 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_Sc
                     // auto color_interp = c0 * iw0 + c1 * iw1 + c2 * iw2;
 
                     interp_type w = interp_type(1.0f) / invW;
-
 
                     float t0_fp = iw0 * v0.position.w * w;
                     float t1_fp = iw1 * v1.position.w * w;
@@ -420,13 +534,13 @@ void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace &v0, const Vertex_Sc
                     tileColor[tileIdx] = blendFragment(finalColor, tileColor[tileIdx]);
                 }
             }
-            e0 += e0_dx;
-            e1 += e1_dx;
-            e2 += e2_dx;
+            e0 += (edge_type)e0_dx;
+            e1 += (edge_type)e1_dx;
+            e2 += (edge_type)e2_dx;
         }
-        e0_row += e0_dy;
-        e1_row += e1_dy;
-        e2_row += e2_dy;
+        e0_row += (edge_type)e0_dy;
+        e1_row += (edge_type)e1_dy;
+        e2_row += (edge_type)e2_dy;
     }
 }
 #endif
@@ -444,8 +558,8 @@ uint32_t Rasterizer::blendFragment(uint32_t source, uint32_t destination) const
     uint32_t result = 0;
     for (unsigned shift = 0; shift < 32; shift += 8)
     {
-        const uint32_t sum = ((source >> shift) & 255) * sourceFactor +
-                             ((destination >> shift) & 255) * destinationFactor + 128;
+        const uint32_t sum =
+            ((source >> shift) & 255) * sourceFactor + ((destination >> shift) & 255) * destinationFactor + 128;
         result |= std::min(255u, sum >> 8) << shift;
     }
     return result;

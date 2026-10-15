@@ -6,4 +6,17 @@ tb_sim*
 **/__pycache__/
 **/*.pyc 
 *.dot
+**/*.exe
 /tools/
+
+**/obj_dir/
+
+# Vivado stuff
+*xsim*
+!scripts/vivado/xsim.mk
+*.log
+*.pb
+*.jou
+*.wdb
+/build/
+tb/**/logs/

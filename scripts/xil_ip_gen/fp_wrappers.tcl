@@ -65,24 +65,8 @@
 
 # Non-blocking IPs (Max Latency)
 
-create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name xil_fp_add
-set_property -dict [list \
-  CONFIG.Add_Sub_Value {Add} \
-  CONFIG.C_Latency {11} \
-  CONFIG.Flow_Control {NonBlocking} \
-  CONFIG.Has_ACLKEN {true} \
-  CONFIG.Has_RESULT_TREADY {false}] [get_ips xil_fp_add]
-
-create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name xil_fp_sub
-set_property -dict [list \
-  CONFIG.Add_Sub_Value {Subtract} \
-  CONFIG.C_Latency {11} \
-  CONFIG.Flow_Control {NonBlocking} \
-  CONFIG.Has_ACLKEN {true} \
-  CONFIG.Has_RESULT_TREADY {false}] [get_ips xil_fp_sub]
-
 create_ip -name floating_point -vendor xilinx.com -library ip -version 7.1 -module_name xil_fp_mul
-set_property -dict [list \
+set_property -dict [list \fp
   CONFIG.A_Precision_Type {Single} \
   CONFIG.C_A_Exponent_Width {8} \
   CONFIG.C_A_Fraction_Width {24} \

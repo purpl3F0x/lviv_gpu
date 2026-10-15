@@ -14,7 +14,7 @@ SV_SRCS := $(ROOT_DIR)/rtl/gpu_types_pkg.sv \
 .PHONY: compile run clean
 
 compile:
->$(VERILATOR) --binary --timing --top-module tb_thread_orchestrator -GTHREAD_HALF_PERIOD=$(THREAD_HALF_PERIOD) --Mdir $(OBJ_DIR) -Wno-SHORTREAL -Wno-WIDTH $(SV_SRCS) $(ROOT_DIR)/dv/raster_core/dpi_functions.cpp
+>$(VERILATOR) --binary --timing --top-module tb_thread_orchestrator -GTHREAD_HALF_PERIOD=$(THREAD_HALF_PERIOD) --Mdir $(OBJ_DIR) -Wno-SHORTREAL -Wno-WIDTH $(SV_SRCS) $(ROOT_DIR)/dv/common/dpi_functions.cpp
 
 run: compile
 >$(OBJ_DIR)/Vtb_thread_orchestrator

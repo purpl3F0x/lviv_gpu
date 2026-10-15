@@ -25,6 +25,27 @@ package gpu_types_pkg;
   parameter int TILE_ADDR_X = $clog2(TILE_SIZE_X / X_THREADS);
   parameter int TILE_ADDR_Y = $clog2(TILE_SIZE_Y / Y_THREADS);
 
+  typedef logic [TILE_ADDR_X-1:0] tile_addr_x_t;
+  typedef logic [TILE_ADDR_Y-1:0] tile_addr_y_t;
+
+  // typedef declarations
+  typedef logic [31:0] float_t;
+
+  typedef logic signed [23:0] fx_14_10_t;
+  typedef logic signed [47:0] fx_28_20_t;
+  typedef logic signed [30:0] fx_14_17_t;
+  typedef logic signed [42:0] fx_27_16_t;
+  typedef logic signed [17:0] fx_5_13_t;
+  typedef logic signed [15:0] int16_t;
+
+  typedef logic [2:0] uint3_t;
+  typedef logic [3:0] uint4_t;
+  typedef logic [5:0] uint6_t;
+  typedef logic [7:0] uint8_t;
+  typedef logic [11:0] uint12_t;
+  typedef logic [13:0] uint14_t;
+  typedef logic [31:0] uint32_t;
+
   typedef enum logic [2:0] {
     REPLACE = 0,
     MODULATE = 1,
@@ -59,25 +80,46 @@ package gpu_types_pkg;
     logic [7:0] b;  // Blue
   } color_argb_t;
 
+
+  typedef struct packed {
+    float_t x;
+    float_t y;
+    float_t z;
+  } vec3_t;
+
+  typedef struct packed {
+    float_t x;
+    float_t y;
+    float_t z;
+    float_t w;
+  } vec4_t;
+
   typedef struct packed {
     // Position
-    logic [31:0] x;
-    logic [31:0] y;
-    logic [31:0] z;
-    logic [31:0] w;
+    vec4_t position;
 
-    // Normals
-    logic [31:0] nx;
-    logic [31:0] ny;
-    logic [31:0] nz;
+    // // Normals
+    // vec3_t normals;
 
     // Color
     color_argb_t color;
 
     // Textures
-    logic [31:0] u;
-    logic [31:0] v;
+    float_t u;
+    float_t v;
   } vertex_t;
+
+  typedef struct packed {
+    vertex_t v0;
+    vertex_t v1;
+    vertex_t v2;
+    logic [7:0] tex_id;
+    texture_address_mode_t texture_mode_u;
+    texture_address_mode_t texture_mode_v;
+    fragment_op_t texture_function;
+    blend_op_t sfactor_op;
+    blend_op_t dfactor_op;
+  } frontend_data_in_t;
 
   // Thread ingress token after frontend preprocessing.
   // Texture u/v arrive in the narrower fixed-point format used by the thread path.
@@ -105,38 +147,57 @@ package gpu_types_pkg;
     logic [17:0] v0_u;
     logic [31:0] v0_w;
     logic [31:0] v0_z;
-    logic [7:0] v0_color_a;
-    logic [7:0] v0_color_r;
-    logic [7:0] v0_color_g;
-    logic [7:0] v0_color_b;
-    logic [7:0] v1_color_a;
-    logic [7:0] v1_color_r;
-    logic [7:0] v1_color_g;
-    logic [7:0] v1_color_b;
-    logic [7:0] v2_color_a;
-    logic [7:0] v2_color_r;
-    logic [7:0] v2_color_g;
-    logic [7:0] v2_color_b;
+    color_argb_t v0_color;
+    color_argb_t v1_color;
+    color_argb_t v2_color;
   } thread_data_in_t;
 
   typedef logic signed [47:0] edge_fixed_t;
 
   typedef struct packed {
-    edge_fixed_t init_e0;
-    edge_fixed_t init_e1;
-    edge_fixed_t init_e2;
-    edge_fixed_t e0_dx;
-    edge_fixed_t e0_dy;
-    edge_fixed_t e1_dx;
-    edge_fixed_t e1_dy;
-    edge_fixed_t e2_dx;
-    edge_fixed_t e2_dy;
+    fx_28_20_t init_e0;
+    fx_28_20_t init_e1;
+    fx_28_20_t init_e2;
+    fx_14_10_t e0_dx;
+    fx_14_10_t e0_dy;
+    fx_14_10_t e1_dx;
+    fx_14_10_t e1_dy;
+    fx_14_10_t e2_dx;
+    fx_14_10_t e2_dy;
     // Corner 2x2 group of the box; with the group coordinates this forms the shared thread address.
-    logic [TILE_ADDR_X-1:0] minX_local;
-    logic [TILE_ADDR_Y-1:0] minY_local;
-    // Box size in 2x2 groups (pixels / 2), traversed size-1 down to 0; extra bit holds a full tile.
-    logic [TILE_ADDR_X:0] width;
-    logic [TILE_ADDR_Y:0] height;
-    thread_data_in_t thread_data;
+    tile_addr_x_t minX_local;
+    tile_addr_y_t minY_local;
+    // Last 2x2 group offset (group count - 1); zero represents one group.
+    tile_addr_x_t width;
+    tile_addr_y_t height;
+
+    // Fixed Point UVs
+    fx_5_13_t v0_v;
+    fx_5_13_t v0_u;
+    fx_5_13_t v1_v;
+    fx_5_13_t v1_u;
+    fx_5_13_t v2_v;
+    fx_5_13_t v2_u;
+
+    // Passthough data
+
+    logic [7:0] tex_id;
+    texture_address_mode_t texture_mode_u;
+    texture_address_mode_t texture_mode_v;
+    fragment_op_t texture_function;
+    blend_op_t sfactor_op;
+    blend_op_t dfactor_op;
+    float_t inv_area;
+
+    float_t v0_w;
+    float_t v0_z;
+    float_t v1_w;
+    float_t v1_z;
+    float_t v2_w;
+    float_t v2_z;
+
+    color_argb_t v0_color;
+    color_argb_t v1_color;
+    color_argb_t v2_color;
   } orchestrator_data_in_t;
 endpackage

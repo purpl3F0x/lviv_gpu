@@ -120,15 +120,27 @@ void savePNG(const Framebuffer &fb, const char *filename)
 int main(int argc, char **argv)
 {
     bool alphaBlend = false;
+    std::string frontendInputsCsv;
+    std::string frontendExpectedCsv;
     for (int argument = 1; argument < argc; ++argument)
     {
         if (std::string(argv[argument]) == "--alpha-blend")
             alphaBlend = true;
+        else if (std::string(argv[argument]) == "--frontend-inputs-csv" && argument + 1 < argc)
+            frontendInputsCsv = argv[++argument];
+        else if (std::string(argv[argument]) == "--frontend-expected-csv" && argument + 1 < argc)
+            frontendExpectedCsv = argv[++argument];
         else
         {
-            std::cerr << "Usage: " << argv[0] << " [--alpha-blend]\n";
+            std::cerr << "Usage: " << argv[0]
+                      << " [--alpha-blend] [--frontend-inputs-csv PATH --frontend-expected-csv PATH]\n";
             return 1;
         }
+    }
+    if (frontendInputsCsv.empty() != frontendExpectedCsv.empty())
+    {
+        std::cerr << "Both frontend CSV paths must be provided.\n";
+        return 1;
     }
     int width = 1280;
     int height = 720;
@@ -241,6 +253,12 @@ int main(int argc, char **argv)
 
     // Execute binning and rasterization (dumping bins to images)
     rasterizer.flush(true);
+    if (!frontendInputsCsv.empty())
+    {
+        rasterizer.dumpFrontendInputCsv(frontendInputsCsv);
+        rasterizer.dumpFrontendExpectedCsv(frontendExpectedCsv);
+        std::cout << "Wrote " << frontendInputsCsv << " and " << frontendExpectedCsv << std::endl;
+    }
 
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> render_ms = end_time - start_time;

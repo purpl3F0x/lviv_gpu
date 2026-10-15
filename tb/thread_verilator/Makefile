@@ -34,7 +34,7 @@ SV_SRCS = verilator.vlt \
 CPP_SRCS = ../../dv/raster_sw/main.cpp \
            ../../dv/raster_sw/geometry_engine.cpp \
            ../../dv/raster_sw/rasterizer.cpp \
-           ../../dv/raster_core/dpi_functions.cpp \
+           ../../dv/common/dpi_functions.cpp \
            thread_rasterizer.cpp
 
 VERILATOR_CFLAGS = --CFLAGS -std=c++20 \

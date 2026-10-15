@@ -2,6 +2,7 @@ import argparse
 import ast
 import csv
 import inspect
+import json
 import struct
 import textwrap
 from contextlib import contextmanager
@@ -18,6 +19,15 @@ DEFAULT_LATENCIES = {
     "fx_add": 2,
     "fx_sub": 2,
     "fx_mul": 5,
+    "fp_to_fx14_10": 6,
+    "fx28_20_to_fp32": 7,
+    "int_mul": 4,
+    "int_mul_add": 5,
+    "int_mul_sub": 5,
+    "int_min_max_3": 2,
+    "int_min": 1,
+    "int_max": 1,
+    "tri_bb_aligned_boundries": 2,
     "fx_min_2": 1,
     "fx_max_2": 1,
     "fp_to_fx14_17": 6,
@@ -26,6 +36,7 @@ DEFAULT_LATENCIES = {
     "fp32_to_uint12": 2,
     "int_add": 1,
     "int_sub": 1,
+    "reg": 1,
     # Raster frontend operations from create_pipeline.py.
     "int16_add_sub": 0,
     "fp32_to_int16": 2,
@@ -80,6 +91,18 @@ class Value:
         self.name_assigned = False
         self.producer = producer
         self.bit_slice = bit_slice
+        self.attributes = {}
+
+    def add_attribute(self, attributes: dict[str, str | int | bool]):
+        if not isinstance(attributes, dict):
+            raise TypeError("add_attribute() expects a dictionary.")
+        for name, value in attributes.items():
+            if not isinstance(name, str) or not name.isidentifier():
+                raise ValueError(f"Invalid SystemVerilog attribute name: {name!r}")
+            if not isinstance(value, (str, int, bool)):
+                raise TypeError("Attribute values must be strings, integers, or bools.")
+        self.attributes.update(attributes)
+        return self
 
     def _binary(self, other, op):
         if not isinstance(other, Value):
@@ -144,6 +167,11 @@ class Float(Value):
         "fp_mul": 8,
         "fp_neg": 0,
         "fp_recip": 29,
+        "fp_to_fx14_10": 6,
+        "fx28_20_to_fp32": 7,
+        "int_mul": 4,
+        "int_min_max_3": 2,
+        "tri_bb_aligned_boundries": 2,
         "fp_to_fx14_17": 6,
         "fp_to_fx27_16": 6,
         "fp32_to_uint12": 2,
@@ -151,6 +179,47 @@ class Float(Value):
         "fp_min_2": 1,
         "fp_max_2": 1,
         "fp_add_half_fast": 2,
+    }
+
+
+class Fx14_10(Value):
+    KIND = "fx14_10"
+    SIGNED = True
+    INTEGER_BITS = 14
+    FRACTIONAL_BITS = 10
+    ADD_OP = "int_add"
+    SUB_OP = "int_sub"
+    OP_LATENCIES = {
+        "fp_to_fx14_10": 6,
+        "fx14_10_to_uint12": 0,
+        "int_add": 1,
+        "int_sub": 1,
+        "int_min_max_3": 2,
+        "fx_min_2": 1,
+        "fx_max_2": 1,
+        "uint12_to_fx14_10": 0,
+        "uint14_to_fx14_10": 0,
+        "uint14_to_fx14_10_pixel_center": 0,
+        "fx14_10_to_uint12": 0,
+        "fx_bbox_min_even": 0,
+        "fx_bbox_max_odd": 0,
+    }
+
+
+class Fx28_20(Value):
+    KIND = "fx28_20"
+    SIGNED = True
+    INTEGER_BITS = 28
+    FRACTIONAL_BITS = 20
+    ADD_OP = "int_add"
+    SUB_OP = "int_sub"
+    OP_LATENCIES = {
+        "int_add": 1,
+        "int_sub": 1,
+        "int_mul": 4,
+        "int_mul_add": 5,
+        "int_mul_sub": 5,
+        "fx28_20_to_fp32": 7,
     }
 
 
@@ -219,6 +288,20 @@ class UInt12(Value):
     OP_LATENCIES = {"fp32_to_uint12": 2, "int_add": 1, "int_sub": 1}
 
 
+class UInt14(Value):
+    KIND = "uint14"
+    SIGNED = False
+    BITS = 14
+    OP_LATENCIES = {
+        "tri_bb_aligned_boundries": 2,
+        "int_min_max_3": 2,
+        "int_min": 1,
+        "int_max": 1,
+        "uint12_to_uint14": 0,
+        "uint14_to_uint12": 0,
+    }
+
+
 class TileAddrX(Value):
     KIND = "tile_addr_x"
     SIGNED = False
@@ -239,6 +322,8 @@ class TileAddrY(Value):
 
 ANNOTATION_TYPES = {
     Float,
+    Fx14_10,
+    Fx28_20,
     Fx14_17,
     Fx27_16,
     Fx5_13,
@@ -249,6 +334,7 @@ ANNOTATION_TYPES = {
     UInt8,
     UInt32,
     UInt12,
+    UInt14,
     TileAddrX,
     TileAddrY,
 }
@@ -287,6 +373,136 @@ def fp_to_fx5_13(value: Float) -> Fx5_13:
     return _float_to_fixed(value, Fx5_13, "fp_to_fx5_13")
 
 
+def fp_to_fx14_10(value: Float) -> Fx14_10:
+    return _float_to_fixed(value, Fx14_10, "fp_to_fx14_10")
+
+
+def fx28_20_to_fp32(value: Fx28_20) -> Float:
+    if not isinstance(value, Fx28_20):
+        raise TypeError("fx28_20_to_fp32() expects an Fx28_20 value.")
+    return value.graph._record("fx28_20_to_fp32", Float, value)
+
+
+def fx14_10_mul(a: Fx14_10, b: Fx14_10) -> Fx28_20:
+    if not isinstance(a, Fx14_10) or not isinstance(b, Fx14_10):
+        raise TypeError("fx14_10_mul() expects Fx14_10 arguments.")
+    return _record_custom("int_mul", Fx28_20, a, b)
+
+
+def fx14_10_mul_add(a: Fx14_10, b: Fx14_10, c: Fx28_20) -> Fx28_20:
+    if not isinstance(a, Fx14_10) or not isinstance(b, Fx14_10):
+        raise TypeError("fx14_10_mul_add() expects Fx14_10 multiplicands.")
+    if not isinstance(c, Fx28_20):
+        raise TypeError("fx14_10_mul_add() expects an Fx28_20 addend.")
+    return _record_custom("int_mul_add", Fx28_20, a, b, c)
+
+
+def fx14_10_mul_sub(a: Fx14_10, b: Fx14_10, c: Fx28_20) -> Fx28_20:
+    if not isinstance(a, Fx14_10) or not isinstance(b, Fx14_10):
+        raise TypeError("fx14_10_mul_sub() expects Fx14_10 multiplicands.")
+    if not isinstance(c, Fx28_20):
+        raise TypeError("fx14_10_mul_sub() expects an Fx28_20 subtrahend.")
+    return _record_custom("int_mul_sub", Fx28_20, a, b, c)
+
+
+def uint12_to_fx14_10(value: UInt12) -> Fx14_10:
+    if not isinstance(value, UInt12):
+        raise TypeError("uint12_to_fx14_10() expects a UInt12 value.")
+    return _record_custom("uint12_to_fx14_10", Fx14_10, value)
+
+
+def fx14_10_to_uint12(value: Fx14_10) -> UInt12:
+    if not isinstance(value, Fx14_10):
+        raise TypeError("fx14_10_to_uint12() expects an Fx14_10 value.")
+    return _record_custom("fx14_10_to_uint12", UInt12, value)
+
+
+def uint12_to_uint14(value: UInt12) -> UInt14:
+    if not isinstance(value, UInt12):
+        raise TypeError("uint12_to_uint14() expects a UInt12 value.")
+    return _record_custom("uint12_to_uint14", UInt14, value)
+
+
+def uint14_to_uint12(value: UInt14) -> UInt12:
+    if not isinstance(value, UInt14):
+        raise TypeError("uint14_to_uint12() expects a UInt14 value.")
+    return _record_custom("uint14_to_uint12", UInt12, value)
+
+
+def uint12_to_fx14_10(value: UInt12) -> Fx14_10:
+    if not isinstance(value, UInt12):
+        raise TypeError("uint12_to_fx14_10() expects a UInt12 value.")
+    return _record_custom("uint12_to_fx14_10", Fx14_10, value)
+
+
+def uint14_to_fx14_10(value: UInt14) -> Fx14_10:
+    if not isinstance(value, UInt14):
+        raise TypeError("uint14_to_fx14_10() expects a UInt14 value.")
+    return _record_custom("uint14_to_fx14_10", Fx14_10, value)
+
+
+def uint14_to_fx14_10_pixel_center(value: UInt14) -> Fx14_10:
+    if not isinstance(value, UInt14):
+        raise TypeError("uint14_to_fx14_10_pixel_center() expects a UInt14 value.")
+    return _record_custom("uint14_to_fx14_10_pixel_center", Fx14_10, value)
+
+
+def fx_bbox_min_even(value: Fx14_10) -> Fx14_10:
+    if not isinstance(value, Fx14_10):
+        raise TypeError("fx_bbox_min_even() expects an Fx14_10 value.")
+    return _record_custom("fx_bbox_min_even", Fx14_10, value)
+
+
+def fx_bbox_max_odd(value: Fx14_10) -> Fx14_10:
+    if not isinstance(value, Fx14_10):
+        raise TypeError("fx_bbox_max_odd() expects an Fx14_10 value.")
+    return _record_custom("fx_bbox_max_odd", Fx14_10, value)
+
+
+def min_max_3(a: Fx14_10, b: Fx14_10, c: Fx14_10) -> tuple[Fx14_10, Fx14_10]:
+    if any(not isinstance(value, Fx14_10) for value in (a, b, c)):
+        raise TypeError("min_max_3() expects Fx14_10 arguments.")
+    operation = _record_custom("int_min_max_3", Fx14_10, a, b, c)
+    return (
+        operation.graph.output(operation, "min"),
+        operation.graph.output(operation, "max"),
+    )
+
+
+def uint_min_max_3(a: UInt14, b: UInt14, c: UInt14) -> tuple[UInt14, UInt14]:
+    if any(not isinstance(value, UInt14) for value in (a, b, c)):
+        raise TypeError("uint_min_max_3() expects UInt14 arguments.")
+    operation = _record_custom("int_min_max_3", UInt14, a, b, c)
+    return (
+        operation.graph.output(operation, "min"),
+        operation.graph.output(operation, "max"),
+    )
+
+
+def int_min(a: UInt14, b: UInt14) -> UInt14:
+    if not isinstance(a, UInt14) or not isinstance(b, UInt14):
+        raise TypeError("int_min() expects UInt14 arguments.")
+    return _record_custom("int_min", UInt14, a, b)
+
+
+def int_max(a: UInt14, b: UInt14) -> UInt14:
+    if not isinstance(a, UInt14) or not isinstance(b, UInt14):
+        raise TypeError("int_max() expects UInt14 arguments.")
+    return _record_custom("int_max", UInt14, a, b)
+
+
+def tri_bb_aligned_boundries(
+    x0: Fx14_10, x1: Fx14_10, x2: Fx14_10
+) -> tuple[UInt14, UInt14]:
+    if any(not isinstance(value, Fx14_10) for value in (x0, x1, x2)):
+        raise TypeError("tri_bb_aligned_boundries() expects Fx14_10 arguments.")
+    operation = _record_custom("tri_bb_aligned_boundries", UInt14, x0, x1, x2)
+    return (
+        operation.graph.output(operation, "min"),
+        operation.graph.output(operation, "max"),
+    )
+
+
 def fp32_to_uint12(value: Float) -> UInt12:
     if not isinstance(value, Float):
         raise TypeError("fp32_to_uint12() expects a float value.")
@@ -305,7 +521,7 @@ def _uint12_to_local_quad(value: UInt12, result_type, tile_addr_parameter: str):
         result_type.KIND,
         operands=(value,),
         producer=value if value.op is not None else value.producer,
-        bit_slice=(f"gpu_types_pkg::{tile_addr_parameter}", 1),
+        bit_slice=(f"{tile_addr_parameter}", 1),
     )
 
 
@@ -324,6 +540,12 @@ def _record_custom(op_type: str, result_type: type[Value], *operands: Value) -> 
     if any(operand.graph is not graph for operand in operands):
         raise ValueError("Operands belong to different graphs.")
     return graph._record(op_type, result_type, *operands)
+
+
+def register(value: Value) -> Value:
+    if not isinstance(value, Value):
+        raise TypeError("register() expects a symbolic Value.")
+    return _record_custom("reg", type(value), value)
 
 
 def tri_bb_min_max(x0: Float, x1: Float, x2: Float) -> tuple[Float, Float]:
@@ -349,13 +571,13 @@ def fp_min_2(a: Float, b: Float) -> Float:
 
 
 def fx_max_2(a: Value, b: Value) -> Value:
-    if type(a) not in (Fx14_17, Fx27_16) or type(b) is not type(a):
+    if type(a) not in (Fx14_10, Fx14_17, Fx27_16) or type(b) is not type(a):
         raise TypeError("fx_max_2() expects matching fixed-point arguments.")
     return _record_custom("fx_max_2", type(a), a, b)
 
 
 def fx_min_2(a: Value, b: Value) -> Value:
-    if type(a) not in (Fx14_17, Fx27_16) or type(b) is not type(a):
+    if type(a) not in (Fx14_10, Fx14_17, Fx27_16) or type(b) is not type(a):
         raise TypeError("fx_min_2() expects matching fixed-point arguments.")
     return _record_custom("fx_min_2", type(a), a, b)
 
@@ -621,12 +843,12 @@ class Graph:
             if folded is not _NOT_CONSTANT:
                 return self.constant(value_type, folded)
 
-        commutative = op.endswith(("_add", "_mul", "_min_2", "_max_2"))
+        commutative = expression in ("add", "mul") or op.endswith(("_min_2", "_max_2"))
         operand_key = tuple(id(operand) for operand in operands)
         if commutative:
             operand_key = tuple(sorted(operand_key))
         cache_key = (op, expression, value_type, operand_key)
-        if cache_key in self._expressions:
+        if op != "reg" and cache_key in self._expressions:
             return self._expressions[cache_key]
 
         value = value_type(
@@ -1010,117 +1232,11 @@ def export_resource_table(
     return output_path
 
 
-def raster_frontend(
-    v0_x: Float,
-    v0_y: Float,
-    v1_x: Float,
-    v1_y: Float,
-    v2_x: Float,
-    v2_y: Float,
-    bin_min_x: Float,
-    bin_min_y: Float,
-    bin_max_x: Float,
-    bin_max_y: Float,
-    v0_u: Float,
-    v0_v: Float,
-    v1_u: Float,
-    v1_v: Float,
-    v2_u: Float,
-    v2_v: Float,
-):
-
-    dx_0 = v2_y - v1_y
-    dx_1 = v0_y - v2_y
-    dx_2 = v1_y - v0_y
-
-    dy_0 = v1_x - v2_x
-    dy_1 = v2_x - v0_x
-    dy_2 = v0_x - v1_x
-
-    Area = dy_2 * dx_1 - dy_1 * dx_2
-
-    invArea = 1.0 / Area
-
-    min_x, max_x = tri_bb_min_max(v0_x, v1_x, v2_x)
-    min_y, max_y = tri_bb_min_max(v0_y, v1_y, v2_y)
-
-    # # ceil, floor here
-    bb_min_x = fp_max_2(min_x, bin_min_x)
-    bb_min_y = fp_max_2(min_y, bin_min_y)
-    bb_max_x = fp_min_2(max_x, bin_max_x)
-    bb_max_y = fp_min_2(max_y, bin_max_y)
-
-    p_min_x = fp_add_half_fast(bb_min_x)
-    p_min_y = fp_add_half_fast(bb_min_y)
-    p_max_x = fp_add_half_fast(bb_max_x)
-    p_max_y = fp_add_half_fast(bb_max_y)
-
-    w0 = fp_to_fx27_16(dy_0 * (v1_y - p_min_y) + dx_0 * (v1_x - p_min_x))
-    w1 = fp_to_fx27_16(dy_1 * (v2_x - p_min_x) + dx_1 * (v2_y - p_min_y))
-    w2 = fp_to_fx27_16(dy_2 * (v0_x - p_min_x) + dx_2 * (v0_y - p_min_y))
-
-    dx0_fx = fp_to_fx14_17(dx_0)
-    dx1_fx = fp_to_fx14_17(dx_1)
-    dx2_fx = fp_to_fx14_17(dx_2)
-    dy0_fx = fp_to_fx14_17(dy_0)
-    dy1_fx = fp_to_fx14_17(dy_1)
-    dy2_fx = fp_to_fx14_17(dy_2)
-
-    bb_min_x_int = fp32_to_uint12(bb_min_x)
-    bb_min_y_int = fp32_to_uint12(bb_min_y)
-    bb_max_x_int = fp32_to_uint12(bb_max_x)
-    bb_max_y_int = fp32_to_uint12(bb_max_y)
-
-    minX_local = uint12_to_local_quad_x(bb_min_x_int)
-    minY_local = uint12_to_local_quad_y(bb_min_y_int)
-    maxX_local = uint12_to_local_quad_x(bb_max_x_int)
-    maxY_local = uint12_to_local_quad_y(bb_max_y_int)
-    bb_width = maxX_local - minX_local
-    bb_height = maxY_local - minY_local
-
-    # e0_dx_plus_dy = dx0_fx + dy0_fx
-    # e1_dx_plus_dy = dx1_fx + dy1_fx
-    # e2_dx_plus_dy = dx2_fx + dy2_fx
-
-    v0_u_fixed = fp_to_fx5_13(v0_u)
-    v0_v_fixed = fp_to_fx5_13(v0_v)
-    v1_u_fixed = fp_to_fx5_13(v1_u)
-    v1_v_fixed = fp_to_fx5_13(v1_v)
-    v2_u_fixed = fp_to_fx5_13(v2_u)
-    v2_v_fixed = fp_to_fx5_13(v2_v)
-
-    return (
-        invArea,
-        w0,
-        w1,
-        w2,
-        dx0_fx,
-        dx1_fx,
-        dx2_fx,
-        dy0_fx,
-        dy1_fx,
-        dy2_fx,
-        # e0_dx_plus_dy,
-        # e1_dx_plus_dy,
-        # e2_dx_plus_dy,
-        bb_width,
-        bb_height,
-        minX_local,
-        minY_local,
-        v0_u_fixed,
-        v0_v_fixed,
-        v1_u_fixed,
-        v1_v_fixed,
-        v2_u_fixed,
-        v2_v_fixed,
-    )
-
-
 def value_width(value):
     value_type = type(value)
     if value_type is Float:
         return 32
-    if value_type in (Fx14_17, Fx27_16, Fx5_13):
+    if value_type in (Fx14_10, Fx28_20, Fx14_17, Fx27_16, Fx5_13):
         return value_type.INTEGER_BITS + value_type.FRACTIONAL_BITS
     return getattr(value_type, "BITS", 16)
 
@@ -1182,14 +1298,32 @@ def export_pipeline_rtl(
     declarations = []
     logic = []
     delays = {}
+    consumers = {value: set() for value in operations}
+    for consumer in operations:
+        for operand in consumer.operands:
+            producer = operand.producer or operand
+            if producer in consumers:
+                consumers[producer].add(consumer)
+    returned = {value.producer or value for value in graph.returns}
+    retimed_registers = {}
+    for value in operations:
+        if value.op != "reg" or value in returned or len(consumers[value]) != 1:
+            continue
+        consumer = next(iter(consumers[value]))
+        input_delay = starts[consumer] - ends[value]
+        if input_delay > 0:
+            retimed_registers[value] = (consumer, input_delay)
 
     def declaration(value, name):
         types = {
             Float: "float_t",
+            Fx14_10: "fx_14_10_t",
+            Fx28_20: "fx_28_20_t",
             Fx14_17: "fx_14_17_t",
             Fx27_16: "fx_27_16_t",
             Fx5_13: "fx_5_13_t",
             Int16: "int16_t",
+            UInt14: "uint14_t",
             TileAddrX: "tile_addr_x_t",
             TileAddrY: "tile_addr_y_t",
             UInt12: "uint12_t",
@@ -1198,13 +1332,33 @@ def export_pipeline_rtl(
             return f"logic {name}"
         if type(value) in (UInt3, UInt4, UInt8, UInt32):
             return f"logic [{value_width(value)-1}:0] {name}"
-        return f"  gpu_types_pkg::{types[type(value)]} {name}"
+        return f"{types[type(value)]} {name}"
+
+    def attribute_prefix(value):
+        if not value.attributes:
+            return ""
+        attributes = []
+        for name, attribute_value in value.attributes.items():
+            if isinstance(attribute_value, str):
+                rendered_value = json.dumps(attribute_value)
+            elif isinstance(attribute_value, bool):
+                rendered_value = "1'b1" if attribute_value else "1'b0"
+            else:
+                rendered_value = str(attribute_value)
+            attributes.append(f"{name} = {rendered_value}")
+        return "(* " + ", ".join(attributes) + " *) "
+
+    def variable_declaration(value, name):
+        return attribute_prefix(value) + declaration(value, name)
+
+    def port_declaration(value, direction, name):
+        return attribute_prefix(value) + direction + " " + declaration(value, name)
 
     def rtl_width(value):
         if type(value) is TileAddrX:
-            return "$bits(gpu_types_pkg::tile_addr_x_t)"
+            return "$bits(tile_addr_x_t)"
         if type(value) is TileAddrY:
-            return "$bits(gpu_types_pkg::tile_addr_y_t)"
+            return "$bits(tile_addr_y_t)"
         return value_width(value)
 
     def base(value):
@@ -1212,7 +1366,7 @@ def export_pipeline_rtl(
             width = value_width(value)
             if type(value) is Float:
                 bits = struct.unpack(">I", struct.pack(">f", value.constant))[0]
-            elif type(value) in (Fx14_17, Fx27_16, Fx5_13):
+            elif type(value) in (Fx14_10, Fx28_20, Fx14_17, Fx27_16, Fx5_13):
                 bits = int(value.constant * (1 << type(value).FRACTIONAL_BITS))
             else:
                 bits = int(value.constant)
@@ -1230,6 +1384,9 @@ def export_pipeline_rtl(
 
     def aligned(value, cycle):
         signal, ready_cycle = base(value)
+        retimed = retimed_registers.get(value)
+        if retimed is not None and cycle == starts[retimed[0]]:
+            return signal
         depth = cycle - ready_cycle
         if depth < 0:
             raise ValueError(f"{value.name} is not ready at cycle {cycle}.")
@@ -1239,7 +1396,7 @@ def export_pipeline_rtl(
         if key not in delays:
             name = f"delay_{len(delays)}"
             delays[key] = name
-            declarations.append(declaration(value, name) + ";")
+            declarations.append(variable_declaration(value, name) + ";")
             logic.append(
                 f"delay_pipe #(.WIDTH({rtl_width(value)}), .STAGES({depth})) "
                 f"u_{name} (.clk(clk), .rst_n(1'b1), .clken(clken), "
@@ -1254,7 +1411,7 @@ def export_pipeline_rtl(
             logic.append(f"assign {name} = {expression};")
         else:
             pipe = f"pipe_{value.name}"
-            declarations.append(declaration(value, pipe) + ";")
+            declarations.append(variable_declaration(value, pipe) + ";")
             logic.append(f"assign {pipe} = {expression};")
             logic.append(
                 f"delay_pipe #(.WIDTH({rtl_width(value)}), .STAGES({latency})) "
@@ -1264,8 +1421,12 @@ def export_pipeline_rtl(
 
     for value in operations:
         name = f"n_{value.name}"
-        declarations.append(declaration(value, name) + ";")
-        operands = [aligned(operand, starts[value]) for operand in value.operands]
+        declarations.append(variable_declaration(value, name) + ";")
+        operand_cycle = starts[value]
+        retimed = retimed_registers.get(value)
+        if retimed is not None:
+            operand_cycle += retimed[1]
+        operands = [aligned(operand, operand_cycle) for operand in value.operands]
         latency = latencies[value.op]
         ports = [".aclk(clk)", ".aclken(clken)", ".valid_in(1'b1)"]
         if value.op == "fp_neg":
@@ -1281,6 +1442,8 @@ def export_pipeline_rtl(
             )
         elif value.op in (
             "fp32_to_uint12",
+            "fp_to_fx14_10",
+            "fx28_20_to_fp32",
             "fp_to_fx14_17",
             "fp_to_fx27_16",
             "fp_to_fx5_13",
@@ -1291,11 +1454,90 @@ def export_pipeline_rtl(
                 f".s_axis_a_tdata({operands[0]}), .m_axis_result_tvalid(), "
                 f".m_axis_result_tdata({name}));"
             )
+        elif value.op == "tri_bb_aligned_boundries":
+            declarations.extend(
+                [
+                    variable_declaration(value, f"{name}_min") + ";",
+                    variable_declaration(value, f"{name}_max") + ";",
+                ]
+            )
+            logic.append(
+                f"tri_bb_aligned_boundries #(.WIDTH(24), .FRACTIONAL(10)) u_{value.name} "
+                f"(.clk(clk), .clken(clken), .a({operands[0]}), .b({operands[1]}), "
+                f".c({operands[2]}), .min_val({name}_min), .max_val({name}_max));"
+            )
+        elif value.op == "int_min_max_3":
+            declarations.extend(
+                [
+                    variable_declaration(value, f"{name}_min") + ";",
+                    variable_declaration(value, f"{name}_max") + ";",
+                ]
+            )
+            logic.append(
+                f"int_min_max_3 #(.WIDTH({value_width(value)})) u_{value.name} "
+                f"(.clk(clk), .clken(clken), .a({operands[0]}), .b({operands[1]}), "
+                f".c({operands[2]}), .min_val({name}_min), .max_val({name}_max));"
+            )
+        elif value.op in ("int_min", "int_max"):
+            logic.append(
+                f"{value.op} #(.WIDTH({value_width(value)})) u_{value.name} "
+                f"(.clk(clk), .clken(clken), .a({operands[0]}), "
+                f".b({operands[1]}), .res({name}));"
+            )
+        elif value.op == "int_mul":
+            if type(value) is not Fx28_20 or any(
+                type(operand) is not Fx14_10 for operand in value.operands
+            ):
+                raise TypeError(
+                    "int_mul in this frontend requires two Fx14_10 operands."
+                )
+            logic.append(
+                f"int_mul #(.WIDTHA(24), .WIDTHB(24), .WIDTHP(48), "
+                f".INPUT_BUFFERS(1), .OUTPUT_BUFFERS(2), .LATENCY({latency})) "
+                f"u_{value.name} (.clk(clk), .clken(clken), .a({operands[0]}), "
+                f".b({operands[1]}), .p({name}));"
+            )
+        elif value.op in ("int_mul_add", "int_mul_sub"):
+            if (
+                type(value) is not Fx28_20
+                or len(value.operands) != 3
+                or type(value.operands[0]) is not Fx14_10
+                or type(value.operands[1]) is not Fx14_10
+                or type(value.operands[2]) is not Fx28_20
+            ):
+                raise TypeError(
+                    f"{value.op} requires Fx14_10 multiplicands and an Fx28_20 addend."
+                )
+            subtract = "1'b1" if value.op == "int_mul_sub" else "1'b0"
+            logic.append(
+                f"int_mul_add #(.WIDTHA(24), .WIDTHB(24), .WIDTHP(48), "
+                f".SUBTRACT({subtract}), .INPUT_BUFFERS(1), .OUTPUT_BUFFERS(2), "
+                f".LATENCY({latency})) u_{value.name} (.clk(clk), .clken(clken), "
+                f".a({operands[0]}), .b({operands[1]}), .c({operands[2]}), .p({name}));"
+            )
+        elif value.op in (
+            "uint12_to_uint14",
+            "uint14_to_uint12",
+            "uint12_to_fx14_10",
+            "uint14_to_fx14_10",
+            "uint14_to_fx14_10_pixel_center",
+            "fx14_10_to_uint12",
+        ):
+            operand = operands[0]
+            expressions = {
+                "uint12_to_uint14": f"{{2'b0, {operand}}}",
+                "uint14_to_uint12": f"{operand}[11:0]",
+                "uint12_to_fx14_10": f"{{2'b0, {operand}, 10'b0}}",
+                "uint14_to_fx14_10": f"{{{operand}, 10'b0}}",
+                "uint14_to_fx14_10_pixel_center": f"{{{operand}, 1'b1, 9'b0}}",
+                "fx14_10_to_uint12": f"{operand}[21:10]",
+            }
+            inline_pipeline(value, expressions[value.op])
         elif value.op == "tri_bb_min_max":
             declarations.extend(
                 [
-                    declaration(value, f"{name}_min") + ";",
-                    declaration(value, f"{name}_max") + ";",
+                    variable_declaration(value, f"{name}_min") + ";",
+                    variable_declaration(value, f"{name}_max") + ";",
                 ]
             )
             logic.append(
@@ -1320,21 +1562,27 @@ def export_pipeline_rtl(
         elif value.op in ("int_add", "int_sub"):
             if latency != 1:
                 raise ValueError(f"{value.op} RTL has a fixed latency of one cycle.")
-            if type(value) is UInt12:
-                operand_type = UInt12
-            elif type(value) in (TileAddrX, TileAddrY):
-                operand_type = type(value)
-            else:
+            supported_integer_types = (
+                UInt12,
+                UInt14,
+                Fx14_10,
+                Fx28_20,
+                TileAddrX,
+                TileAddrY,
+            )
+            if type(value) not in supported_integer_types:
                 raise TypeError(f"{value.op} has an unsupported integer result type.")
+            operand_type = type(value)
             if any(type(operand) is not operand_type for operand in value.operands):
                 raise TypeError(
                     f"{value.op} requires matching {operand_type.__name__} operands."
                 )
-            logic.append(
-                f"{value.op} #(.WIDTH({rtl_width(value)})) u_{value.name} "
-                f"(.clk(clk), .clken(clken), .a({operands[0]}), "
-                f".b({operands[1]}), .s({name}));"
-            )
+            macro = "INT_ADD" if value.op == "int_add" else "INT_SUB"
+            logic.append(f"`{macro}(clk, clken, {operands[0]}, {operands[1]}, {name})")
+        elif value.op == "reg":
+            if len(operands) != 1 or type(value) is not type(value.operands[0]):
+                raise TypeError("reg requires one input and preserves its type.")
+            logic.append(f"`REG(clk, clken, {operands[0]}, {name})")
         elif value.op == "int16_add_sub" or value.op in (
             "fx_add",
             "fx_sub",
@@ -1370,22 +1618,164 @@ def export_pipeline_rtl(
     logic.extend(f"assign {name} = {signal};" for name, signal, _ in outputs)
     ports = ["input logic clk", "input logic clken", "input logic rst_n"]
     ports.extend(
-        "input " + declaration(value, f"in_{value.name}") for value in graph.inputs
+        port_declaration(value, "input", f"in_{value.name}") for value in graph.inputs
     )
-    ports.extend("output " + declaration(value, name) for name, _, value in outputs)
+    ports.extend(port_declaration(value, "output", name) for name, _, value in outputs)
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
         "// Auto-generated by scripts/frontend/generator.py; do not edit.\n"
         f"localparam int {latency_name} = {total};\n\n"
+        "`define INT_ADD(CLK, CE, A, B, S) \\\n"
+        "always_ff @(posedge CLK) begin \\\n"
+        "    if (CE) S <= (A) + (B); \\\n"
+        "end\n"
+        "`define INT_SUB(CLK, CE, A, B, S) \\\n"
+        "always_ff @(posedge CLK) begin \\\n"
+        "    if (CE) S <= (A) - (B); \\\n"
+        "end\n"
+        "`define REG(CLK, CE, D, Q) \\\n"
+        "always_ff @(posedge CLK) begin \\\n"
+        "    if (CE) Q <= D; \\\n"
+        "end\n"
+        "\n\n"
+        '(* use_dsp = "simd" *)'
         f"module {module_name} (\n  "
         + ",\n  ".join(ports)
         + "\n);\n"
-        + "\n".join(declarations + logic)
+        + "\n // Declarations\n"
+        + "\n".join(map("  {0}".format, declarations))
+        + "\n // Logic\n"
+        + "\n".join(map("  {0}".format, logic))
         + "\nendmodule\n",
         encoding="utf-8",
     )
     return output_path
+
+
+###################################################
+###################################################
+###################################################
+
+
+def raster_frontend(
+    v0_x: Float,
+    v0_y: Float,
+    v1_x: Float,
+    v1_y: Float,
+    v2_x: Float,
+    v2_y: Float,
+    bin_min_x: UInt12,
+    bin_min_y: UInt12,
+    bin_max_x: UInt12,
+    bin_max_y: UInt12,
+    v0_u: Float,
+    v0_v: Float,
+    v1_u: Float,
+    v1_v: Float,
+    v2_u: Float,
+    v2_v: Float,
+):
+
+    v0_x_fx = fp_to_fx14_10(v0_x)
+    v0_y_fx = fp_to_fx14_10(v0_y)
+    v1_x_fx = fp_to_fx14_10(v1_x)
+    v1_y_fx = fp_to_fx14_10(v1_y)
+    v2_x_fx = fp_to_fx14_10(v2_x)
+    v2_y_fx = fp_to_fx14_10(v2_y)
+
+    dx_0 = register(v2_y_fx) - register(v1_y_fx)
+    dx_1 = register(v0_y_fx) - register(v2_y_fx)
+    dx_2 = register(v1_y_fx) - register(v0_y_fx)
+    dy_0 = register(v1_x_fx) - register(v2_x_fx)
+    dy_1 = register(v2_x_fx) - register(v0_x_fx)
+    dy_2 = register(v0_x_fx) - register(v1_x_fx)
+
+    area = register(fx14_10_mul(register(dy_1), dx_2)) - register(fx14_10_mul(register(dy_2), dx_1))
+    invArea = 1.0 / fx28_20_to_fp32(area)
+
+    tri_min_x, tri_max_x = tri_bb_aligned_boundries(v0_x_fx, v1_x_fx, v2_x_fx)
+    tri_min_y, tri_max_y = tri_bb_aligned_boundries(v0_y_fx, v1_y_fx, v2_y_fx)
+
+    bin_min_x_u14 = uint12_to_uint14(bin_min_x)
+    bin_min_y_u14 = uint12_to_uint14(bin_min_y)
+    bin_max_x_u14 = uint12_to_uint14(bin_max_x)
+    bin_max_y_u14 = uint12_to_uint14(bin_max_y)
+    bb_min_x_u14 = int_max(tri_min_x, bin_min_x_u14)
+    bb_min_y_u14 = int_max(tri_min_y, bin_min_y_u14)
+    bb_max_x_u14 = int_min(tri_max_x, bin_max_x_u14)
+    bb_max_y_u14 = int_min(tri_max_y, bin_max_y_u14)
+
+    p_min_x = uint14_to_fx14_10_pixel_center(bb_min_x_u14)
+    p_min_y = uint14_to_fx14_10_pixel_center(bb_min_y_u14)
+
+    w0 = register(
+        fx14_10_mul(register(dy_0), register(register(p_min_y) - register(register(v1_y_fx))))
+    ) + register(fx14_10_mul(register(dx_0), register(register(p_min_x) - register(register(v1_x_fx)))))
+
+    w1 = register(
+        fx14_10_mul(register(dy_1), register(register(p_min_y) - register(register(v2_y_fx))))
+    ) + register(fx14_10_mul(register(dx_1), register(register(p_min_x) - register(register(v2_x_fx)))))
+
+    w2 = register(
+        fx14_10_mul(register(dy_2), register(register(p_min_y) - register(register(v0_y_fx))))
+    ) + register(fx14_10_mul(register(dx_2), register(register(p_min_x) - register(register(v0_x_fx)))))
+
+    bb_min_x_int = uint14_to_uint12(register(bb_min_x_u14))
+    bb_min_y_int = uint14_to_uint12(register(bb_min_y_u14))
+    bb_max_x_int = uint14_to_uint12(register(bb_max_x_u14))
+    bb_max_y_int = uint14_to_uint12(register(bb_max_y_u14))
+
+    minX_local = uint12_to_local_quad_x(bb_min_x_int)
+    minY_local = uint12_to_local_quad_y(bb_min_y_int)
+    maxX_local = uint12_to_local_quad_x(bb_max_x_int)
+    maxY_local = uint12_to_local_quad_y(bb_max_y_int)
+
+    bb_width = maxX_local - minX_local
+    bb_height = maxY_local - minY_local
+
+    bb_width.add_attribute({"use_dsp": "no"})
+    bb_height.add_attribute({"use_dsp": "no"})
+
+    dx0_fx = dx_0
+    dx1_fx = dx_1
+    dx2_fx = dx_2
+    dy0_fx = dy_0
+    dy1_fx = dy_1
+    dy2_fx = dy_2
+
+    v0_u_fixed = fp_to_fx5_13(v0_u)
+    v0_v_fixed = fp_to_fx5_13(v0_v)
+    v1_u_fixed = fp_to_fx5_13(v1_u)
+    v1_v_fixed = fp_to_fx5_13(v1_v)
+    v2_u_fixed = fp_to_fx5_13(v2_u)
+    v2_v_fixed = fp_to_fx5_13(v2_v)
+
+    return (
+        invArea,
+        w0,
+        w1,
+        w2,
+        dx0_fx,
+        dx1_fx,
+        dx2_fx,
+        dy0_fx,
+        dy1_fx,
+        dy2_fx,
+        # e0_dx_plus_dy,
+        # e1_dx_plus_dy,
+        # e2_dx_plus_dy,
+        bb_width,
+        bb_height,
+        minX_local,
+        minY_local,
+        v0_u_fixed,
+        v0_v_fixed,
+        v1_u_fixed,
+        v1_v_fixed,
+        v2_u_fixed,
+        v2_v_fixed,
+    )
 
 
 def main():
@@ -1408,7 +1798,9 @@ def main():
             Path(__file__).parents[2]
             / "rtl"
             / "generated"
-            / "raster_frontend_autogen.svh",
+            / "raster_frontend_fixed_autogen.svh",
+            module_name="raster_frontend_fixed_core",
+            latency_name="RASTER_FRONTEND_FIXED_LATENCY",
         )
         print(f"RTL written to {path}")
     if args.resource_table:

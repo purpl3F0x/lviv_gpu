@@ -17,6 +17,8 @@ package gpu_types_pkg;
 
 
   // Calculated Widths
+  parameter int SCREEN_RES_X_WIDTH = $clog2(MAX_RES_X);
+  parameter int SCREEN_RES_Y_WIDTH = $clog2(MAX_RES_Y);
   parameter int TILE_ID_W_X = $clog2(MAX_RES_X / TILE_SIZE_X);
   parameter int TILE_ID_W_Y = $clog2(MAX_RES_Y / TILE_SIZE_Y);
   parameter int PIXEL_ADDR_W = $clog2(TILE_SIZE_X * TILE_SIZE_Y);
@@ -27,6 +29,9 @@ package gpu_types_pkg;
 
   typedef logic [TILE_ADDR_X-1:0] tile_addr_x_t;
   typedef logic [TILE_ADDR_Y-1:0] tile_addr_y_t;
+
+  typedef logic [SCREEN_RES_X_WIDTH-1:0] screen_addr_x_t;
+  typedef logic [SCREEN_RES_Y_WIDTH-1:0] screen_addr_y_t;
 
   // typedef declarations
   typedef logic [31:0] float_t;

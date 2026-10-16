@@ -2,17 +2,17 @@
 
 import gpu_types_pkg::*;
 
-`include "raster_frontend_fixed_autogen.svh"
+`include "generated/raster_frontend_fixed_autogen.svh"
 
 
 /*
  *                       FrontEnd Core Block Diagram
  *   ┌──────────────────────────────────────────────────────────────────┐
- *   │                           ┌────────────┐                         │
- *   │                     ┌─────►Compute Core├────┐                    │
- *   │                     │     └────────────┘    │                    │
+ *   │ ┌────────┐ ┌─tile-info───►┌────────────┐                       ──┼►
+ *  ─┼─►APB Crtl├─┘        ┌─────►Compute Core├────┐                    │
+ *   │ └────────┘          │     └────────────┘    │                    │
  *   │┌─────────────────┐  │                       │┌──────────────────┐│
- * ──┼►Input Skid buffer├──┤                       ├┼Output Skid buffer├┼
+ * ──┼►Input Skid buffer├──┤                       ├┼Output Skid buffer├┼►
  *   │└─────────────────┘  │                       │└──────────────────┘│
  *   │                     │   ┌─────────────────┐ │                    │
  *   │                     └───►Delay unused data├─┘                    │
@@ -24,27 +24,31 @@ module raster_frontend (
     input logic clk,
     input logic rst_n,
 
+    // * APB Interface * //
+    input logic apb_clk,
+    input logic apb_rst_n,
+    input logic [4:0] s_apb_PADDR,
+    input logic [0:0] s_apb_PSEL,
+    input logic s_apb_PENABLE,
+    output logic s_apb_PREADY,
+    input logic s_apb_PWRITE,
+    input logic [31:0] s_apb_PWDATA,
+    output logic [31:0] s_apb_PRDATA,
+    output logic s_apb_PSLVERROR,
+
+    // * Input Interface * //
     input logic valid_in,
     output logic ready_out,
     input frontend_data_in_t in_data,
-    input uint12_t bin_min_x,
-    input uint12_t bin_min_y,
-    input uint12_t bin_max_x,
-    input uint12_t bin_max_y,
 
+    // * Output Interface * //
     input logic ready_in,
     output logic valid_out,
-    output logic core_empty,
-    output orchestrator_data_in_t out_data
-);
-  typedef struct packed {
-    frontend_data_in_t data;
-    uint12_t bin_min_x;
-    uint12_t bin_min_y;
-    uint12_t bin_max_x;
-    uint12_t bin_max_y;
-  } frontend_skid_data_t;
+    output orchestrator_data_in_t out_data,
 
+    // * Status Signal * //
+    output logic core_empty
+);
   typedef struct packed {
     logic [7:0] tex_id;
     texture_address_mode_t texture_mode_u;
@@ -64,11 +68,13 @@ module raster_frontend (
   } frontend_passthrough_t;
 
   localparam int FrontendLatency = RASTER_FRONTEND_FIXED_LATENCY;
-  localparam int InputWidth = $bits(frontend_skid_data_t);
+  localparam int InputWidth = $bits(frontend_data_in_t);
   localparam int OutputWidth = $bits(orchestrator_data_in_t);
+  localparam int TileOffsetWidthX = SCREEN_RES_X_WIDTH - TILE_ID_W_X;
+  localparam int TileOffsetWidthY = SCREEN_RES_Y_WIDTH - TILE_ID_W_Y;
 
-  frontend_skid_data_t input_skid_source;
-  frontend_skid_data_t input_skid_data;
+  frontend_data_in_t input_skid_source;
+  frontend_data_in_t input_skid_data;
   logic [InputWidth-1:0] input_skid_data_bits;
   logic input_skid_valid;
   logic input_skid_ready;
@@ -81,25 +87,56 @@ module raster_frontend (
   frontend_passthrough_t passthrough_in;
   frontend_passthrough_t passthrough_out;
   wire orchestrator_data_in_t output_data_internal;
+  logic [TILE_ID_W_X-1:0] tile_x_index;
+  logic [TILE_ID_W_Y-1:0] tile_y_index;
+  logic frontend_sw_reset;
 
-  always_comb begin
-    input_skid_source.data = in_data;
-    input_skid_source.bin_min_x = bin_min_x;
-    input_skid_source.bin_min_y = bin_min_y;
-    input_skid_source.bin_max_x = bin_max_x;
-    input_skid_source.bin_max_y = bin_max_y;
+  screen_addr_x_t bb_min_x;
+  screen_addr_y_t bb_min_y;
+  screen_addr_x_t bb_max_x;
+  screen_addr_y_t bb_max_y;
+
+  // Buffer reset and combine it with the software reset.
+  (*dont_touch = "true" *) logic local_reset_n;
+  always_ff @(posedge clk) begin
+    local_reset_n <= rst_n & ~frontend_sw_reset;
   end
 
+  APBFrontendRegs u_apb_frontend_regs (
+      .apb_clock(apb_clk),
+      .apb_resetn(apb_rst_n),
+      .thread_clk(clk),
+      .thread_resetn(rst_n),
+      .s_apb_PADDR(s_apb_PADDR),
+      .s_apb_PSEL(s_apb_PSEL),
+      .s_apb_PENABLE(s_apb_PENABLE),
+      .s_apb_PREADY(s_apb_PREADY),
+      .s_apb_PWRITE(s_apb_PWRITE),
+      .s_apb_PWDATA(s_apb_PWDATA),
+      .s_apb_PRDATA(s_apb_PRDATA),
+      .s_apb_PSLVERROR(s_apb_PSLVERROR),
+      .thread_empty(core_empty),
+      .thread_sw_reset(frontend_sw_reset),
+      .tile_x_index(tile_x_index),
+      .tile_y_index(tile_y_index)
+  );
+
+  assign bb_min_x = {tile_x_index, {TileOffsetWidthX{1'b0}}};
+  assign bb_min_y = {tile_y_index, {TileOffsetWidthY{1'b0}}};
+  assign bb_max_x = {tile_x_index, {TileOffsetWidthX{1'b1}}};
+  assign bb_max_y = {tile_y_index, {TileOffsetWidthY{1'b1}}};
+
+  assign input_skid_source = in_data;
   assign pipe_advance = output_skid_s_ready;
   assign ready_out = input_skid_ready;
   assign input_skid_m_ready = pipe_advance;
-  assign input_skid_data = frontend_skid_data_t'(input_skid_data_bits);
+  assign input_skid_data = frontend_data_in_t'(input_skid_data_bits);
 
   axis_skid_buffer #(
       .WIDTH(InputWidth)
   ) u_input_skid (
       .aclk(clk),
-      .aresetn(rst_n),
+      .aresetn(local_reset_n),
       .s_axis_tdata(input_skid_source),
       .s_axis_tvalid(valid_in),
       .s_axis_tready(input_skid_ready),
@@ -111,23 +148,22 @@ module raster_frontend (
   raster_frontend_fixed_core u_generated_core (
       .clk(clk),
       .clken(pipe_advance),
-      .rst_n(rst_n),
-      .in_v0_x(input_skid_data.data.v0.position.x),
-      .in_v0_y(input_skid_data.data.v0.position.y),
-      .in_v1_x(input_skid_data.data.v1.position.x),
-      .in_v1_y(input_skid_data.data.v1.position.y),
-      .in_v2_x(input_skid_data.data.v2.position.x),
-      .in_v2_y(input_skid_data.data.v2.position.y),
-      .in_bin_min_x(input_skid_data.bin_min_x),
-      .in_bin_min_y(input_skid_data.bin_min_y),
-      .in_bin_max_x(input_skid_data.bin_max_x),
-      .in_bin_max_y(input_skid_data.bin_max_y),
-      .in_v0_u(input_skid_data.data.v0.u),
-      .in_v0_v(input_skid_data.data.v0.v),
-      .in_v1_u(input_skid_data.data.v1.u),
-      .in_v1_v(input_skid_data.data.v1.v),
-      .in_v2_u(input_skid_data.data.v2.u),
-      .in_v2_v(input_skid_data.data.v2.v),
+      .in_v0_x(input_skid_data.v0.position.x),
+      .in_v0_y(input_skid_data.v0.position.y),
+      .in_v1_x(input_skid_data.v1.position.x),
+      .in_v1_y(input_skid_data.v1.position.y),
+      .in_v2_x(input_skid_data.v2.position.x),
+      .in_v2_y(input_skid_data.v2.position.y),
+      .in_bin_min_x(bb_min_x),
+      .in_bin_min_y(bb_min_y),
+      .in_bin_max_x(bb_max_x),
+      .in_bin_max_y(bb_max_y),
+      .in_v0_u(input_skid_data.v0.u),
+      .in_v0_v(input_skid_data.v0.v),
+      .in_v1_u(input_skid_data.v1.u),
+      .in_v1_v(input_skid_data.v1.v),
+      .in_v2_u(input_skid_data.v2.u),
+      .in_v2_v(input_skid_data.v2.v),
       .out_invArea(output_data_internal.inv_area),
       .out_w0(output_data_internal.init_e0),
       .out_w1(output_data_internal.init_e1),
@@ -151,21 +187,21 @@ module raster_frontend (
   );
 
   always_comb begin
-    passthrough_in.tex_id = input_skid_data.data.tex_id;
-    passthrough_in.texture_mode_u = input_skid_data.data.texture_mode_u;
-    passthrough_in.texture_mode_v = input_skid_data.data.texture_mode_v;
-    passthrough_in.texture_function = input_skid_data.data.texture_function;
-    passthrough_in.sfactor_op = input_skid_data.data.sfactor_op;
-    passthrough_in.dfactor_op = input_skid_data.data.dfactor_op;
-    passthrough_in.v0_z = input_skid_data.data.v0.position.z;
-    passthrough_in.v0_w = input_skid_data.data.v0.position.w;
-    passthrough_in.v0_color = input_skid_data.data.v0.color;
-    passthrough_in.v1_z = input_skid_data.data.v1.position.z;
-    passthrough_in.v1_w = input_skid_data.data.v1.position.w;
-    passthrough_in.v1_color = input_skid_data.data.v1.color;
-    passthrough_in.v2_z = input_skid_data.data.v2.position.z;
-    passthrough_in.v2_w = input_skid_data.data.v2.position.w;
-    passthrough_in.v2_color = input_skid_data.data.v2.color;
+    passthrough_in.tex_id = input_skid_data.tex_id;
+    passthrough_in.texture_mode_u = input_skid_data.texture_mode_u;
+    passthrough_in.texture_mode_v = input_skid_data.texture_mode_v;
+    passthrough_in.texture_function = input_skid_data.texture_function;
+    passthrough_in.sfactor_op = input_skid_data.sfactor_op;
+    passthrough_in.dfactor_op = input_skid_data.dfactor_op;
+    passthrough_in.v0_z = input_skid_data.v0.position.z;
+    passthrough_in.v0_w = input_skid_data.v0.position.w;
+    passthrough_in.v0_color = input_skid_data.v0.color;
+    passthrough_in.v1_z = input_skid_data.v1.position.z;
+    passthrough_in.v1_w = input_skid_data.v1.position.w;
+    passthrough_in.v1_color = input_skid_data.v1.color;
+    passthrough_in.v2_z = input_skid_data.v2.position.z;
+    passthrough_in.v2_w = input_skid_data.v2.position.w;
+    passthrough_in.v2_color = input_skid_data.v2.color;
   end
 
   delay_pipe #(
@@ -184,7 +220,7 @@ module raster_frontend (
       .STAGES(FrontendLatency)
   ) u_valid_delay (
       .clk(clk),
-      .rst_n(rst_n),
+      .rst_n(local_reset_n),
       .clken(pipe_advance),
       .data_in(input_skid_valid),
       .data_out(delayed_valid)
@@ -210,7 +246,7 @@ module raster_frontend (
       .WIDTH(OutputWidth)
   ) u_output_skid (
       .aclk(clk),
-      .aresetn(rst_n),
+      .aresetn(local_reset_n),
       .s_axis_tdata(output_data_internal),
       .s_axis_tvalid(delayed_valid),
       .s_axis_tready(output_skid_s_ready),
@@ -237,7 +273,7 @@ module raster_frontend (
   assign core_empty = core_inflight_count == '0;
 
   always_ff @(posedge clk) begin
-    if (!rst_n) core_inflight_count <= '0;
+    if (!local_reset_n) core_inflight_count <= '0;
     else begin
       case ({
         frontend_input_fire, frontend_output_fire

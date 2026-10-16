@@ -5,16 +5,20 @@ import gpu_types_pkg::*;
 module tb_raster_frontend_csv;
   logic clk = 1'b0;
   logic rst_n = 1'b0;
+  logic [4:0] s_apb_PADDR = '0;
+  logic [0:0] s_apb_PSEL = '0;
+  logic s_apb_PENABLE = 1'b0;
+  logic s_apb_PREADY;
+  logic s_apb_PWRITE = 1'b0;
+  logic [31:0] s_apb_PWDATA = '0;
+  logic [31:0] s_apb_PRDATA;
+  logic s_apb_PSLVERROR;
   logic valid_in = 1'b0;
   logic ready_out;
   logic ready_in = 1'b1;
   logic valid_out;
   logic core_empty;
   frontend_data_in_t in_data = '0;
-  uint12_t bin_min_x = '0;
-  uint12_t bin_min_y = '0;
-  uint12_t bin_max_x = '0;
-  uint12_t bin_max_y = '0;
   orchestrator_data_in_t out_data;
 
   integer input_file;
@@ -32,6 +36,11 @@ module tb_raster_frontend_csv;
   integer expected_min_x_local;
   integer expected_min_y_local;
   integer rows_checked = 0;
+  integer configured_tile_x = -1;
+  integer configured_tile_y = -1;
+  integer target_tile_x;
+  integer target_tile_y;
+  logic [31:0] apb_readback;
   string input_path;
   string expected_path;
 
@@ -45,13 +54,19 @@ module tb_raster_frontend_csv;
   raster_frontend dut (
       .clk(clk),
       .rst_n(rst_n),
+      .apb_clk(clk),
+      .apb_rst_n(rst_n),
+      .s_apb_PADDR(s_apb_PADDR),
+      .s_apb_PSEL(s_apb_PSEL),
+      .s_apb_PENABLE(s_apb_PENABLE),
+      .s_apb_PREADY(s_apb_PREADY),
+      .s_apb_PWRITE(s_apb_PWRITE),
+      .s_apb_PWDATA(s_apb_PWDATA),
+      .s_apb_PRDATA(s_apb_PRDATA),
+      .s_apb_PSLVERROR(s_apb_PSLVERROR),
       .valid_in(valid_in),
       .ready_out(ready_out),
       .in_data(in_data),
-      .bin_min_x(bin_min_x),
-      .bin_min_y(bin_min_y),
-      .bin_max_x(bin_max_x),
-      .bin_max_y(bin_max_y),
       .ready_in(ready_in),
       .valid_out(valid_out),
       .core_empty(core_empty),
@@ -59,6 +74,55 @@ module tb_raster_frontend_csv;
   );
 
   always #5 clk = ~clk;
+
+  task automatic apb_write(input logic [4:0] address, input logic [31:0] data);
+    begin
+      @(negedge clk);
+      s_apb_PADDR = address;
+      s_apb_PSEL = 1'b1;
+      s_apb_PWRITE = 1'b1;
+      s_apb_PWDATA = data;
+      @(negedge clk);
+      s_apb_PENABLE = 1'b1;
+      @(negedge clk);
+      s_apb_PSEL = 1'b0;
+      s_apb_PENABLE = 1'b0;
+      s_apb_PWRITE = 1'b0;
+    end
+  endtask
+
+  task automatic apb_read(input logic [4:0] address, output logic [31:0] data);
+    begin
+      @(negedge clk);
+      s_apb_PADDR = address;
+      s_apb_PSEL = 1'b1;
+      s_apb_PWRITE = 1'b0;
+      s_apb_PENABLE = 1'b0;
+      @(posedge clk);
+      #1;
+      data = s_apb_PRDATA;
+      if (s_apb_PSLVERROR)
+        $fatal(1, "APB read error at address 0x%0h", address);
+      @(negedge clk);
+      s_apb_PENABLE = 1'b1;
+      @(negedge clk);
+      s_apb_PSEL = 1'b0;
+      s_apb_PENABLE = 1'b0;
+    end
+  endtask
+
+  task automatic wait_frontend_empty;
+    integer wait_cycles;
+    begin
+      wait_cycles = 0;
+      while (!core_empty) begin
+        @(negedge clk);
+        wait_cycles = wait_cycles + 1;
+        if (wait_cycles >= 1000)
+          $fatal(1, "frontend did not become empty before tile reconfiguration");
+      end
+    end
+  endtask
 
   function automatic logic [31:0] to_fp32(input real value);
     shortreal single_value;
@@ -226,10 +290,42 @@ module tb_raster_frontend_csv;
         in_data.v1.v = to_fp32(v1_v);
         in_data.v2.u = to_fp32(v2_u);
         in_data.v2.v = to_fp32(v2_v);
-        bin_min_x = bin_min_x_value;
-        bin_min_y = bin_min_y_value;
-        bin_max_x = bin_max_x_value;
-        bin_max_y = bin_max_y_value;
+        if (((bin_min_x_value % TILE_SIZE_X) != 0)
+            || ((bin_min_y_value % TILE_SIZE_Y) != 0)
+            || (bin_max_x_value != bin_min_x_value + TILE_SIZE_X - 1)
+            || (bin_max_y_value != bin_min_y_value + TILE_SIZE_Y - 1))
+          $fatal(1, "CSV bounds do not describe a full tile");
+        target_tile_x = bin_min_x_value / TILE_SIZE_X;
+        target_tile_y = bin_min_y_value / TILE_SIZE_Y;
+        if ((configured_tile_x != target_tile_x)
+            || (configured_tile_y != target_tile_y)) begin
+          wait_frontend_empty();
+          if (configured_tile_x != target_tile_x)
+            apb_write(5'h04, target_tile_x);
+          if (configured_tile_y != target_tile_y)
+            apb_write(5'h08, target_tile_y);
+
+          apb_read(5'h04, apb_readback);
+          if (apb_readback !== {27'b0, target_tile_x[4:0]})
+            $fatal(
+                1,
+                "APB tile X readback mismatch: got %0d expected %0d",
+                apb_readback[4:0],
+                target_tile_x
+            );
+          apb_read(5'h08, apb_readback);
+          if (apb_readback !== {27'b0, target_tile_y[4:0]})
+            $fatal(
+                1,
+                "APB tile Y readback mismatch: got %0d expected %0d",
+                apb_readback[4:0],
+                target_tile_y
+            );
+
+          configured_tile_x = target_tile_x;
+          configured_tile_y = target_tile_y;
+          repeat (8) @(posedge clk);
+        end
 
         @(negedge clk);
         while (!ready_out) @(negedge clk);

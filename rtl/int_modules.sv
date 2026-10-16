@@ -209,8 +209,9 @@ module tri_bb_aligned_boundries #(
     output logic signed [WIDTH-FRACTIONAL-1:0] min_val,
     output logic signed [WIDTH-FRACTIONAL-1:0] max_val
 );
-
+  // verilator lint_off UNUSEDSIGNAL
   logic signed [WIDTH-1:0] c_reg, min1, max1, min2, max2;
+  // verilator lint_on UNUSEDSIGNAL
 
   always_ff @(posedge clk) begin
     if (clken) begin

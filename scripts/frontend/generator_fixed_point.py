@@ -92,6 +92,14 @@ class Value:
         self.producer = producer
         self.bit_slice = bit_slice
         self.attributes = {}
+        self.batch_constant = False
+
+    def as_batch_constant(self):
+        """Keep this input stable until all active pipeline iterations finish."""
+        if self not in self.graph.inputs:
+            raise ValueError("Only inputs can be marked as batch-constant.")
+        self.batch_constant = True
+        return self
 
     def add_attribute(self, attributes: dict[str, str | int | bool]):
         if not isinstance(attributes, dict):
@@ -288,6 +296,14 @@ class UInt12(Value):
     OP_LATENCIES = {"fp32_to_uint12": 2, "int_add": 1, "int_sub": 1}
 
 
+class ScreenAddrX(UInt12):
+    KIND = "screen_addr_x"
+
+
+class ScreenAddrY(UInt12):
+    KIND = "screen_addr_y"
+
+
 class UInt14(Value):
     KIND = "uint14"
     SIGNED = False
@@ -334,6 +350,8 @@ ANNOTATION_TYPES = {
     UInt8,
     UInt32,
     UInt12,
+    ScreenAddrX,
+    ScreenAddrY,
     UInt14,
     TileAddrX,
     TileAddrY,
@@ -813,6 +831,8 @@ class Graph:
             UInt8,
             UInt32,
             UInt12,
+            ScreenAddrX,
+            ScreenAddrY,
             TileAddrX,
             TileAddrY,
         ):
@@ -1293,8 +1313,15 @@ def export_pipeline_rtl(
     module_name="raster_frontend_core",
     latency_name="RASTER_FRONTEND_LATENCY",
 ):
-    """Write an includable module; the latency localparam sits at file scope."""
+    """Write a module, omitting alignment delays for batch-constant inputs."""
     operations, starts, ends, latencies, total = pipeline_schedule(graph)
+    batch_constants = {value for value in graph.inputs if value.batch_constant}
+    for value in operations:
+        if latencies[value.op] == 0 and all(
+            operand in batch_constants or operand.constant is not _NOT_CONSTANT
+            for operand in value.operands
+        ):
+            batch_constants.add(value)
     declarations = []
     logic = []
     delays = {}
@@ -1327,6 +1354,8 @@ def export_pipeline_rtl(
             TileAddrX: "tile_addr_x_t",
             TileAddrY: "tile_addr_y_t",
             UInt12: "uint12_t",
+            ScreenAddrX: "screen_addr_x_t",
+            ScreenAddrY: "screen_addr_y_t",
         }
         if type(value) is UInt1:
             return f"logic {name}"
@@ -1359,6 +1388,10 @@ def export_pipeline_rtl(
             return "$bits(tile_addr_x_t)"
         if type(value) is TileAddrY:
             return "$bits(tile_addr_y_t)"
+        if type(value) is ScreenAddrX:
+            return "$bits(screen_addr_x_t)"
+        if type(value) is ScreenAddrY:
+            return "$bits(screen_addr_y_t)"
         return value_width(value)
 
     def base(value):
@@ -1384,6 +1417,8 @@ def export_pipeline_rtl(
 
     def aligned(value, cycle):
         signal, ready_cycle = base(value)
+        if (value.producer or value) in batch_constants:
+            return signal
         retimed = retimed_registers.get(value)
         if retimed is not None and cycle == starts[retimed[0]]:
             return signal
@@ -1429,23 +1464,15 @@ def export_pipeline_rtl(
         operands = [aligned(operand, operand_cycle) for operand in value.operands]
         latency = latencies[value.op]
         ports = [".aclk(clk)", ".aclken(clken)", ".valid_in(1'b1)"]
-        if value.op == "fp_neg":
-            inline_pipeline(value, f"{operands[0]} ^ 32'h80000000")
-            continue
-        if value.op in ("fp_add", "fp_sub", "fp_mul", "fp_recip", "fp32_to_int16"):
+        if value.op == "fp_recip":
             ports.append(f".a({operands[0]})")
-            if len(operands) == 2:
-                ports.append(f".b({operands[1]})")
             ports.append(f".result({name})")
             logic.append(
                 f"{value.op} #(.LATENCY({latency})) u_{value.name} ({', '.join(ports)});"
             )
         elif value.op in (
-            "fp32_to_uint12",
             "fp_to_fx14_10",
             "fx28_20_to_fp32",
-            "fp_to_fx14_17",
-            "fp_to_fx27_16",
             "fp_to_fx5_13",
         ):
             logic.append(
@@ -1463,18 +1490,6 @@ def export_pipeline_rtl(
             )
             logic.append(
                 f"tri_bb_aligned_boundries #(.WIDTH(24), .FRACTIONAL(10)) u_{value.name} "
-                f"(.clk(clk), .clken(clken), .a({operands[0]}), .b({operands[1]}), "
-                f".c({operands[2]}), .min_val({name}_min), .max_val({name}_max));"
-            )
-        elif value.op == "int_min_max_3":
-            declarations.extend(
-                [
-                    variable_declaration(value, f"{name}_min") + ";",
-                    variable_declaration(value, f"{name}_max") + ";",
-                ]
-            )
-            logic.append(
-                f"int_min_max_3 #(.WIDTH({value_width(value)})) u_{value.name} "
                 f"(.clk(clk), .clken(clken), .a({operands[0]}), .b({operands[1]}), "
                 f".c({operands[2]}), .min_val({name}_min), .max_val({name}_max));"
             )
@@ -1497,68 +1512,23 @@ def export_pipeline_rtl(
                 f"u_{value.name} (.clk(clk), .clken(clken), .a({operands[0]}), "
                 f".b({operands[1]}), .p({name}));"
             )
-        elif value.op in ("int_mul_add", "int_mul_sub"):
-            if (
-                type(value) is not Fx28_20
-                or len(value.operands) != 3
-                or type(value.operands[0]) is not Fx14_10
-                or type(value.operands[1]) is not Fx14_10
-                or type(value.operands[2]) is not Fx28_20
-            ):
-                raise TypeError(
-                    f"{value.op} requires Fx14_10 multiplicands and an Fx28_20 addend."
-                )
-            subtract = "1'b1" if value.op == "int_mul_sub" else "1'b0"
-            logic.append(
-                f"int_mul_add #(.WIDTHA(24), .WIDTHB(24), .WIDTHP(48), "
-                f".SUBTRACT({subtract}), .INPUT_BUFFERS(1), .OUTPUT_BUFFERS(2), "
-                f".LATENCY({latency})) u_{value.name} (.clk(clk), .clken(clken), "
-                f".a({operands[0]}), .b({operands[1]}), .c({operands[2]}), .p({name}));"
-            )
         elif value.op in (
             "uint12_to_uint14",
             "uint14_to_uint12",
-            "uint12_to_fx14_10",
-            "uint14_to_fx14_10",
             "uint14_to_fx14_10_pixel_center",
-            "fx14_10_to_uint12",
         ):
             operand = operands[0]
             expressions = {
                 "uint12_to_uint14": f"{{2'b0, {operand}}}",
                 "uint14_to_uint12": f"{operand}[11:0]",
-                "uint12_to_fx14_10": f"{{2'b0, {operand}, 10'b0}}",
-                "uint14_to_fx14_10": f"{{{operand}, 10'b0}}",
                 "uint14_to_fx14_10_pixel_center": f"{{{operand}, 1'b1, 9'b0}}",
-                "fx14_10_to_uint12": f"{operand}[21:10]",
             }
+            if value.op == "uint12_to_uint14" and type(value.operands[0]) in (
+                ScreenAddrX,
+                ScreenAddrY,
+            ):
+                expressions[value.op] = f"uint14_t'({operand})"
             inline_pipeline(value, expressions[value.op])
-        elif value.op == "tri_bb_min_max":
-            declarations.extend(
-                [
-                    variable_declaration(value, f"{name}_min") + ";",
-                    variable_declaration(value, f"{name}_max") + ";",
-                ]
-            )
-            logic.append(
-                f"tri_bb_min_max u_{value.name} (.clk(clk), .clken(clken), .rst_n(rst_n), "
-                f".f_a({operands[0]}), .f_b({operands[1]}), .f_c({operands[2]}), "
-                f".f_min_floor({name}_min), .f_max_ceil({name}_max));"
-            )
-        elif value.op in ("fp_min_2", "fp_max_2", "fp_add_half_fast"):
-            ports = [".clk(clk)", ".clken(clken)", ".rst_n(rst_n)"]
-            if value.op == "fp_add_half_fast":
-                ports.extend([f".f_in({operands[0]})", f".f_out({name})"])
-            else:
-                suffix = "min" if value.op == "fp_min_2" else "max"
-                ports.extend(
-                    [
-                        f".f_a({operands[0]})",
-                        f".f_b({operands[1]})",
-                        f".f_{suffix}({name})",
-                    ]
-                )
-            logic.append(f"{value.op} u_{value.name} ({', '.join(ports)});")
         elif value.op in ("int_add", "int_sub"):
             if latency != 1:
                 raise ValueError(f"{value.op} RTL has a fixed latency of one cycle.")
@@ -1583,29 +1553,6 @@ def export_pipeline_rtl(
             if len(operands) != 1 or type(value) is not type(value.operands[0]):
                 raise TypeError("reg requires one input and preserves its type.")
             logic.append(f"`REG(clk, clken, {operands[0]}, {name})")
-        elif value.op == "int16_add_sub" or value.op in (
-            "fx_add",
-            "fx_sub",
-            "fx_mul",
-            "fx_min_2",
-            "fx_max_2",
-        ):
-            operator = {"add": "+", "sub": "-", "mul": "*"}.get(value.expression)
-            if operator:
-                expression = f"$signed({operands[0]}) {operator} $signed({operands[1]})"
-                if value.expression == "mul" and type(value) in (Fx14_17, Fx27_16):
-                    width = 2 * max(value_width(operand) for operand in value.operands)
-                    shift = (
-                        sum(type(operand).FRACTIONAL_BITS for operand in value.operands)
-                        - type(value).FRACTIONAL_BITS
-                    )
-                    expression = f"({width}'($signed({operands[0]})) * {width}'($signed({operands[1]}))) >>> {shift}"
-            elif value.op == "int16_add_sub":
-                expression = f"{operands[0]} - {operands[1]}"
-            else:
-                compare = "<" if value.op == "fx_min_2" else ">"
-                expression = f"$signed({operands[0]}) {compare} $signed({operands[1]}) ? {operands[0]} : {operands[1]}"
-            inline_pipeline(value, expression)
         else:
             raise ValueError(f"No RTL implementation for {value.op}.")
 
@@ -1616,7 +1563,7 @@ def export_pipeline_rtl(
             name += f"_{index}"
         outputs.append((name, aligned(value, total), value))
     logic.extend(f"assign {name} = {signal};" for name, signal, _ in outputs)
-    ports = ["input logic clk", "input logic clken", "input logic rst_n"]
+    ports = ["input logic clk", "input logic clken"]
     ports.extend(
         port_declaration(value, "input", f"in_{value.name}") for value in graph.inputs
     )
@@ -1624,7 +1571,7 @@ def export_pipeline_rtl(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(
-        "// Auto-generated by scripts/frontend/generator.py; do not edit.\n"
+        "// Auto-generated by scripts/frontend/generator_fixed_point.py; do not edit.\n"
         f"localparam int {latency_name} = {total};\n\n"
         "`define INT_ADD(CLK, CE, A, B, S) \\\n"
         "always_ff @(posedge CLK) begin \\\n"
@@ -1639,7 +1586,7 @@ def export_pipeline_rtl(
         "    if (CE) Q <= D; \\\n"
         "end\n"
         "\n\n"
-        '(* use_dsp = "simd" *)'
+        "(* use_dsp = "simd" *)\n"
         f"module {module_name} (\n  "
         + ",\n  ".join(ports)
         + "\n);\n"
@@ -1665,10 +1612,10 @@ def raster_frontend(
     v1_y: Float,
     v2_x: Float,
     v2_y: Float,
-    bin_min_x: UInt12,
-    bin_min_y: UInt12,
-    bin_max_x: UInt12,
-    bin_max_y: UInt12,
+    bin_min_x: ScreenAddrX,
+    bin_min_y: ScreenAddrY,
+    bin_max_x: ScreenAddrX,
+    bin_max_y: ScreenAddrY,
     v0_u: Float,
     v0_v: Float,
     v1_u: Float,
@@ -1676,6 +1623,10 @@ def raster_frontend(
     v2_u: Float,
     v2_v: Float,
 ):
+    bin_min_x.as_batch_constant()
+    bin_min_y.as_batch_constant()
+    bin_max_x.as_batch_constant()
+    bin_max_y.as_batch_constant()
 
     v0_x_fx = fp_to_fx14_10(v0_x)
     v0_y_fx = fp_to_fx14_10(v0_y)

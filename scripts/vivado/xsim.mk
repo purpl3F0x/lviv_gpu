@@ -7,18 +7,29 @@
 #   build/xsim/<tb>/      per-tb xsim work dir (xsim.dir, *.pb, *.jou, *.wdb)
 #   <tb>/logs/            xvlog/xvhdl/xelab logs and one log per simulation top
 #
-# Works from PowerShell/cmd and bash (make built-ins + PowerShell for mkdir/rm).
+# Works on Windows (PowerShell/cmd/bash; PowerShell for mkdir/rm) and Linux.
 
 XSIM_MK_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 REPO_ROOT := $(abspath $(XSIM_MK_DIR)/../..)
 
+ifeq ($(OS),Windows_NT)
 VIVADO_BIN ?= C:/AMDDesignTools/2025.2/Vivado/bin
+TOOL_EXT = .bat
+MKDIR = powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path '$(1)' | Out-Null"
+RMDIR = powershell -NoProfile -Command "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue '$(1)'; exit 0"
+else
+VIVADO_BIN ?= /opt/Xilinx/Vivado/2025.2/bin
+TOOL_EXT =
+MKDIR = mkdir -p '$(1)'
+RMDIR = rm -rf $(1)
+endif
+
 PART ?= xczu3eg-sbva484-1-e
-VIVADO = $(VIVADO_BIN)/vivado.bat
-XVLOG = $(VIVADO_BIN)/xvlog.bat
-XVHDL = $(VIVADO_BIN)/xvhdl.bat
-XELAB = $(VIVADO_BIN)/xelab.bat
-XSIM = $(VIVADO_BIN)/xsim.bat
+VIVADO = $(VIVADO_BIN)/vivado$(TOOL_EXT)
+XVLOG = $(VIVADO_BIN)/xvlog$(TOOL_EXT)
+XVHDL = $(VIVADO_BIN)/xvhdl$(TOOL_EXT)
+XELAB = $(VIVADO_BIN)/xelab$(TOOL_EXT)
+XSIM = $(VIVADO_BIN)/xsim$(TOOL_EXT)
 
 IP_DIR = $(REPO_ROOT)/build/vivado_ip
 IP_TCL = $(XSIM_MK_DIR)/gen_sim_ips.tcl
@@ -36,9 +47,6 @@ IP_COMPILED = $(WORK_DIR)/.ip_compiled
 
 INCLUDES ?= -i $(REPO_ROOT)/rtl -i $(REPO_ROOT)/rtl/generated
 SIM_ARGS ?=
-
-MKDIR = powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path '$(1)' | Out-Null"
-RMDIR = powershell -NoProfile -Command "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue '$(1)'; exit 0"
 
 .PHONY: ip compile run gui clean distclean
 

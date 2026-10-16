@@ -1,7 +1,7 @@
 # Vivado xsim flow for the raster frontend, using the real Xilinx FP IP (see scripts/vivado/xsim.mk).
-# Usage: make -f Makefile.vivado [simple|csv|gui_simple|gui_csv|ip|clean|distclean]
+# Usage: make -f Makefile.vivado [simple|csv|gui_simple|gui_csv|synth|impl|synth_gui|impl_gui|ooc_clean|ip|clean|distclean]
 
-RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/int_modules.sv ../../rtl/delay_pipe.sv ../../rtl/axis_skid_buffer.sv ../../rtl/fp_wrappers.sv ../../rtl/raster_frontend.sv
+RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/int_modules.sv ../../rtl/delay_pipe.sv ../../rtl/axis_skid_buffer.sv ../../rtl/fp_wrappers.sv ../../rtl/generated/APBFrontendRegs.v ../../rtl/raster_frontend.sv
 
 .DEFAULT_GOAL := simple
 include ../../scripts/vivado/xsim.mk
@@ -14,7 +14,78 @@ simple gui_simple: TB_SRCS = tb_raster_frontend_smoke.sv
 # xsim runs in the work dir, so point the tb at the CSVs in this folder.
 csv gui_csv: TOP = tb_raster_frontend_csv
 csv gui_csv: TB_SRCS = tb_raster_frontend_csv.sv
-csv gui_csv: SIM_ARGS = --testplusarg INPUTS=$(CURDIR)/frontend_inputs_float.csv --testplusarg EXPECTED=$(CURDIR)/frontend_expected.csv
+csv gui_csv: SIM_ARGS = --testplusarg "INPUTS=$(CURDIR)/frontend_inputs_float.csv" --testplusarg "EXPECTED=$(CURDIR)/frontend_expected.csv"
 
 simple csv: run
 gui_simple gui_csv: gui
+
+# ---------------------------------------------------------------------------
+# Out-of-context synthesis + implementation on ZCU104
+#   synth / impl          run only if their inputs changed (checkpoints are the make targets);
+#                         add GUI=1 to open the result in the Vivado GUI when done.
+#                         impl with stale synth runs both stages in one Vivado session.
+#   synth_gui / impl_gui  shorthand for synth GUI=1 / impl GUI=1
+#   ooc_clean             delete checkpoints and reports to force a full rerun
+# Output in build/ooc/raster_frontend (checkpoints + reports/), logs in logs/.
+# ---------------------------------------------------------------------------
+OOC_TOP = raster_frontend
+OOC_PART ?= xczu7ev-ffvc1156-2-e
+OOC_XDC = raster_frontend_ooc.xdc
+OOC_DIR = $(REPO_ROOT)/build/ooc/$(OOC_TOP)
+OOC_ARGS = $(OOC_DIR)/ooc_args.tcl
+SYNTH_DCP = $(OOC_DIR)/$(OOC_TOP)_synth.dcp
+IMPL_DCP = $(OOC_DIR)/$(OOC_TOP)_routed.dcp
+
+# Anything that changes the synthesised netlist; Makefile.vivado covers part/file-list changes.
+SYNTH_DEPS = $(RTL) $(OOC_XDC) $(wildcard ../../rtl/*.svh ../../rtl/generated/*.svh) \
+             $(IP_UNITS_TCL) $(XSIM_MK_DIR)/ooc_flow.tcl Makefile.vivado
+
+# Passed to Vivado as a Tcl file so paths never go through cmd.exe argument splitting.
+define OOC_ARGS_TCL
+set part $(OOC_PART)
+set top $(OOC_TOP)
+set out_dir $(OOC_DIR)
+set xdc_files [list $(abspath $(OOC_XDC))]
+set sources [list $(abspath $(RTL))]
+set include_dirs [list $(REPO_ROOT)/rtl $(REPO_ROOT)/rtl/generated]
+set stages {$(OOC_STAGES)}
+endef
+
+GUI ?=
+OOC_STAGES =
+OOC_IMPL_GOAL = $(filter impl impl_gui,$(MAKECMDGOALS))
+OPEN_GUI = cd $(OOC_DIR) && $(VIVADO) -mode gui -nojournal -log $(LOG_DIR)/gui_$(OOC_TOP).log -source $(XSIM_MK_DIR)/open_dcp.tcl -tclargs $(1)
+define RUN_OOC
+$(file >$(OOC_ARGS),$(OOC_ARGS_TCL))
+$(call MKDIR,$(LOG_DIR))
+cd $(OOC_DIR) && $(VIVADO) -mode batch -nojournal -log $(LOG_DIR)/ooc_$(OOC_TOP).log -source $(XSIM_MK_DIR)/ooc_flow.tcl -tclargs $(OOC_ARGS)
+endef
+
+.PHONY: synth impl synth_gui impl_gui ooc_clean
+
+synth: $(SYNTH_DCP)
+	$(if $(GUI),$(call OPEN_GUI,$(SYNTH_DCP)))
+
+impl: $(IMPL_DCP)
+	$(if $(GUI),$(call OPEN_GUI,$(IMPL_DCP)))
+
+synth_gui impl_gui: GUI = 1
+synth_gui: synth
+impl_gui: impl
+
+$(OOC_DIR):
+	$(call MKDIR,$@)
+
+# When implementing, a stale synthesis is not run on its own: it is queued into OOC_STAGES
+# and runs in the same Vivado session as implementation (so the Tcl can time both).
+$(SYNTH_DCP): $(SYNTH_DEPS) | $(OOC_DIR)
+	$(eval OOC_STAGES += synth)
+	$(if $(OOC_IMPL_GOAL),,$(RUN_OOC))
+
+# Also depends on SYNTH_DEPS so it is rebuilt when synthesis is queued above.
+$(IMPL_DCP): $(SYNTH_DEPS) $(SYNTH_DCP) | $(OOC_DIR)
+	$(eval OOC_STAGES += impl)
+	$(RUN_OOC)
+
+ooc_clean:
+	$(call RMDIR,$(OOC_DIR))

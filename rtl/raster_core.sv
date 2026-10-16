@@ -12,6 +12,17 @@ module raster_core (
     input logic clk,
     input logic rst_n,
 
+    input logic apb_clk,
+    input logic apb_rst_n,
+    input logic [4:0] s_apb_PADDR,
+    input logic [0:0] s_apb_PSEL,
+    input logic s_apb_PENABLE,
+    output logic s_apb_PREADY,
+    input logic s_apb_PWRITE,
+    input logic [31:0] s_apb_PWDATA,
+    output logic [31:0] s_apb_PRDATA,
+    output logic s_apb_PSLVERROR,
+
     // Input Vertex Data (Sequential)
     input vertex_t vertex_in,
 
@@ -62,6 +73,16 @@ module raster_core (
   raster_frontend u_frontend (
       .clk            (clk),
       .rst_n          (rst_n),
+      .apb_clk        (apb_clk),
+      .apb_rst_n      (apb_rst_n),
+      .s_apb_PADDR    (s_apb_PADDR),
+      .s_apb_PSEL     (s_apb_PSEL),
+      .s_apb_PENABLE  (s_apb_PENABLE),
+      .s_apb_PREADY   (s_apb_PREADY),
+      .s_apb_PWRITE   (s_apb_PWRITE),
+      .s_apb_PWDATA   (s_apb_PWDATA),
+      .s_apb_PRDATA   (s_apb_PRDATA),
+      .s_apb_PSLVERROR(s_apb_PSLVERROR),
       .vertex_in      (vertex_in),
       .tile_x_id      (tile_x_id),
       .tile_y_id      (tile_y_id),
@@ -181,4 +202,3 @@ module raster_core (
   assign valid_out = o_valid_out[0] || o_valid_out[1] || o_valid_out[2] || o_valid_out[3];
 
 endmodule
-

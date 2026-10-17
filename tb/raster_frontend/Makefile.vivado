@@ -39,7 +39,7 @@ IMPL_DCP = $(OOC_DIR)/$(OOC_TOP)_routed.dcp
 
 # Anything that changes the synthesised netlist; Makefile.vivado covers part/file-list changes.
 SYNTH_DEPS = $(RTL) $(OOC_XDC) $(wildcard ../../rtl/*.svh ../../rtl/generated/*.svh) \
-             $(IP_UNITS_TCL) $(VIVADO_MK_DIR)/ooc_flow.tcl Makefile.vivado
+             $(XILINX_IPS_TCL) $(VIVADO_MK_DIR)/ooc_flow.tcl Makefile.vivado
 
 # Passed to Vivado as a Tcl file so paths never go through cmd.exe argument splitting.
 define OOC_ARGS_TCL

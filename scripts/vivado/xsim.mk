@@ -32,7 +32,7 @@ SIM_ARGS ?=
 
 ip: $(IP_STAMP)
 
-$(IP_STAMP): $(IP_TCL) $(IP_UNITS_TCL)
+$(IP_STAMP): $(IP_TCL) $(XILINX_IPS_TCL)
 	$(call MKDIR,$(REPO_ROOT)/build)
 	cd $(REPO_ROOT)/build && $(VIVADO) -mode batch -nojournal -nolog -source $(IP_TCL) -tclargs $(IP_DIR) $(PART)
 

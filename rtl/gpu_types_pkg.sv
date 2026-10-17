@@ -157,8 +157,6 @@ package gpu_types_pkg;
     color_argb_t v2_color;
   } thread_data_in_t;
 
-  typedef logic signed [47:0] edge_fixed_t;
-
   typedef struct packed {
     fx_28_20_t init_e0;
     fx_28_20_t init_e1;
@@ -169,6 +167,11 @@ package gpu_types_pkg;
     fx_14_10_t e1_dy;
     fx_14_10_t e2_dx;
     fx_14_10_t e2_dy;
+    // Needed for thread (1,1)
+    fx_14_10_t e0_dx_plus_dy;
+    fx_14_10_t e1_dx_plus_dy;
+    fx_14_10_t e2_dx_plus_dy;
+
     // Corner 2x2 group of the box; with the group coordinates this forms the shared thread address.
     tile_addr_x_t minX_local;
     tile_addr_y_t minY_local;

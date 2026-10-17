@@ -1,4 +1,4 @@
-# Generate Xilinx floating-point IP simulation models for standalone xsim runs.
+# Generate Xilinx IP simulation models for standalone xsim runs.
 # Usage: vivado -mode batch -source gen_sim_ips.tcl -tclargs <out_dir> <part>
 
 # Re-run this file untraced: Vivado echoes every command of a -source script (the "# ..." lines).
@@ -13,7 +13,7 @@ create_project -force sim_ips $out_dir/proj -part $part
 set_property target_language Verilog [current_project]
 set_property simulator_language Mixed [current_project]
 
-source $script_dir/floatin_point_units.tcl
+source $script_dir/xilinx_ips.tcl
 
 generate_target simulation [get_ips]
 export_ip_user_files -of_objects [get_ips] -no_script -force

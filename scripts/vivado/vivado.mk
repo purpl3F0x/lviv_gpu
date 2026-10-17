@@ -25,8 +25,8 @@ XVHDL = $(VIVADO_BIN)/xvhdl$(TOOL_EXT)
 XELAB = $(VIVADO_BIN)/xelab$(TOOL_EXT)
 XSIM = $(VIVADO_BIN)/xsim$(TOOL_EXT)
 
-# Xilinx floating-point IP configuration, used by both the simulation and synthesis flows.
-IP_UNITS_TCL = $(VIVADO_MK_DIR)/floatin_point_units.tcl
+# Xilinx IP configuration (FP units, DSP macro), used by both the simulation and synthesis flows.
+XILINX_IPS_TCL = $(VIVADO_MK_DIR)/xilinx_ips.tcl
 
 # Logs of every flow go next to the Makefile that runs it.
 LOG_DIR = $(CURDIR)/logs

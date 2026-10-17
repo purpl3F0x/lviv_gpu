@@ -1,4 +1,4 @@
-# Out-of-context synthesis and/or implementation using the real Xilinx floating-point IP.
+# Out-of-context synthesis and/or implementation using the real Xilinx IP.
 # Usage: vivado -mode batch -source ooc_flow.tcl -tclargs <ooc_args.tcl>
 # ooc_args.tcl (written by the calling Makefile) sets:
 #   part top out_dir xdc_files sources include_dirs
@@ -40,7 +40,7 @@ if {"synth" in $stages} {
   add_files -fileset constrs_1 -norecurse $xdc_files
 
   # Same IP configuration as the simulation flow; synthesised inline with the design.
-  source $script_dir/floatin_point_units.tcl
+  source $script_dir/xilinx_ips.tcl
   set_property generate_synth_checkpoint false [get_files -of_objects [get_filesets sources_1] *.xci]
   generate_target all [get_ips]
 

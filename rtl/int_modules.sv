@@ -40,7 +40,7 @@ module int_mul #(
     input logic clken,
     input logic signed [WIDTHA-1:0] a,
     input logic signed [WIDTHB-1:0] b,
-    output logic [WIDTHP-1:0] p
+    output logic signed [WIDTHP-1:0] p
 );
 
   if (LATENCY != 1 + OUTPUT_BUFFERS + INPUT_BUFFERS)
@@ -107,7 +107,7 @@ module int_mul_add #(
     input logic signed [WIDTHA-1:0] a,
     input logic signed [WIDTHB-1:0] b,
     input logic signed [WIDTHP-1:0] c,  // Input non-pipelined
-    output logic [WIDTHP-1:0] p
+    output logic signed [WIDTHP-1:0] p
 );
 
   if (LATENCY != 2 + OUTPUT_BUFFERS + INPUT_BUFFERS)

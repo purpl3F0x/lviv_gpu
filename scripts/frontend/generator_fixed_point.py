@@ -1585,9 +1585,8 @@ def export_pipeline_rtl(
         "always_ff @(posedge CLK) begin \\\n"
         "    if (CE) Q <= D; \\\n"
         "end\n"
-        "\n\n"
-        "(* use_dsp = "simd" *)\n"
-        f"module {module_name} (\n  "
+        "\n\n(* use_dsp = \"simd\" *)\n"
+        + f"module {module_name} (\n  "
         + ",\n  ".join(ports)
         + "\n);\n"
         + "\n // Declarations\n"

@@ -4,6 +4,9 @@
 #   part top out_dir xdc_files sources include_dirs
 #   stages   any of {synth impl}; impl without synth starts from the existing synth checkpoint
 
+# Re-run this file untraced: Vivado echoes every command of a -source script (the "# ..." lines).
+if {![info exists ::untraced]} { set ::untraced 1; source -notrace [info script]; return }
+
 set flow_start [clock seconds]
 source [lindex $argv 0]
 set script_dir [file dirname [file normalize [info script]]]

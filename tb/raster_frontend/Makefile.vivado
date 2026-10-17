@@ -1,4 +1,5 @@
-# Vivado xsim flow for the raster frontend, using the real Xilinx FP IP (see scripts/vivado/xsim.mk).
+# Vivado flows for the raster frontend, using the real Xilinx FP IP:
+#   xsim simulation (scripts/vivado/xsim.mk) and out-of-context synth/impl (below, scripts/vivado/ooc_flow.tcl).
 # Usage: make -f Makefile.vivado [simple|csv|gui_simple|gui_csv|synth|impl|synth_gui|impl_gui|ooc_clean|ip|clean|distclean]
 
 RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/int_modules.sv ../../rtl/delay_pipe.sv ../../rtl/axis_skid_buffer.sv ../../rtl/fp_wrappers.sv ../../rtl/generated/APBFrontendRegs.v ../../rtl/raster_frontend.sv
@@ -38,7 +39,7 @@ IMPL_DCP = $(OOC_DIR)/$(OOC_TOP)_routed.dcp
 
 # Anything that changes the synthesised netlist; Makefile.vivado covers part/file-list changes.
 SYNTH_DEPS = $(RTL) $(OOC_XDC) $(wildcard ../../rtl/*.svh ../../rtl/generated/*.svh) \
-             $(IP_UNITS_TCL) $(XSIM_MK_DIR)/ooc_flow.tcl Makefile.vivado
+             $(IP_UNITS_TCL) $(VIVADO_MK_DIR)/ooc_flow.tcl Makefile.vivado
 
 # Passed to Vivado as a Tcl file so paths never go through cmd.exe argument splitting.
 define OOC_ARGS_TCL
@@ -54,11 +55,11 @@ endef
 GUI ?=
 OOC_STAGES =
 OOC_IMPL_GOAL = $(filter impl impl_gui,$(MAKECMDGOALS))
-OPEN_GUI = cd $(OOC_DIR) && $(VIVADO) -mode gui -nojournal -log $(LOG_DIR)/gui_$(OOC_TOP).log -source $(XSIM_MK_DIR)/open_dcp.tcl -tclargs $(1)
+OPEN_GUI = cd $(OOC_DIR) && $(VIVADO) -mode gui -nojournal -log $(LOG_DIR)/gui_$(OOC_TOP).log -source $(VIVADO_MK_DIR)/open_dcp.tcl -tclargs $(1)
 define RUN_OOC
 $(file >$(OOC_ARGS),$(OOC_ARGS_TCL))
 $(call MKDIR,$(LOG_DIR))
-cd $(OOC_DIR) && $(VIVADO) -mode batch -nojournal -log $(LOG_DIR)/ooc_$(OOC_TOP).log -source $(XSIM_MK_DIR)/ooc_flow.tcl -tclargs $(OOC_ARGS)
+cd $(OOC_DIR) && $(VIVADO) -mode batch -nojournal -log $(LOG_DIR)/ooc_$(OOC_TOP).log -source $(VIVADO_MK_DIR)/ooc_flow.tcl -tclargs $(OOC_ARGS)
 endef
 
 .PHONY: synth impl synth_gui impl_gui ooc_clean

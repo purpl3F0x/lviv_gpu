@@ -1,4 +1,4 @@
-# LVIL GPU
+# LVIV GPU
 
 A work-in-progress FPGA GPU in SystemVerilog, with a C++ reference rasterizer.
 

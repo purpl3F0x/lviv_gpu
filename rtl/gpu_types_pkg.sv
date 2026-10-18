@@ -167,10 +167,6 @@ package gpu_types_pkg;
     fx_14_10_t e1_dy;
     fx_14_10_t e2_dx;
     fx_14_10_t e2_dy;
-    // Needed for thread (1,1)
-    fx_14_10_t e0_dx_plus_dy;
-    fx_14_10_t e1_dx_plus_dy;
-    fx_14_10_t e2_dx_plus_dy;
 
     // Corner 2x2 group of the box; with the group coordinates this forms the shared thread address.
     tile_addr_x_t minX_local;

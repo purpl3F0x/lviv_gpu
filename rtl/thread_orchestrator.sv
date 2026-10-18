@@ -16,21 +16,22 @@ module thread_orchestrator #(
     input logic rst_n,
     input logic ready_in[4],
     output logic valid_out[4],
-    output thread_data_in_t out_data[4]
+    output thread_data_in_t out_data[4],
+
+    // Status: no triangle queued, no group in the pipeline and every thread FIFO drained.
+    output logic empty
 );
 
-  localparam int AccumulatorLatency = 2;
+  localparam int AccumulatorLatency = 4;
   localparam int ConverterLatency = 7;
   localparam int PipeLatency = AccumulatorLatency + ConverterLatency;
-  localparam int InFifoDepth = 16;
+  localparam int InFifoDepth = 32;  // On US+ any less than 32 wastes resources
   localparam int ThreadFifoDepth = 32;
-  localparam int DelayDepth = 2 ** $clog2(PipeLatency);
-  localparam int DelayAddrW = $clog2(DelayDepth);
 
-  // DSP instructions, in the order configured in dsp_macro_0.
-  localparam logic [1:0] Load = 2'd0,  // CONCAT + C
-                         Add = 2'd1,   // P + CONCAT
-                         Sub = 2'd2;   // P - CONCAT
+  // Group operations of the snake traversal.
+  localparam logic [1:0] Load = 2'd0,  // first group of a triangle: init + lane offset
+  Add = 2'd1,  // step right or down
+  Sub = 2'd2;  // step left
 
   // Thread token fields that do not come from the DSPs; they travel beside the DSP pipeline.
   typedef struct packed {
@@ -47,10 +48,6 @@ module thread_orchestrator #(
     color_argb_t v0_color, v1_color, v2_color;
   } passthrough_t;
 
-  // 14.10 edge deltas aligned to the 28.20 edge format.
-  function automatic fx_28_20_t align_delta(input fx_14_10_t delta);
-    return fx_28_20_t'(delta) <<< 10;
-  endfunction
 
   //
   // Input FIFO (frontend clock to orchestrator clock)
@@ -88,7 +85,9 @@ module thread_orchestrator #(
   // Snake traversal
   //
 
-  logic advance, issue, issue_last, issue_down;
+  (*max_fanout=1000*) logic advance;
+
+  logic issue, issue_last, issue_down;
   logic [1:0] issue_op;
   logic busy, dir_right, dir_right_q, step_down_q, last_q;
   logic [1:0] step_op_q;
@@ -161,36 +160,45 @@ module thread_orchestrator #(
   // Edge accumulators
   //
 
-  fx_28_20_t init[3], dx[3], dy[3], dxdy[3];
-  fx_28_20_t concat_operand[3], c_operand[4][3], edges[4][3];
+  // edge = init + (x * dx + y * dy) * 1024: the DSP multiplier aligns the 14.10 deltas to 28.20,
+  // and the pre-adder picks the delta term from A = dx and D = dy through INMODE.
+  localparam logic [4:0] InmodeZero = 5'b00010,  // A gated, D off: 0
+  InmodeA = 5'b00000,  // dx
+  InmodeNegA = 5'b01000,  // D off, D - A: -dx
+  InmodeD = 5'b00110,  // A gated, D on: dy
+  InmodeAD = 5'b00100;  // dx + dy
+
+  // On load each lane adds its pixel's offset inside the 2x2 group (lane = {ly, lx}).
+  localparam logic [3:0][4:0] LoadInmode = {InmodeAD, InmodeD, InmodeA, InmodeZero};
+  // A group step moves two pixels.
+  localparam logic signed [17:0] LoadScale = 18'sd1024, StepScale = 18'sd2048;
+
+  fx_28_20_t init[3], edges[4][3];
+  fx_28_20_t init_q[2][3];
+  fx_14_10_t dx[3], dy[3];
+  logic [4:0] step_inmode;
+  logic [1:0] load_q;
   logic [3:0][2:0][31:0] results;
 
   assign init = '{triangle.init_e0, triangle.init_e1, triangle.init_e2};
-  assign dx = '{
-          align_delta(triangle.e0_dx), align_delta(triangle.e1_dx), align_delta(triangle.e2_dx)
-      };
-  assign dy = '{
-          align_delta(triangle.e0_dy), align_delta(triangle.e1_dy), align_delta(triangle.e2_dy)
-      };
-  assign dxdy = '{
-          align_delta(triangle.e0_dx_plus_dy),
-          align_delta(triangle.e1_dx_plus_dy),
-          align_delta(triangle.e2_dx_plus_dy)
-      };
+  assign dx = '{triangle.e0_dx, triangle.e1_dx, triangle.e2_dx};
+  assign dy = '{triangle.e0_dy, triangle.e1_dy, triangle.e2_dy};
 
-  // CONCAT is shared by all lanes: the edge value on load, then the 2x2 group step.
-  // C is a fixed per-lane offset to the lane's pixel inside the group, used only on load.
-  for (genvar edge_idx = 0; edge_idx < 3; edge_idx++) begin : g_operand
-    always_comb begin
-      if (issue_op == Load) concat_operand[edge_idx] = init[edge_idx];
-      else if (issue_down) concat_operand[edge_idx] = dy[edge_idx] <<< 1;
-      else concat_operand[edge_idx] = dx[edge_idx] <<< 1;
+  // Right adds dx, left subtracts it, down adds dy.
+  always_comb begin
+    if (issue_down) step_inmode = InmodeD;
+    else if (issue_op == Sub) step_inmode = InmodeNegA;
+    else step_inmode = InmodeA;
+  end
+
+  // init and the load select enter at the DSP's ALU stage, two advancing cycles after issue.
+  // Shared by the four lanes.
+  always_ff @(posedge clk) begin
+    if (advance) begin
+      init_q[0] <= init;
+      init_q[1] <= init_q[0];
+      load_q <= {load_q[0], issue_op == Load};
     end
-
-    assign c_operand[0][edge_idx] = '0;
-    assign c_operand[1][edge_idx] = dx[edge_idx];
-    assign c_operand[2][edge_idx] = dy[edge_idx];
-    assign c_operand[3][edge_idx] = dxdy[edge_idx];
   end
 
   logic [PipeLatency-1:0] valid_pipe;
@@ -205,9 +213,12 @@ module thread_orchestrator #(
       orchestrator_alu u_alu (
           .clk(clk),
           .clken(advance),
-          .op(issue_op),
-          .concat_operand(concat_operand[edge_idx]),
-          .c_operand(c_operand[lane][edge_idx]),
+          .a(dx[edge_idx]),
+          .d(dy[edge_idx]),
+          .b(issue_op == Load ? LoadScale : StepScale),
+          .inmode(issue_op == Load ? LoadInmode[lane] : step_inmode),
+          .c(init_q[1][edge_idx]),
+          .load(load_q[1]),
           .result(edges[lane][edge_idx])
       );
 
@@ -228,10 +239,9 @@ module thread_orchestrator #(
   // Passthrough delay line
   //
 
-  // Written every advancing cycle so it stays aligned with the DSP and converter pipeline;
-  // the read pointer trails the write pointer by PipeLatency - 1, plus the output register.
-  (* ram_style = "distributed" *) passthrough_t delay_mem[DelayDepth];
-  logic [DelayAddrW-1:0] delay_wr_ptr, delay_rd_ptr;
+  // 1 registers delay_in before the LUTRAM (same latency, one RAM entry fewer).
+  localparam int DelayInReg = 1;
+
   passthrough_t delay_in, delay_out;
 
   always_comb begin
@@ -260,28 +270,26 @@ module thread_orchestrator #(
     delay_in.v2_color = triangle.v2_color;
   end
 
-  always_ff @(posedge clk) begin
-    if (!rst_n) begin
-      delay_wr_ptr <= '0;
-      delay_rd_ptr <= DelayAddrW'(DelayDepth - (PipeLatency - 1));
-    end else if (advance) begin
-      delay_wr_ptr <= delay_wr_ptr + 1'b1;
-      delay_rd_ptr <= delay_rd_ptr + 1'b1;
-    end
-  end
-
-  always_ff @(posedge clk) begin
-    if (advance) begin
-      delay_mem[delay_wr_ptr] <= delay_in;
-      delay_out <= delay_mem[delay_rd_ptr];
-    end
-  end
+  // Written every advancing cycle so it stays aligned with the DSP and converter pipeline:
+  // a group leaves PipeLatency advancing cycles after issue, together with its converter results.
+  delay_pipe_fifo #(
+      .WIDTH ($bits(passthrough_t)),
+      .STAGES(PipeLatency),
+      .IN_REG(DelayInReg)
+  ) u_passthrough_delay (
+      .clk(clk),
+      .rst_n(rst_n),
+      .clken(advance),
+      .data_in(delay_in),
+      .data_out(delay_out)
+  );
 
   //
   // Thread FIFOs
   //
 
   logic [3:0] fifo_almost_full;
+  logic [3:0][$clog2(ThreadFifoDepth):0] thread_fill;
   logic out_fire;
   thread_data_in_t fifo_wdata[4];
 
@@ -336,7 +344,7 @@ module thread_orchestrator #(
         .wr_en(out_fire),
         .rd_en(ready_in[lane]),
         .data_o(rdata),
-        .fill_cnt(),
+        .fill_cnt(thread_fill[lane]),
         .fifo_full(),
         .fifo_almost_full(fifo_almost_full[lane]),
         .fifo_empty(fifo_empty)
@@ -344,6 +352,19 @@ module thread_orchestrator #(
 
     assign valid_out[lane] = !fifo_empty;
     assign out_data[lane]  = thread_data_in_t'(rdata);
+  end
+
+  //
+  // Status
+  //
+
+  // Registered, so it trails the state by one cycle. busy needs no term: it implies a head
+  // triangle still in the input FIFO. A triangle still crossing from in_clk is not visible yet.
+  // The thread FIFOs use fill_cnt, not fifo_empty: a group written into a FIFO takes cycles to reach
+  // data_o, and fifo_empty would report that gap as empty.
+  always_ff @(posedge clk) begin
+    if (!rst_n) empty <= 1'b1;
+    else empty <= in_empty && !(|valid_pipe) && (thread_fill == '0);
   end
 
 endmodule

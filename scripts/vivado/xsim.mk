@@ -28,6 +28,9 @@ IP_COMPILED = $(WORK_DIR)/.ip_compiled
 INCLUDES ?= -i $(REPO_ROOT)/rtl -i $(REPO_ROOT)/rtl/generated
 SIM_ARGS ?=
 
+# Directly instantiated primitives (e.g. DSP48E2) simulate from unisims_ver, which needs glbl.
+GLBL = $(VIVADO_BIN)/../data/verilog/src/glbl.v
+
 .PHONY: ip compile run gui clean distclean
 
 ip: $(IP_STAMP)
@@ -43,8 +46,8 @@ $(IP_COMPILED): $(IP_STAMP)
 
 compile: $(IP_COMPILED)
 	$(call MKDIR,$(LOG_DIR))
-	cd $(WORK_DIR) && $(XVLOG) -sv $(INCLUDES) --log $(LOG_DIR)/xvlog.log $(abspath $(RTL) $(TB_SRCS))
-	cd $(WORK_DIR) && $(XELAB) -debug typical -relax $(addprefix -L ,$(IP_LIBS)) --log $(LOG_DIR)/xelab.log -s $(TOP)_snap $(TOP)
+	cd $(WORK_DIR) && $(XVLOG) -sv $(INCLUDES) --log $(LOG_DIR)/xvlog.log $(abspath $(RTL) $(TB_SRCS)) $(GLBL)
+	cd $(WORK_DIR) && $(XELAB) -debug typical -relax $(addprefix -L ,$(IP_LIBS)) -L unisims_ver --log $(LOG_DIR)/xelab.log -s $(TOP)_snap $(TOP) glbl
 
 run: compile
 	cd $(WORK_DIR) && $(XSIM) $(TOP)_snap -R --log $(LOG_DIR)/$(TOP).log $(SIM_ARGS)

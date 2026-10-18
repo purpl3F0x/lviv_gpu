@@ -1,8 +1,8 @@
-# Vivado flows for the thread orchestrator, using the real Xilinx IP (FP converters, DSP macro):
+# Vivado flows for the thread orchestrator, using the real Xilinx IP (FP converters) and DSP48E2 primitives:
 #   xsim simulation (scripts/vivado/xsim.mk) and out-of-context synth/impl (below, scripts/vivado/ooc_flow.tcl).
 # Usage: make -f Makefile.vivado [sim|gui_sim|synth|impl|synth_gui|impl_gui|ooc_clean|ip|clean|distclean]
 
-RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/fp_wrappers.sv ../../rtl/orchestrator_alu.sv ../../rtl/async_fifo.sv ../../rtl/sync_fifo.sv ../../rtl/thread_orchestrator.sv
+RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/fp_wrappers.sv ../../rtl/orchestrator_alu.sv ../../rtl/async_fifo.sv ../../rtl/sync_fifo.sv ../../rtl/delay_pipe_fifo.sv ../../rtl/thread_orchestrator.sv
 
 .DEFAULT_GOAL := sim
 include ../../scripts/vivado/xsim.mk

@@ -16,6 +16,7 @@ module tb_thread_orchestrator #(
   logic ready_in[4];
   logic valid_out[4];
   thread_data_in_t out_data[4];
+  logic empty;
 
   thread_orchestrator dut (.*);
   always #5 clk = ~clk;
@@ -77,9 +78,6 @@ module tb_thread_orchestrator #(
     tdata.e0_dy = fx_14_10_t'(dy[0]);
     tdata.e1_dy = fx_14_10_t'(dy[1]);
     tdata.e2_dy = fx_14_10_t'(dy[2]);
-    tdata.e0_dx_plus_dy = fx_14_10_t'(dx[0] + dy[0]);
-    tdata.e1_dx_plus_dy = fx_14_10_t'(dx[1] + dy[1]);
-    tdata.e2_dx_plus_dy = fx_14_10_t'(dx[2] + dy[2]);
     tdata.minX_local = TILE_ADDR_X'(min_x);
     tdata.minY_local = TILE_ADDR_Y'(min_y);
     tdata.width = TILE_ADDR_X'(w);
@@ -184,6 +182,7 @@ module tb_thread_orchestrator #(
     for (int lane = 0; lane < 4; lane++)
       if (valid_out[lane]) $fatal(1, "%s: extra token on lane %0d", name, lane);
     if (!ready_out) $fatal(1, "%s: ready_out low after drain", name);
+    if (!empty) $fatal(1, "%s: empty low after drain", name);
     $display("  %-28s ok  (%0d triangles, %0d tokens so far)", name, triangles, tokens);
   endtask
 
@@ -217,6 +216,7 @@ module tb_thread_orchestrator #(
         max_fill = int'(dut.g_thread_fifo[0].u_fifo.fill_cnt);
 
       for (int lane = 0; lane < 4; lane++) begin
+        if (empty && valid_out[lane]) $fatal(1, "empty high with a token on lane %0d", lane);
         if (held_valid[lane] && (!valid_out[lane] || out_data[lane] !== held_data[lane]))
           $fatal(1, "stalled thread output changed on lane %0d", lane);
         if (valid_out[lane] && ready_in[lane]) begin
@@ -306,6 +306,7 @@ module tb_thread_orchestrator #(
       repeat (400) @(negedge clk);
     join
     if (max_fill < ThreadFifoDepthTb - 1) $fatal(1, "FIFO only reached %0d entries", max_fill);
+    if (empty) $fatal(1, "empty high while the thread FIFOs are stalled full");
     ready_mode = 0;
     drain("long thread stall");
 

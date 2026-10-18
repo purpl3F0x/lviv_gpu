@@ -80,19 +80,3 @@ set_property -dict [list \
     CONFIG.Operation_Type {Float_to_fixed} \
     CONFIG.Result_Precision_Type {Custom}] [get_ips xil_fp_to_fx5_13]
 
-# orchestrator_alu: latency 2 (CONCAT, C and SEL at tier 5, P at tier 6);
-# instruction order is the SEL encoding used by the RTL.
-create_ip -name dsp_macro -vendor xilinx.com -library ip -version 1.0 -module_name dsp_macro_0
-set_property -dict [list \
-    CONFIG.instruction1 {CONCAT+C} \
-    CONFIG.instruction2 {P+CONCAT} \
-    CONFIG.instruction3 {P-CONCAT} \
-    CONFIG.pipeline_options {By_Tier} \
-    CONFIG.tier_5 {true} \
-    CONFIG.tier_6 {true} \
-    CONFIG.has_ce {true} \
-    CONFIG.concat_width {48} \
-    CONFIG.c_width {48} \
-    CONFIG.output_properties {User_Defined} \
-    CONFIG.p_width {48}] [get_ips dsp_macro_0]
-

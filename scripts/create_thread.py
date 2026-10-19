@@ -721,7 +721,6 @@ class HardwareDAG:
         control_gate_ref_by_node = {}
         align_decls = []
         align_decls_seen = set()
-        align_skeletons = []
         leaf_ready_assigns = []
         seen_leaf_ready = set()
         leaf_ready_keys = set()
@@ -747,11 +746,21 @@ class HardwareDAG:
                     align_decls_seen.add(name)
                     align_decls.append(f"logic [{width-1}:0] {name};")
 
-        def _emit_delay_align(src_ref, dst_ref, width, stages):
+        # Recorded here and emitted merged (see _merged_delay_lines) once all are known.
+        align_delays = []
+
+        def _emit_delay_align(src_ref, dst_ref, width, stages, end_stage):
             _declare_buffer_signal(dst_ref, width)
-            width_expr = width if isinstance(width, str) else str(width)
-            align_skeletons.append(
-                f"delay_pipe #(.WIDTH({width_expr}), .STAGES({stages})) u_{dst_ref}_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in({src_ref}), .data_out({dst_ref}));"
+            align_delays.append(
+                (
+                    src_ref,
+                    dst_ref,
+                    width,
+                    end_stage - stages,
+                    stages,
+                    "1'b1",
+                    f"u_{dst_ref}_data_delay",
+                )
             )
 
         # Track alignment delays to find max alignment depth
@@ -805,7 +814,9 @@ class HardwareDAG:
                     input_ref_by_edge[(dst, idx)] = buf_name
                     input_valid_ref_by_edge[(dst, idx)] = f"{buf_name}_valid"
                     _declare_buffer_signal(buf_name, width)
-                    _emit_delay_align(delay_src_ref, buf_name, width, delay_stages)
+                    _emit_delay_align(
+                        delay_src_ref, buf_name, width, delay_stages, dst_start
+                    )
                     alignment_delays[buf_name] = extra_delay
 
                     if not (isinstance(sig, (Signal, PredicateSignal)) and sig.hw_id):
@@ -866,7 +877,7 @@ class HardwareDAG:
         if align_decls:
             lines.extend(align_decls)
             lines.append("")
-            lines.extend(align_skeletons)
+            lines.extend(self._merged_delay_lines(align_delays, "align"))
         else:
             lines.append("// None")
         lines.append("")
@@ -1071,6 +1082,7 @@ class HardwareDAG:
             lines.append("logic output_bundle_buf_tready;")
             lines.append("")
             bundle_data_refs = []
+            bundle_delays = []
             for out_name, width, stage, src_ref in out_fields:
                 delay_to_final = final_out_stage - stage
                 if delay_to_final > 0:
@@ -1083,14 +1095,23 @@ class HardwareDAG:
                             lines.append(f"logic [{width}-1:0] {aligned_name};")
                         else:
                             lines.append(f"logic [{width-1}:0] {aligned_name};")
-                    lines.append(
-                        f"delay_pipe #(.WIDTH({width if not isinstance(width, str) else width}), .STAGES({delay_to_final})) u_align_{out_name}_to_output_bundle_d{delay_to_final} (.clk(clk), .rst_n({reset_signal}), .clken(pipe_en_internal), .data_in({src_ref}), .data_out({aligned_name}));"
+                    bundle_delays.append(
+                        (
+                            src_ref,
+                            aligned_name,
+                            width,
+                            stage,
+                            delay_to_final,
+                            reset_signal,
+                            f"u_align_{out_name}_to_output_bundle_d{delay_to_final}",
+                        )
                     )
                     bundle_data_refs.append(aligned_name)
                 else:
                     bundle_data_refs.append(src_ref)
 
-            if any(final_out_stage - stage > 0 for _, _, stage, _ in out_fields):
+            if bundle_delays:
+                lines.extend(self._merged_delay_lines(bundle_delays, "bundle"))
                 lines.append("")
 
             pack_fields = ", ".join(bundle_data_refs)
@@ -1118,6 +1139,47 @@ class HardwareDAG:
         lines.append("")
 
         Path(output_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    @staticmethod
+    def _merged_delay_lines(delays, prefix):
+        """Emit delay_pipes for (src, dst, width, start, stages, reset, instance) records.
+
+        A source already delayed by the same depth reuses that delay's output. Delays from the
+        same start stage to the same end stage, with the same reset, share one wide delay_pipe.
+        """
+        lines = []
+        dst_by_source = {}
+        groups = {}
+        for src, dst, width, start, stages, reset, instance in delays:
+            key = (src, stages, reset)
+            if key in dst_by_source:
+                lines.append(f"assign {dst} = {dst_by_source[key]};")
+                continue
+            dst_by_source[key] = dst
+            groups.setdefault((start, stages, reset), []).append(
+                (src, dst, width, instance)
+            )
+
+        for (start, stages, reset), members in groups.items():
+            if len(members) == 1:
+                src, dst, width, instance = members[0]
+                lines.append(
+                    f"delay_pipe #(.WIDTH({width}), .STAGES({stages})) {instance} (.clk(clk), .rst_n({reset}), .clken(pipe_en_internal), .data_in({src}), .data_out({dst}));"
+                )
+                continue
+            numeric = sum(width for _, _, width, _ in members if isinstance(width, int))
+            symbolic = [width for _, _, width, _ in members if not isinstance(width, int)]
+            width = " + ".join(symbolic + ([str(numeric)] if numeric else []))
+            bus = f"{prefix}_s{start}_d{stages}" + ("" if reset == "1'b1" else "_rst")
+            sources = ", ".join(src for src, _, _, _ in members)
+            dsts = ", ".join(dst for _, dst, _, _ in members)
+            lines.append(f"logic [{width}-1:0] {bus}_in, {bus}_out;")
+            lines.append(f"assign {bus}_in = {{{sources}}};")
+            lines.append(
+                f"delay_pipe #(.WIDTH({width}), .STAGES({stages})) u_{bus} (.clk(clk), .rst_n({reset}), .clken(pipe_en_internal), .data_in({bus}_in), .data_out({bus}_out));"
+            )
+            lines.append(f"assign {{{dsts}}} = {bus}_out;")
+        return lines
 
     def print_schedule(self, schedule_result):
         start_times = schedule_result["start_times"]

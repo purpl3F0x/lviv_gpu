@@ -1312,8 +1312,13 @@ def export_pipeline_rtl(
     output_path,
     module_name="raster_frontend_core",
     latency_name="RASTER_FRONTEND_LATENCY",
+    output_delay_fifo=True,
 ):
-    """Write a module, omitting alignment delays for batch-constant inputs."""
+    """Write a module, omitting alignment delays for batch-constant inputs.
+
+    output_delay_fifo: implement output-alignment delays as LUTRAM
+    delay_pipe_fifo (IN_REG=0) instead of register delay_pipe chains.
+    """
     operations, starts, ends, latencies, total = pipeline_schedule(graph)
     batch_constants = {value for value in graph.inputs if value.batch_constant}
     for value in operations:
@@ -1415,7 +1420,11 @@ def export_pipeline_rtl(
             return signal, ends[producer]
         return (f"n_{value.name}", ends[value]) if value.op else (f"in_{value.name}", 0)
 
-    def aligned(value, cycle):
+    # Output-only alignment delays, grouped by depth so equal-depth outputs
+    # share one wide delay_pipe: {depth: [(width, signal, name), ...]}.
+    output_delay_groups = {}
+
+    def aligned(value, cycle, group=False):
         signal, ready_cycle = base(value)
         if (value.producer or value) in batch_constants:
             return signal
@@ -1432,12 +1441,51 @@ def export_pipeline_rtl(
             name = f"delay_{len(delays)}"
             delays[key] = name
             declarations.append(variable_declaration(value, name) + ";")
-            logic.append(
-                f"delay_pipe #(.WIDTH({rtl_width(value)}), .STAGES({depth})) "
-                f"u_{name} (.clk(clk), .rst_n(1'b1), .clken(clken), "
-                f".data_in({signal}), .data_out({name}));"
-            )
+            if group:
+                output_delay_groups.setdefault(depth, []).append(
+                    (rtl_width(value), signal, name)
+                )
+            else:
+                logic.append(
+                    f"delay_pipe #(.WIDTH({rtl_width(value)}), .STAGES({depth})) "
+                    f"u_{name} (.clk(clk), .rst_n(1'b1), .clken(clken), "
+                    f".data_in({signal}), .data_out({name}));"
+                )
         return delays[key]
+
+    def output_delay(width, depth):
+        # delay_pipe_fifo with IN_REG=0 needs STAGES >= 2.
+        if output_delay_fifo and depth >= 2:
+            return (
+                f"delay_pipe_fifo #(.WIDTH({width}), .STAGES({depth}), .IN_REG(0))"
+            )
+        return f"delay_pipe #(.WIDTH({width}), .STAGES({depth}))"
+
+    def emit_output_delay_groups():
+        for depth, members in sorted(output_delay_groups.items()):
+            if len(members) == 1:
+                width, signal, name = members[0]
+                logic.append(
+                    f"{output_delay(width, depth)} "
+                    f"u_{name} (.clk(clk), .rst_n(1'b1), .clken(clken), "
+                    f".data_in({signal}), .data_out({name}));"
+                )
+                continue
+            numeric = sum(width for width, _, _ in members if isinstance(width, int))
+            symbolic = [width for width, _, _ in members if not isinstance(width, int)]
+            width = " + ".join(symbolic + ([str(numeric)] if numeric else []))
+            group = f"delay_out_s{depth}"
+            declarations.append(f"logic [{width}-1:0] {group}_in;")
+            declarations.append(f"logic [{width}-1:0] {group}_out;")
+            signals = ", ".join(signal for _, signal, _ in members)
+            names = ", ".join(name for _, _, name in members)
+            logic.append(f"assign {group}_in = {{{signals}}};")
+            logic.append(
+                f"{output_delay(width, depth)} "
+                f"u_{group} (.clk(clk), .rst_n(1'b1), .clken(clken), "
+                f".data_in({group}_in), .data_out({group}_out));"
+            )
+            logic.append(f"assign {{{names}}} = {group}_out;")
 
     def inline_pipeline(value, expression):
         name = f"n_{value.name}"
@@ -1561,7 +1609,8 @@ def export_pipeline_rtl(
         name = f"out_{value.name}"
         if name in [item[0] for item in outputs]:
             name += f"_{index}"
-        outputs.append((name, aligned(value, total), value))
+        outputs.append((name, aligned(value, total, group=True), value))
+    emit_output_delay_groups()
     logic.extend(f"assign {name} = {signal};" for name, signal, _ in outputs)
     ports = ["input logic clk", "input logic clken"]
     ports.extend(
@@ -1585,7 +1634,7 @@ def export_pipeline_rtl(
         "always_ff @(posedge CLK) begin \\\n"
         "    if (CE) Q <= D; \\\n"
         "end\n"
-        "\n\n(* use_dsp = \"simd\" *)\n"
+        '\n\n(* use_dsp = "simd" *)\n'
         + f"module {module_name} (\n  "
         + ",\n  ".join(ports)
         + "\n);\n"
@@ -1641,7 +1690,9 @@ def raster_frontend(
     dy_1 = register(v2_x_fx) - register(v0_x_fx)
     dy_2 = register(v0_x_fx) - register(v1_x_fx)
 
-    area = register(fx14_10_mul(register(dy_1), dx_2)) - register(fx14_10_mul(register(dy_2), dx_1))
+    area = register(fx14_10_mul(register(dy_1), dx_2)) - register(
+        fx14_10_mul(register(dy_2), dx_1)
+    )
     invArea = 1.0 / fx28_20_to_fp32(area)
 
     tri_min_x, tri_max_x = tri_bb_aligned_boundries(v0_x_fx, v1_x_fx, v2_x_fx)
@@ -1660,16 +1711,34 @@ def raster_frontend(
     p_min_y = uint14_to_fx14_10_pixel_center(bb_min_y_u14)
 
     w0 = register(
-        fx14_10_mul(register(dy_0), register(register(p_min_y) - register(register(v1_y_fx))))
-    ) + register(fx14_10_mul(register(dx_0), register(register(p_min_x) - register(register(v1_x_fx)))))
+        fx14_10_mul(
+            register(dy_0), register(register(p_min_y) - register(register(v1_y_fx)))
+        )
+    ) + register(
+        fx14_10_mul(
+            register(dx_0), register(register(p_min_x) - register(register(v1_x_fx)))
+        )
+    )
 
     w1 = register(
-        fx14_10_mul(register(dy_1), register(register(p_min_y) - register(register(v2_y_fx))))
-    ) + register(fx14_10_mul(register(dx_1), register(register(p_min_x) - register(register(v2_x_fx)))))
+        fx14_10_mul(
+            register(dy_1), register(register(p_min_y) - register(register(v2_y_fx)))
+        )
+    ) + register(
+        fx14_10_mul(
+            register(dx_1), register(register(p_min_x) - register(register(v2_x_fx)))
+        )
+    )
 
     w2 = register(
-        fx14_10_mul(register(dy_2), register(register(p_min_y) - register(register(v0_y_fx))))
-    ) + register(fx14_10_mul(register(dx_2), register(register(p_min_x) - register(register(v0_x_fx)))))
+        fx14_10_mul(
+            register(dy_2), register(register(p_min_y) - register(register(v0_y_fx)))
+        )
+    ) + register(
+        fx14_10_mul(
+            register(dx_2), register(register(p_min_x) - register(register(v0_x_fx)))
+        )
+    )
 
     bb_min_x_int = uint14_to_uint12(register(bb_min_x_u14))
     bb_min_y_int = uint14_to_uint12(register(bb_min_y_u14))
@@ -1712,9 +1781,6 @@ def raster_frontend(
         dy0_fx,
         dy1_fx,
         dy2_fx,
-        # e0_dx_plus_dy,
-        # e1_dx_plus_dy,
-        # e2_dx_plus_dy,
         bb_width,
         bb_height,
         minX_local,
@@ -1738,6 +1804,12 @@ def main():
         action="store_true",
         help="also schedule II=1..10 and write the resource CSV",
     )
+    parser.add_argument(
+        "--no-output-delay-fifo",
+        dest="output_delay_fifo",
+        action="store_false",
+        help="use register delay_pipe instead of LUTRAM delay_pipe_fifo for output delays",
+    )
     args = parser.parse_args()
 
     graph = trace(raster_frontend, return_graph=True)
@@ -1751,6 +1823,7 @@ def main():
             / "raster_frontend_fixed_autogen.svh",
             module_name="raster_frontend_fixed_core",
             latency_name="RASTER_FRONTEND_FIXED_LATENCY",
+            output_delay_fifo=args.output_delay_fifo,
         )
         print(f"RTL written to {path}")
     if args.resource_table:

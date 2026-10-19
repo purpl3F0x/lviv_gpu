@@ -204,12 +204,24 @@ module raster_frontend (
     passthrough_in.v2_color = input_skid_data.v2.color;
   end
 
-  delay_pipe #(
+  // delay_pipe #(
+  //     .WIDTH ($bits(frontend_passthrough_t)),
+  //     .STAGES(FrontendLatency)
+  // ) u_passthrough_delay (
+  //     .clk(clk),
+  //     .rst_n(1'b1),
+  //     .clken(pipe_advance),
+  //     .data_in(passthrough_in),
+  //     .data_out(passthrough_out)
+  // );
+
+  delay_pipe_fifo #(
       .WIDTH ($bits(frontend_passthrough_t)),
-      .STAGES(FrontendLatency)
+      .STAGES(FrontendLatency),
+      .IN_REG(0)
   ) u_passthrough_delay (
       .clk(clk),
-      .rst_n(1'b1),
+      .rst_n(rst_n),
       .clken(pipe_advance),
       .data_in(passthrough_in),
       .data_out(passthrough_out)

@@ -2,7 +2,7 @@
 IVERILOG = iverilog
 VVP = vvp
 VERILATOR ?= verilator
-RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/int_modules.sv ../../rtl/delay_pipe.sv ../../rtl/axis_skid_buffer.sv ../../rtl/fp_wrappers.sv ../../rtl/generated/APBFrontendRegs.v ../../rtl/raster_frontend.sv
+RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/int_modules.sv ../../rtl/delay_pipe.sv ../../rtl/delay_pipe_fifo.sv ../../rtl/axis_skid_buffer.sv ../../rtl/fp_wrappers.sv ../../rtl/generated/APBFrontendRegs.v ../../rtl/raster_frontend.sv
 INCLUDES = -I../../rtl -I../../rtl/generated
 
 VERILATOR_FLAGS ?= --lint-only --timing -Wall -Wno-fatal -Wno-MODMISSING

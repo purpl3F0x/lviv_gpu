@@ -4,7 +4,7 @@
 // dout = din from OFFSET CE ticks ago, so a register (or another delay_pipe_ram) must follow it.
 //
 // PTR_MODE 2: dual pointers OFFSET apart; dual-port RAM, ~0.6 LUT/bit up to 32 deep.
-//          1: one pointer wrapping at OFFSET, read before write; single-port RAM, 1 LUT/bit per 64.
+//          1: one pointer wrapping at OFFSET, read before write; single-port RAM, 1 LUT/bit per 64. (Has a small cost performance)
 //          0: auto, dual below 32, single from 32 up.
 // rst resets the pointers only.
 module delay_pipe_ram #(
@@ -34,7 +34,7 @@ module delay_pipe_ram #(
 
   generate
     if (SINGLE != 0) begin : g_single
-      reg [AW-1:0] ptr = {AW{1'b0}};
+      (*max_fanout=200*) reg [AW-1:0] ptr = {AW{1'b0}};
 
       always @(posedge clk) begin
         if (rst) ptr <= {AW{1'b0}};
@@ -48,8 +48,8 @@ module delay_pipe_ram #(
       assign dout = mem[ptr];  // old content, read before the write above
     end else begin : g_dual
       localparam [AW-1:0] RD_INIT = DEPTH - OFFSET;
-      reg [AW-1:0] wr_ptr = {AW{1'b0}};
-      reg [AW-1:0] rd_ptr = RD_INIT;
+      (*max_fanout=200*) reg [AW-1:0] wr_ptr = {AW{1'b0}};
+      (*max_fanout=200*) reg [AW-1:0] rd_ptr = RD_INIT;
 
       always @(posedge clk) begin
         if (ce) mem[wr_ptr] <= din;

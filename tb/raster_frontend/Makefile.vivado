@@ -2,7 +2,7 @@
 #   xsim simulation (scripts/vivado/xsim.mk) and out-of-context synth/impl (below, scripts/vivado/ooc_flow.tcl).
 # Usage: make -f Makefile.vivado [simple|csv|gui_simple|gui_csv|synth|impl|synth_gui|impl_gui|ooc_clean|ip|clean|distclean]
 
-RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/int_modules.sv ../../rtl/delay_pipe.sv ../../rtl/axis_skid_buffer.sv ../../rtl/fp_wrappers.sv ../../rtl/generated/APBFrontendRegs.v ../../rtl/raster_frontend.sv
+RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/int_modules.sv ../../rtl/delay_pipe.sv ../../rtl/delay_pipe_fifo.sv ../../rtl/axis_skid_buffer.sv ../../rtl/fp_wrappers.sv ../../rtl/generated/APBFrontendRegs.v ../../rtl/raster_frontend.sv
 
 .DEFAULT_GOAL := simple
 include ../../scripts/vivado/xsim.mk
@@ -39,7 +39,7 @@ IMPL_DCP = $(OOC_DIR)/$(OOC_TOP)_routed.dcp
 
 # Anything that changes the synthesised netlist; Makefile.vivado covers part/file-list changes.
 SYNTH_DEPS = $(RTL) $(OOC_XDC) $(wildcard ../../rtl/*.svh ../../rtl/generated/*.svh) \
-             $(XILINX_IPS_TCL) $(VIVADO_MK_DIR)/ooc_flow.tcl Makefile.vivado
+             $(IP_UNITS_TCL) $(VIVADO_MK_DIR)/ooc_flow.tcl Makefile.vivado
 
 # Passed to Vivado as a Tcl file so paths never go through cmd.exe argument splitting.
 define OOC_ARGS_TCL

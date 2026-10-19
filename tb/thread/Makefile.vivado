@@ -1,0 +1,91 @@
+# Vivado flows for the thread, using the real Xilinx FP IP:
+#   xsim simulation (scripts/vivado/xsim.mk) and out-of-context synth/impl (below, scripts/vivado/ooc_flow.tcl).
+# Usage: make -f Makefile.vivado [sim|gui_sim|synth|impl|synth_gui|impl_gui|ooc_clean|ip|clean|distclean]
+
+RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/fp_wrappers.sv ../../rtl/fp_cmp_le.sv ../../rtl/axis_skid_buffer.sv \
+      ../../rtl/delay_pipe.sv ../../rtl/fx_texture_interpolator.sv ../../rtl/fx_color_interpolator.sv \
+      ../../rtl/fragment_shader.sv ../../rtl/blend_unit.sv ../../rtl/z_buffer_ram.sv \
+      ../../rtl/texture_address_generator.sv ../../rtl/texture_cache.sv ../../rtl/generated/ApbThreadRegs.v \
+      ../../rtl/thread.sv
+
+.DEFAULT_GOAL := sim
+include ../../scripts/vivado/xsim.mk
+
+.PHONY: sim gui_sim
+
+sim gui_sim: TOP = tb_thread
+sim gui_sim: TB_SRCS = tb_thread.sv ../common/axi_ram.v
+
+sim: run
+gui_sim: gui
+
+# ---------------------------------------------------------------------------
+# Out-of-context synthesis + implementation on ZCU104
+#   synth / impl          run only if their inputs changed (checkpoints are the make targets);
+#                         add GUI=1 to open the result in the Vivado GUI when done.
+#                         impl with stale synth runs both stages in one Vivado session.
+#   synth_gui / impl_gui  shorthand for synth GUI=1 / impl GUI=1
+#   ooc_clean             delete checkpoints and reports to force a full rerun
+# Output in build/ooc/thread (checkpoints + reports/), logs in logs/.
+# ---------------------------------------------------------------------------
+OOC_TOP = thread
+OOC_PART ?= xczu7ev-ffvc1156-2-e
+OOC_XDC = thread_ooc.xdc
+OOC_DIR = $(REPO_ROOT)/build/ooc/$(OOC_TOP)
+OOC_ARGS = $(OOC_DIR)/ooc_args.tcl
+SYNTH_DCP = $(OOC_DIR)/$(OOC_TOP)_synth.dcp
+IMPL_DCP = $(OOC_DIR)/$(OOC_TOP)_routed.dcp
+
+# Anything that changes the synthesised netlist; Makefile.vivado covers part/file-list changes.
+SYNTH_DEPS = $(RTL) $(OOC_XDC) $(wildcard ../../rtl/*.svh ../../rtl/generated/*.svh) \
+             $(XILINX_IPS_TCL) $(VIVADO_MK_DIR)/ooc_flow.tcl Makefile.vivado
+
+# Passed to Vivado as a Tcl file so paths never go through cmd.exe argument splitting.
+define OOC_ARGS_TCL
+set part $(OOC_PART)
+set top $(OOC_TOP)
+set out_dir $(OOC_DIR)
+set xdc_files [list $(abspath $(OOC_XDC))]
+set sources [list $(abspath $(RTL))]
+set include_dirs [list $(REPO_ROOT)/rtl $(REPO_ROOT)/rtl/generated]
+set stages {$(OOC_STAGES)}
+endef
+
+GUI ?=
+OOC_STAGES =
+OOC_IMPL_GOAL = $(filter impl impl_gui,$(MAKECMDGOALS))
+OPEN_GUI = cd $(OOC_DIR) && $(VIVADO) -mode gui -nojournal -log $(LOG_DIR)/gui_$(OOC_TOP).log -source $(VIVADO_MK_DIR)/open_dcp.tcl -tclargs $(1)
+define RUN_OOC
+$(file >$(OOC_ARGS),$(OOC_ARGS_TCL))
+$(call MKDIR,$(LOG_DIR))
+cd $(OOC_DIR) && $(VIVADO) -mode batch -nojournal -log $(LOG_DIR)/ooc_$(OOC_TOP).log -source $(VIVADO_MK_DIR)/ooc_flow.tcl -tclargs $(OOC_ARGS)
+endef
+
+.PHONY: synth impl synth_gui impl_gui ooc_clean
+
+synth: $(SYNTH_DCP)
+	$(if $(GUI),$(call OPEN_GUI,$(SYNTH_DCP)))
+
+impl: $(IMPL_DCP)
+	$(if $(GUI),$(call OPEN_GUI,$(IMPL_DCP)))
+
+synth_gui impl_gui: GUI = 1
+synth_gui: synth
+impl_gui: impl
+
+$(OOC_DIR):
+	$(call MKDIR,$@)
+
+# When implementing, a stale synthesis is not run on its own: it is queued into OOC_STAGES
+# and runs in the same Vivado session as implementation (so the Tcl can time both).
+$(SYNTH_DCP): $(SYNTH_DEPS) | $(OOC_DIR)
+	$(eval OOC_STAGES += synth)
+	$(if $(OOC_IMPL_GOAL),,$(RUN_OOC))
+
+# Also depends on SYNTH_DEPS so it is rebuilt when synthesis is queued above.
+$(IMPL_DCP): $(SYNTH_DEPS) $(SYNTH_DCP) | $(OOC_DIR)
+	$(eval OOC_STAGES += impl)
+	$(RUN_OOC)
+
+ooc_clean:
+	$(call RMDIR,$(OOC_DIR))

@@ -368,18 +368,18 @@ module tb_thread_cache;
       token.v0_z = ZNear;
       token.v1_z = ZNear;
       token.v2_z = ZNear;
-      token.v0_color_a = 8'hFF;
-      token.v0_color_r = 8'hFF;
-      token.v0_color_g = 8'hFF;
-      token.v0_color_b = 8'hFF;
-      token.v1_color_a = 8'hFF;
-      token.v1_color_r = 8'hFF;
-      token.v1_color_g = 8'hFF;
-      token.v1_color_b = 8'hFF;
-      token.v2_color_a = 8'hFF;
-      token.v2_color_r = 8'hFF;
-      token.v2_color_g = 8'hFF;
-      token.v2_color_b = 8'hFF;
+      token.v0_color.a = 8'hFF;
+      token.v0_color.r = 8'hFF;
+      token.v0_color.g = 8'hFF;
+      token.v0_color.b = 8'hFF;
+      token.v1_color.a = 8'hFF;
+      token.v1_color.r = 8'hFF;
+      token.v1_color.g = 8'hFF;
+      token.v1_color.b = 8'hFF;
+      token.v2_color.a = 8'hFF;
+      token.v2_color.r = 8'hFF;
+      token.v2_color.g = 8'hFF;
+      token.v2_color.b = 8'hFF;
     end
   endtask
 

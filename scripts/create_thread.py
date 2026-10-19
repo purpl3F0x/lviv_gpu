@@ -15,7 +15,6 @@ SUPPORTED_OPS = {
     "mem_read",
     "mem_write",
     "fx_color_interpolate",
-    "fx_color_channel",
     "fx_texture_interpolate",
     "fp_to_fx2_23",
 }
@@ -33,7 +32,6 @@ DEFAULT_LATENCIES = {
     "mem_write": 1,
     # Interpolator latencies follow their RTL pipeline depths.
     "fx_color_interpolate": 6,
-    "fx_color_channel": 0,
     "fx_texture_interpolate": 6,
     # Xilinx conversion wrappers are 2-cycle latency.
     "fp_to_fx2_23": 2,
@@ -42,7 +40,6 @@ DEFAULT_LATENCIES = {
 # Output bit-width for each op type (default 32 for fp ops).
 _FX_OP_WIDTHS = {
     "fx_color_interpolate": 32,
-    "fx_color_channel": 8,
     "fx_texture_interpolate": 48,
     "fp_to_fx2_23": 25,
 }
@@ -67,7 +64,6 @@ class OpInfo:
     op_symbol: str = ""
     cmp_kind: str = ""
     valid_expr: str = "pipe_en"
-    channel: str = ""
 
 
 class HardwareDAG:
@@ -115,7 +111,6 @@ class HardwareDAG:
         op_symbol="",
         cmp_kind="",
         valid_expr="pipe_en",
-        channel="",
     ):
         self.counters[op_type] += 1
         node_id = f"{op_type}_{self.counters[op_type]}"
@@ -126,7 +121,6 @@ class HardwareDAG:
             op_symbol=op_symbol,
             cmp_kind=cmp_kind,
             valid_expr=valid_expr,
-            channel=channel,
         )
         return node_id
 
@@ -293,24 +287,6 @@ class HardwareDAG:
 
         node_id = self._new_node("fx_color_interpolate", expr, valid_expr=valid_expr)
         self._add_edges(node_id, tuple(inputs), tuple(self.control_dependencies))
-        self.expression_cache[cache_key] = node_id
-        return node_id
-
-    def add_color_channel_operation(self, color, channel, expr):
-        if channel not in ("a", "r", "g", "b"):
-            raise ValueError(f"Unsupported color channel: {channel}")
-        valid_expr = self._merge_valid_expr(
-            self.global_valid_expr,
-            self._input_valid_expr(color),
-        )
-        cache_key = ("fx_color_channel", expr, valid_expr, channel)
-        if cache_key in self.expression_cache:
-            return self.expression_cache[cache_key]
-
-        node_id = self._new_node(
-            "fx_color_channel", expr, valid_expr=valid_expr, channel=channel
-        )
-        self._add_edges(node_id, (color,), tuple(self.control_dependencies))
         self.expression_cache[cache_key] = node_id
         return node_id
 
@@ -611,16 +587,9 @@ class HardwareDAG:
         output_aliases = {
             "u": "texcoord_u",
             "v": "texcoord_v",
-            "r": "color_r",
-            "g": "color_g",
-            "b": "color_b",
-            "a": "color_a",
             "texcoord_u": "texcoord_u",
             "texcoord_v": "texcoord_v",
-            "color_r": "color_r",
-            "color_g": "color_g",
-            "color_b": "color_b",
-            "color_a": "color_a",
+            "color": "color",
             "comp_z": "comp_z",
             "addr": "addr",
             "tex_id": "tex_id",
@@ -640,10 +609,7 @@ class HardwareDAG:
             "texture_function",
             "sfactor_op",
             "dfactor_op",
-            "color_r",
-            "color_g",
-            "color_b",
-            "color_a",
+            "color",
             "comp_z",
         )
         selected_node_by_name = {}
@@ -747,34 +713,6 @@ class HardwareDAG:
             raw = getattr(sig, "expr", str(sig))
             return self._sanitize_sv_name(raw)
 
-        def _color_leaf_info(sig):
-            if not isinstance(sig, Signal):
-                return None
-            expr = getattr(sig, "expr", "")
-            m = re.fullmatch(r"v([0-2])_color_([argb])", expr)
-            if not m:
-                return None
-            return (f"v{m.group(1)}", m.group(2))
-
-        def _color_pack_ref(vertex_name):
-            return (
-                "{"
-                f"thread_data_buf.{vertex_name}_color_a, "
-                f"thread_data_buf.{vertex_name}_color_r, "
-                f"thread_data_buf.{vertex_name}_color_g, "
-                f"thread_data_buf.{vertex_name}_color_b"
-                "}"
-            )
-
-        def _color_chan_slice(ref, chan):
-            if chan == "a":
-                return f"{ref}[31:24]"
-            if chan == "r":
-                return f"{ref}[23:16]"
-            if chan == "g":
-                return f"{ref}[15:8]"
-            return f"{ref}[7:0]"
-
         # Align any late-consumed input with delay pipes.
         # Internal AXIS skid buffers are not used in this architecture.
         input_ref_by_edge = {}
@@ -821,63 +759,12 @@ class HardwareDAG:
         # For leaf sources, allow emitting incremental delay chains from an
         # already-aligned tap to reduce delay_pipe storage.
         leaf_align_by_src = {}
-        # Reuse one packed color delay pipe per vertex/stage depth.
-        color_pack_align_by_key = {}
-        color_pack_taps_by_vertex = {}
 
         for dst in sorted_ops:
             dst_start = start_times[dst]
             inputs = self.op_inputs[dst]
 
             for idx, sig in enumerate(inputs):
-                color_info = _color_leaf_info(sig)
-                if color_info and getattr(sig, "type", "") == "fx_color":
-                    vertex_name, chan = color_info
-                    extra_delay = dst_start
-                    packed_src_ref = _color_pack_ref(vertex_name)
-                    leaf_ready_keys.add(f"{vertex_name}_color_{chan}")
-
-                    if extra_delay > 0:
-                        key = (vertex_name, extra_delay)
-                        if key not in color_pack_align_by_key:
-                            delay_src_ref = packed_src_ref
-                            delay_stages = extra_delay
-
-                            prior = color_pack_taps_by_vertex.get(vertex_name, [])
-                            best = None
-                            for dly, aligned_ref in prior:
-                                if dly < extra_delay and (
-                                    best is None or dly > best[0]
-                                ):
-                                    best = (dly, aligned_ref)
-                            if best is not None:
-                                delay_src_ref = best[1]
-                                delay_stages = extra_delay - best[0]
-
-                            packed_buf = (
-                                f"align_{vertex_name}_color_argb_d{extra_delay}"
-                            )
-                            _emit_delay_align(
-                                delay_src_ref, packed_buf, 32, delay_stages
-                            )
-                            alignment_delays[packed_buf] = extra_delay
-                            color_pack_align_by_key[key] = packed_buf
-                            color_pack_taps_by_vertex.setdefault(
-                                vertex_name, []
-                            ).append((extra_delay, packed_buf))
-
-                        packed_ref = color_pack_align_by_key[key]
-                        input_valid_ref_by_edge[(dst, idx)] = f"{packed_ref}_valid"
-                    else:
-                        packed_ref = packed_src_ref
-                        input_valid_ref_by_edge[(dst, idx)] = (
-                            f"valid_pipe[{dst_start + 1}]"
-                        )
-
-                    chan_ref = _color_chan_slice(packed_ref, chan)
-                    input_ref_by_edge[(dst, idx)] = f"{{1'b0, {chan_ref}, 8'h00}}"
-                    continue
-
                 width = _signal_width(sig)
 
                 if isinstance(sig, (Signal, PredicateSignal)) and sig.hw_id:
@@ -1139,10 +1026,6 @@ class HardwareDAG:
                 lines.append(f"    .color2({colors[2]}), .weight2({weights[2]}),")
                 lines.append(f"    .result({out_wire})")
                 lines.append(");")
-            elif info.op_type == "fx_color_channel":
-                source = input_ref_by_edge[(node, 0)]
-                slices = {"a": "31:24", "r": "23:16", "g": "15:8", "b": "7:0"}
-                lines.append(f"assign {out_wire} = {source}[{slices[info.channel]}];")
             elif info.op_type == "fp_to_fx2_23":
                 a = input_ref_by_edge[(node, 0)]
                 lines.append(f"fp_to_fx2_23 #(.LATENCY({info.latency})) u_{unit} (")
@@ -1192,7 +1075,7 @@ class HardwareDAG:
                 delay_to_final = final_out_stage - stage
                 if delay_to_final > 0:
                     aligned_name = f"{out_name}_bundle_tdata"
-                    reset_signal = "rst_n" if out_name == "comp_z" else "1'b1"
+                    reset_signal = "rst_reg" if out_name == "comp_z" else "1'b1"
                     if width == 1:
                         lines.append(f"logic {aligned_name};")
                     else:
@@ -1219,7 +1102,7 @@ class HardwareDAG:
             lines.append("axis_skid_buffer #(")
             lines.append("    .WIDTH(OUTBUNDLEWIDTH)")
             lines.append(") u_output_bundle_skid (")
-            lines.append("    .aclk(clk), .aresetn(rst_n),")
+            lines.append("    .aclk(clk), .aresetn(rst_reg),")
             lines.append("    .s_axis_tdata(output_bundle_tdata),")
             lines.append("    .s_axis_tvalid(output_bundle_tvalid),")
             lines.append("    .s_axis_tready(output_bundle_s_axis_tready),")
@@ -1465,20 +1348,6 @@ class Signal:
         )
 
     @staticmethod
-    def color_channel(color, channel):
-        if not isinstance(color, Signal) or color.type != "color_argb_t":
-            raise TypeError("color_channel expects a packed color_argb_t Signal")
-        expr = f"{color.expr}.{channel}"
-        node_id = color.dag.add_color_channel_operation(color, channel, expr)
-        return Signal(
-            color.dag,
-            hw_id=node_id,
-            expr=expr,
-            type="uint8_t",
-            valid_expr=color.dag.ops[node_id].valid_expr,
-        )
-
-    @staticmethod
     def fma(a, b, c):
         if (
             not isinstance(a, Signal)
@@ -1637,24 +1506,10 @@ if __name__ == "__main__":
     v0_texture_v = Signal(dag, name="v0_texture_v", type="fx_texture")
     v1_texture_v = Signal(dag, name="v1_texture_v", type="fx_texture")
     v2_texture_v = Signal(dag, name="v2_texture_v", type="fx_texture")
-    color0_argb = Signal(
-        dag,
-        name="color0_argb",
-        type="color_argb_t",
-        sv_ref="{thread_data_buf.v0_color_a, thread_data_buf.v0_color_r, thread_data_buf.v0_color_g, thread_data_buf.v0_color_b}",
-    )
-    color1_argb = Signal(
-        dag,
-        name="color1_argb",
-        type="color_argb_t",
-        sv_ref="{thread_data_buf.v1_color_a, thread_data_buf.v1_color_r, thread_data_buf.v1_color_g, thread_data_buf.v1_color_b}",
-    )
-    color2_argb = Signal(
-        dag,
-        name="color2_argb",
-        type="color_argb_t",
-        sv_ref="{thread_data_buf.v2_color_a, thread_data_buf.v2_color_r, thread_data_buf.v2_color_g, thread_data_buf.v2_color_b}",
-    )
+    # Packed ARGB colors map directly onto thread_data_in_t.v*_color.
+    v0_color = Signal(dag, name="v0_color", type="color_argb_t")
+    v1_color = Signal(dag, name="v1_color", type="color_argb_t")
+    v2_color = Signal(dag, name="v2_color", type="color_argb_t")
 
     inv_area = Signal(dag, name="inv_area")
 
@@ -1684,13 +1539,7 @@ if __name__ == "__main__":
     v = Signal.texture_interpolate(v0_texture_v, t0, v1_texture_v, t1, v2_texture_v, t2)
 
     # Interpolate all four packed color channels in one fixed-latency unit.
-    interpolated_color = Signal.color_interpolate(
-        color0_argb, t0, color1_argb, t1, color2_argb, t2
-    )
-    r = Signal.color_channel(interpolated_color, "r")
-    g = Signal.color_channel(interpolated_color, "g")
-    b = Signal.color_channel(interpolated_color, "b")
-    a = Signal.color_channel(interpolated_color, "a")
+    color = Signal.color_interpolate(v0_color, t0, v1_color, t1, v2_color, t2)
 
     z = interpolate(v0_z, v1_z, v2_z, iw0, iw1, iw2)
     current_z = Signal.mem_read(addr, after=z, lead_cycles=1)

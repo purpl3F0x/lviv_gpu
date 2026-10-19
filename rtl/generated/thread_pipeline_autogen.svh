@@ -28,10 +28,6 @@ logic [24:0] fp_to_fx2_23_3_res;
 logic [31:0] fx_color_interpolate_1_res;
 logic [47:0] fx_texture_interpolate_1_res;
 logic [47:0] fx_texture_interpolate_2_res;
-logic [7:0] fx_color_channel_1_res;
-logic [7:0] fx_color_channel_2_res;
-logic [7:0] fx_color_channel_3_res;
-logic [7:0] fx_color_channel_4_res;
 
 // ---- Selected outputs ----
 logic [47:0] texcoord_u_tdata;
@@ -52,14 +48,8 @@ logic [$bits(blend_op_t)-1:0] sfactor_op_tdata;
 assign sfactor_op_tdata = thread_data_buf.sfactor_op;
 logic [$bits(blend_op_t)-1:0] dfactor_op_tdata;
 assign dfactor_op_tdata = thread_data_buf.dfactor_op;
-logic [7:0] color_r_tdata;
-assign color_r_tdata = fx_color_channel_1_res;
-logic [7:0] color_g_tdata;
-assign color_g_tdata = fx_color_channel_2_res;
-logic [7:0] color_b_tdata;
-assign color_b_tdata = fx_color_channel_3_res;
-logic [7:0] color_a_tdata;
-assign color_a_tdata = fx_color_channel_4_res;
+logic [31:0] color_tdata;
+assign color_tdata = fx_color_interpolate_1_res;
 logic comp_z_tdata;
 assign comp_z_tdata = fp_cmp_1_pred;
 
@@ -88,13 +78,9 @@ assign comp_z_tdata = fp_cmp_1_pred;
 // fp_to_fx2_23_1   -> fp_to_fx2_23_1    out=fp_to_fx2_23_1_res  start= 85  end= 88  valid=(pipe_en)  expr=fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area))))
 // fp_to_fx2_23_2   -> fp_to_fx2_23_2    out=fp_to_fx2_23_2_res  start= 85  end= 88  valid=(pipe_en)  expr=fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area))))
 // fp_to_fx2_23_3   -> fp_to_fx2_23_3    out=fp_to_fx2_23_3_res  start= 85  end= 88  valid=(pipe_en)  expr=fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area))))
-// fx_color_interpolate_1 -> fx_color_interpolate_1  out=fx_color_interpolate_1_res  start= 88  end= 94  valid=(pipe_en)  expr=color_interpolate(color0_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))), color1_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), color2_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))))
+// fx_color_interpolate_1 -> fx_color_interpolate_1  out=fx_color_interpolate_1_res  start= 88  end= 94  valid=(pipe_en)  expr=color_interpolate(v0_color, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))), v1_color, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), v2_color, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))))
 // fx_texture_interpolate_1 -> fx_texture_interpolate_1  out=fx_texture_interpolate_1_res  start= 88  end= 94  valid=(pipe_en)  expr=texture_interpolate(v0_texture_u, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))), v1_texture_u, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), v2_texture_u, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))))
 // fx_texture_interpolate_2 -> fx_texture_interpolate_2  out=fx_texture_interpolate_2_res  start= 88  end= 94  valid=(pipe_en)  expr=texture_interpolate(v0_texture_v, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))), v1_texture_v, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), v2_texture_v, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))))
-// fx_color_channel_1 -> fx_color_channel_1  out=fx_color_channel_1_res  start= 94  end= 94  valid=(pipe_en)  expr=color_interpolate(color0_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))), color1_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), color2_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area))))).r
-// fx_color_channel_2 -> fx_color_channel_2  out=fx_color_channel_2_res  start= 94  end= 94  valid=(pipe_en)  expr=color_interpolate(color0_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))), color1_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), color2_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area))))).g
-// fx_color_channel_3 -> fx_color_channel_3  out=fx_color_channel_3_res  start= 94  end= 94  valid=(pipe_en)  expr=color_interpolate(color0_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))), color1_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), color2_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area))))).b
-// fx_color_channel_4 -> fx_color_channel_4  out=fx_color_channel_4_res  start= 94  end= 94  valid=(pipe_en)  expr=color_interpolate(color0_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))), color1_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))), color2_argb, fp_to_fx2_23(((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area))))).a
 
 // ---- Non-AXIS consumer fire wiring ----
 logic mem_read_1_fire;
@@ -122,9 +108,9 @@ logic [31:0] align_fp_fma_4_to_mem_write_1_i1_d4;
 logic [31:0] align_fp_mul_4_to_fp_mul_5_i1_d61;
 logic [31:0] align_fp_mul_6_to_fp_mul_7_i1_d61;
 logic [31:0] align_fp_mul_8_to_fp_mul_9_i1_d61;
-logic [31:0] align_color0_argb_to_fx_color_interpolate_1_i0_d88;
-logic [31:0] align_color1_argb_to_fx_color_interpolate_1_i2_d88;
-logic [31:0] align_color2_argb_to_fx_color_interpolate_1_i4_d88;
+logic [31:0] align_v0_color_to_fx_color_interpolate_1_i0_d88;
+logic [31:0] align_v1_color_to_fx_color_interpolate_1_i2_d88;
+logic [31:0] align_v2_color_to_fx_color_interpolate_1_i4_d88;
 logic [17:0] align_v0_texture_u_to_fx_texture_interpolate_1_i0_d88;
 logic [17:0] align_v1_texture_u_to_fx_texture_interpolate_1_i2_d88;
 logic [17:0] align_v2_texture_u_to_fx_texture_interpolate_1_i4_d88;
@@ -151,9 +137,9 @@ delay_pipe #(.WIDTH(32), .STAGES(4)) u_align_fp_fma_4_to_mem_write_1_i1_d4_data_
 delay_pipe #(.WIDTH(32), .STAGES(61)) u_align_fp_mul_4_to_fp_mul_5_i1_d61_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_mul_5_res), .data_out(align_fp_mul_4_to_fp_mul_5_i1_d61));
 delay_pipe #(.WIDTH(32), .STAGES(61)) u_align_fp_mul_6_to_fp_mul_7_i1_d61_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_mul_6_res), .data_out(align_fp_mul_6_to_fp_mul_7_i1_d61));
 delay_pipe #(.WIDTH(32), .STAGES(61)) u_align_fp_mul_8_to_fp_mul_9_i1_d61_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_mul_7_res), .data_out(align_fp_mul_8_to_fp_mul_9_i1_d61));
-delay_pipe #(.WIDTH(32), .STAGES(88)) u_align_color0_argb_to_fx_color_interpolate_1_i0_d88_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in({thread_data_buf.v0_color_a, thread_data_buf.v0_color_r, thread_data_buf.v0_color_g, thread_data_buf.v0_color_b}), .data_out(align_color0_argb_to_fx_color_interpolate_1_i0_d88));
-delay_pipe #(.WIDTH(32), .STAGES(88)) u_align_color1_argb_to_fx_color_interpolate_1_i2_d88_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in({thread_data_buf.v1_color_a, thread_data_buf.v1_color_r, thread_data_buf.v1_color_g, thread_data_buf.v1_color_b}), .data_out(align_color1_argb_to_fx_color_interpolate_1_i2_d88));
-delay_pipe #(.WIDTH(32), .STAGES(88)) u_align_color2_argb_to_fx_color_interpolate_1_i4_d88_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in({thread_data_buf.v2_color_a, thread_data_buf.v2_color_r, thread_data_buf.v2_color_g, thread_data_buf.v2_color_b}), .data_out(align_color2_argb_to_fx_color_interpolate_1_i4_d88));
+delay_pipe #(.WIDTH(32), .STAGES(88)) u_align_v0_color_to_fx_color_interpolate_1_i0_d88_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v0_color), .data_out(align_v0_color_to_fx_color_interpolate_1_i0_d88));
+delay_pipe #(.WIDTH(32), .STAGES(88)) u_align_v1_color_to_fx_color_interpolate_1_i2_d88_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v1_color), .data_out(align_v1_color_to_fx_color_interpolate_1_i2_d88));
+delay_pipe #(.WIDTH(32), .STAGES(88)) u_align_v2_color_to_fx_color_interpolate_1_i4_d88_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v2_color), .data_out(align_v2_color_to_fx_color_interpolate_1_i4_d88));
 delay_pipe #(.WIDTH(18), .STAGES(88)) u_align_v0_texture_u_to_fx_texture_interpolate_1_i0_d88_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v0_u), .data_out(align_v0_texture_u_to_fx_texture_interpolate_1_i0_d88));
 delay_pipe #(.WIDTH(18), .STAGES(88)) u_align_v1_texture_u_to_fx_texture_interpolate_1_i2_d88_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v1_u), .data_out(align_v1_texture_u_to_fx_texture_interpolate_1_i2_d88));
 delay_pipe #(.WIDTH(18), .STAGES(88)) u_align_v2_texture_u_to_fx_texture_interpolate_1_i4_d88_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v2_u), .data_out(align_v2_texture_u_to_fx_texture_interpolate_1_i4_d88));
@@ -315,9 +301,9 @@ fp_to_fx2_23 #(.LATENCY(3)) u_fp_to_fx2_23_3 (
 );
 fx_color_interpolator u_fx_color_interpolate_1 (
     .clk(clk), .clken(pipe_en_internal),
-    .color0(align_color0_argb_to_fx_color_interpolate_1_i0_d88), .weight0(fp_to_fx2_23_1_res),
-    .color1(align_color1_argb_to_fx_color_interpolate_1_i2_d88), .weight1(fp_to_fx2_23_2_res),
-    .color2(align_color2_argb_to_fx_color_interpolate_1_i4_d88), .weight2(fp_to_fx2_23_3_res),
+    .color0(align_v0_color_to_fx_color_interpolate_1_i0_d88), .weight0(fp_to_fx2_23_1_res),
+    .color1(align_v1_color_to_fx_color_interpolate_1_i2_d88), .weight1(fp_to_fx2_23_2_res),
+    .color2(align_v2_color_to_fx_color_interpolate_1_i4_d88), .weight2(fp_to_fx2_23_3_res),
     .result(fx_color_interpolate_1_res)
 );
 fx_texture_interpolator u_fx_texture_interpolate_1 (
@@ -334,13 +320,9 @@ fx_texture_interpolator u_fx_texture_interpolate_2 (
     .coord2(align_v2_texture_v_to_fx_texture_interpolate_2_i4_d88), .weight2(fp_to_fx2_23_3_res),
     .result(fx_texture_interpolate_2_res)
 );
-assign fx_color_channel_1_res = fx_color_interpolate_1_res[23:16];
-assign fx_color_channel_2_res = fx_color_interpolate_1_res[15:8];
-assign fx_color_channel_3_res = fx_color_interpolate_1_res[7:0];
-assign fx_color_channel_4_res = fx_color_interpolate_1_res[31:24];
 
 // ---- Output skid buffer ----
-localparam int OUTBUNDLEWIDTH = $bits(texcoord_u_tdata) + $bits(texcoord_v_tdata) + $bits(addr_tdata) + $bits(tex_id_tdata) + $bits(texture_mode_u_tdata) + $bits(texture_mode_v_tdata) + $bits(texture_function_tdata) + $bits(sfactor_op_tdata) + $bits(dfactor_op_tdata) + $bits(color_r_tdata) + $bits(color_g_tdata) + $bits(color_b_tdata) + $bits(color_a_tdata) + $bits(comp_z_tdata);
+localparam int OUTBUNDLEWIDTH = $bits(texcoord_u_tdata) + $bits(texcoord_v_tdata) + $bits(addr_tdata) + $bits(tex_id_tdata) + $bits(texture_mode_u_tdata) + $bits(texture_mode_v_tdata) + $bits(texture_function_tdata) + $bits(sfactor_op_tdata) + $bits(dfactor_op_tdata) + $bits(color_tdata) + $bits(comp_z_tdata);
 logic [OUTBUNDLEWIDTH-1:0] output_bundle_tdata;
 logic output_bundle_tvalid;
 (*max_fanout = 250*) logic output_bundle_s_axis_tready;
@@ -365,7 +347,7 @@ delay_pipe #(.WIDTH($bits(blend_op_t)), .STAGES(94)) u_align_dfactor_op_to_outpu
 logic comp_z_bundle_tdata;
 delay_pipe #(.WIDTH(1), .STAGES(42)) u_align_comp_z_to_output_bundle_d42 (.clk(clk), .rst_n(rst_reg), .clken(pipe_en_internal), .data_in(comp_z_tdata), .data_out(comp_z_bundle_tdata));
 
-assign output_bundle_tdata = {texcoord_u_tdata, texcoord_v_tdata, addr_bundle_tdata, tex_id_bundle_tdata, texture_mode_u_bundle_tdata, texture_mode_v_bundle_tdata, texture_function_bundle_tdata, sfactor_op_bundle_tdata, dfactor_op_bundle_tdata, color_r_tdata, color_g_tdata, color_b_tdata, color_a_tdata, comp_z_bundle_tdata};
+assign output_bundle_tdata = {texcoord_u_tdata, texcoord_v_tdata, addr_bundle_tdata, tex_id_bundle_tdata, texture_mode_u_bundle_tdata, texture_mode_v_bundle_tdata, texture_function_bundle_tdata, sfactor_op_bundle_tdata, dfactor_op_bundle_tdata, color_tdata, comp_z_bundle_tdata};
 assign output_bundle_tvalid = valid_pipe[94];
 
 axis_skid_buffer #(

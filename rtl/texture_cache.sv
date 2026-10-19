@@ -361,9 +361,9 @@ module texture_cache #(
   // External interface wiring and top-level flow-control.
   assign stage0_miss_active = stage0_valid && !tag_lookup_hit_found;
   assign stage1_miss_active = stage1_valid && !stage1_hit_found;
-  assign req_ready = !rst_reg && (refill_state == REFILL_IDLE) &&
+  assign req_ready = rst_reg && (refill_state == REFILL_IDLE) &&
       !stage0_miss_active && !stage1_miss_active;
-  assign lookup_fire = request_stage_valid && !rst_reg && (refill_state == REFILL_IDLE) &&
+  assign lookup_fire = request_stage_valid && rst_reg && (refill_state == REFILL_IDLE) &&
       !stage0_miss_active && !stage1_miss_active;
   assign m_axi_araddr = {{AxiAddrPadBits{1'b0}}, refill_base_addr};
   assign m_axi_arlen = 8'(BeatsPerLine - 1);

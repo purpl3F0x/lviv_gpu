@@ -203,10 +203,7 @@ module thread (
     fragment_op_t texture_function;
     blend_op_t sfactor_op;
     blend_op_t dfactor_op;
-    logic [7:0] color_r;
-    logic [7:0] color_g;
-    logic [7:0] color_b;
-    logic [7:0] color_a;
+    color_argb_t color;
     logic comp_z;
   } fragment_bundle_t;
 
@@ -299,10 +296,7 @@ module thread (
     post_skid_token.texture_function = post_skid_bundle.texture_function;
     post_skid_token.sfactor_op = post_skid_bundle.sfactor_op;
     post_skid_token.dfactor_op = post_skid_bundle.dfactor_op;
-    post_skid_token.color.a = post_skid_bundle.color_a;
-    post_skid_token.color.r = post_skid_bundle.color_r;
-    post_skid_token.color.g = post_skid_bundle.color_g;
-    post_skid_token.color.b = post_skid_bundle.color_b;
+    post_skid_token.color = post_skid_bundle.color;
   end
 
   assign address_control_input.valid = output_bundle_buf_tvalid;

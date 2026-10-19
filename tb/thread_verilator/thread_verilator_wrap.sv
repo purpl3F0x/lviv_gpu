@@ -170,18 +170,18 @@ module thread_verilator_wrap (
   assign in_data.v0_u = in_v0_u;
   assign in_data.v0_w = in_v0_w;
   assign in_data.v0_z = in_v0_z;
-  assign in_data.v0_color_a = in_v0_color_a;
-  assign in_data.v0_color_r = in_v0_color_r;
-  assign in_data.v0_color_g = in_v0_color_g;
-  assign in_data.v0_color_b = in_v0_color_b;
-  assign in_data.v1_color_a = in_v1_color_a;
-  assign in_data.v1_color_r = in_v1_color_r;
-  assign in_data.v1_color_g = in_v1_color_g;
-  assign in_data.v1_color_b = in_v1_color_b;
-  assign in_data.v2_color_a = in_v2_color_a;
-  assign in_data.v2_color_r = in_v2_color_r;
-  assign in_data.v2_color_g = in_v2_color_g;
-  assign in_data.v2_color_b = in_v2_color_b;
+  assign in_data.v0_color.a = in_v0_color_a;
+  assign in_data.v0_color.r = in_v0_color_r;
+  assign in_data.v0_color.g = in_v0_color_g;
+  assign in_data.v0_color.b = in_v0_color_b;
+  assign in_data.v1_color.a = in_v1_color_a;
+  assign in_data.v1_color.r = in_v1_color_r;
+  assign in_data.v1_color.g = in_v1_color_g;
+  assign in_data.v1_color.b = in_v1_color_b;
+  assign in_data.v2_color.a = in_v2_color_a;
+  assign in_data.v2_color.r = in_v2_color_r;
+  assign in_data.v2_color.g = in_v2_color_g;
+  assign in_data.v2_color.b = in_v2_color_b;
 
   assign tex_m_axi_arready =
       tex_ram0_arready & tex_ram1_arready & tex_ram2_arready & tex_ram3_arready;

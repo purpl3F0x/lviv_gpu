@@ -66,41 +66,31 @@ module blend_unit (
         coefficient = '0;
       end
       ONE: begin
-        coefficient = '{a: 8'hff, r: 8'hff, g: 8'hff, b: 8'hff};
+        coefficient = '1;
       end
       SRC_COLOR: begin
         coefficient = source;
       end
       ONE_MINUS_SRC_COLOR: begin
-        coefficient = '{a: ~source.a, r: ~source.r, g: ~source.g, b: ~source.b};
+        coefficient = ~source;
       end
       DST_COLOR: begin
         coefficient = destination;
       end
       ONE_MINUS_DST_COLOR: begin
-        coefficient = '{
-            a: ~destination.a,
-            r: ~destination.r,
-            g: ~destination.g,
-            b: ~destination.b
-        };
+        coefficient = ~destination;
       end
       SRC_ALPHA: begin
-        coefficient = '{a: source.a, r: source.a, g: source.a, b: source.a};
+        coefficient = {4{source.a}};
       end
       ONE_MINUS_SRC_ALPHA: begin
-        coefficient = '{a: ~source.a, r: ~source.a, g: ~source.a, b: ~source.a};
+        coefficient = {4{~source.a}};
       end
       DST_ALPHA: begin
-        coefficient = '{a: destination.a, r: destination.a, g: destination.a, b: destination.a};
+        coefficient = {4{destination.a}};
       end
       ONE_MINUS_DST_ALPHA: begin
-        coefficient = '{
-            a: ~destination.a,
-            r: ~destination.a,
-            g: ~destination.a,
-            b: ~destination.a
-        };
+        coefficient = {4{~destination.a}};
       end
       default: begin
         coefficient = default_coefficient;
@@ -112,9 +102,7 @@ module blend_unit (
 
   // Stage 2: Register coefficients and delay colors for the blend stage.
   always_ff @(posedge clk) begin
-    src_coeff_s2 <= calculate_coefficient(
-        sfactor_op_s1, src_color_s1, dst_color_s1, '{a: 8'hff, r: 8'hff, g: 8'hff, b: 8'hff}
-    );
+    src_coeff_s2 <= calculate_coefficient(sfactor_op_s1, src_color_s1, dst_color_s1, '1);
     dst_coeff_s2 <= calculate_coefficient(dfactor_op_s1, src_color_s1, dst_color_s1, '0);
     src_color_s2 <= src_color_s1;
     dst_color_s2 <= dst_color_s1;

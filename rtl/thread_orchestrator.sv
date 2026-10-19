@@ -18,7 +18,7 @@ module thread_orchestrator #(
     output logic valid_out[4],
     output thread_data_in_t out_data[4],
 
-    // Status: no triangle queued, no group in the pipeline and every thread FIFO drained.
+    // Status: will route to APB through the frontend
     output logic empty
 );
 
@@ -181,8 +181,8 @@ module thread_orchestrator #(
   logic [3:0][2:0][31:0] results;
 
   assign init = '{triangle.init_e0, triangle.init_e1, triangle.init_e2};
-  assign dx = '{triangle.e0_dx, triangle.e1_dx, triangle.e2_dx};
-  assign dy = '{triangle.e0_dy, triangle.e1_dy, triangle.e2_dy};
+  assign dx   = '{triangle.e0_dx, triangle.e1_dx, triangle.e2_dx};
+  assign dy   = '{triangle.e0_dy, triangle.e1_dy, triangle.e2_dy};
 
   // Right adds dx, left subtracts it, down adds dy.
   always_comb begin

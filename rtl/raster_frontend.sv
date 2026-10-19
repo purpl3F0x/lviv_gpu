@@ -47,6 +47,7 @@ module raster_frontend (
     output orchestrator_data_in_t out_data,
 
     // * Status Signal * //
+    input logic orchestrator_empty,   // We use the APB of the frontend since it's just 1 signal
     output logic core_empty
 );
   typedef struct packed {
@@ -116,6 +117,7 @@ module raster_frontend (
       .s_apb_PRDATA(s_apb_PRDATA),
       .s_apb_PSLVERROR(s_apb_PSLVERROR),
       .thread_empty(core_empty),
+      .orchestrator_empty(orchestrator_empty),
       .thread_sw_reset(frontend_sw_reset),
       .tile_x_index(tile_x_index),
       .tile_y_index(tile_y_index)

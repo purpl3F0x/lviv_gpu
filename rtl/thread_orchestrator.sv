@@ -2,8 +2,21 @@
 
 import gpu_types_pkg::*;
 
-module thread_orchestrator #(
-) (
+/*
+ *               Orchestrator Block Diagram
+ *  ┌──────────────────────────────────────────────────┐
+ *  │                                                  │
+ *  │                  ┌───fsm─────┐      ┌───────────┐│
+ *  │               ┌──►Interpolate┼───┬─►│thread fifo┼┼►
+ *  │┌─────────────┐│  └───────────┘   │  └───────────┘│
+ * ─┼►In-FIFO (CDC)┼┤              join├─►    ...     ─┼►
+ *  │└─────────────┘│  ┌───────────┐   ├─►    ...     ─┼►
+ *  │               └──►Delay Data ┼───┴─►    ...     ─┼►
+ *  │                  └───────────┘                   │
+ *  └──────────────────────────────────────────────────┘
+ */
+
+module thread_orchestrator (
     // Frontend side
     input logic in_clk,
     input logic in_rst_n,

@@ -596,9 +596,9 @@ module tb_thread;
       hw_cf_q.push_back(dut.post_skid_bundle.color);
   end
 
-  // Tile buffer: 3-cycle read latency, read-before-write; checks every fragment the thread emits.
-  color_argb_t fb_rd_pipe[3];
-  assign in_fb_rd_color = fb_rd_pipe[2];
+  // Tile buffer: 4-cycle read latency, read-before-write; checks every fragment the thread emits.
+  color_argb_t fb_rd_pipe[4];
+  assign in_fb_rd_color = fb_rd_pipe[3];
 
   always @(posedge clk) begin
     frag_t f;
@@ -609,6 +609,7 @@ module tb_thread;
     fb_rd_pipe[0] <= out_fb_rd_en ? fb_mem[out_fb_rd_addr] : 'x;
     fb_rd_pipe[1] <= fb_rd_pipe[0];
     fb_rd_pipe[2] <= fb_rd_pipe[1];
+    fb_rd_pipe[3] <= fb_rd_pipe[2];
 
     if (rst_n && out_fb_valid === 1'b1) begin
       fragments++;

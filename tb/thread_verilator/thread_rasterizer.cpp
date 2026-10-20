@@ -392,7 +392,7 @@ class ThreadRasterCore {
   private:
     std::array<Vthread_verilator_wrap*, HW_THREADS> dut_{};
         std::array<uint8_t, HW_THREADS> apb_clock_divider_{};
-    static constexpr size_t kFramebufferReadLatency = 3;
+    static constexpr size_t kFramebufferReadLatency = 4;
     std::array<std::array<uint32_t, kFramebufferReadLatency>, HW_THREADS> framebuffer_read_pipe_{};
         std::array<uint8_t, HW_THREADS> prev_out_fb_we_{};
         std::array<uint8_t, HW_THREADS> prev_z_wr_en_{};

@@ -7,28 +7,32 @@ import gpu_types_pkg::*;
 
 /*
  *                          Raster Core Block Diagram
- *   ┌──────────────────────────────────────────────────────────────┐
- *   │                                         ┌──────────┐         │
- *   │                                    ┌───►│ Thread 0 ├─────────┼─► tile buffer 0, texture AXI 0
- *   │ ┌──────────┐   ┌──────────────┐    │    ├──────────┤         │
- * ──┼►│ Frontend ├──►│ Orchestrator ├────┼───►│ Thread 1 ├─────────┼─► tile buffer 1, texture AXI 1
- *   │ └────▲─────┘   └──────┬───────┘    │    ├──────────┤         │
- *   │      │      empty     │            ├───►│ Thread 2 ├─────────┼─► tile buffer 2, texture AXI 2
- *   │      └────────────────┘            │    ├──────────┤         │
- *   │                                    └───►│ Thread 3 ├─────────┼─► tile buffer 3, texture AXI 3
- *   │                                         └────▲─────┘         │
- *   │                                     Texture LUT (shared)     │
- *   └──────────────────────────────────────────────────────────────┘
- *     APB: frontend, thread 0..3, texture LUT
+ *   ┌───────────────────────────────────────────────────────────────────────┐
+ *   │                                         ┌──────────┐   ┌──────────┐   │
+ *   │                                    ┌───►│ Thread 0 │◄─►│ FB RAM 0 │◄──┼─► FB host port 0
+ *   │ ┌──────────┐   ┌──────────────┐    │    ├──────────┤   ├──────────┤   │
+ * ──┼►│ Frontend ├──►│ Orchestrator ├────┼───►│ Thread 1 │◄─►│ FB RAM 1 │◄──┼─► FB host port 1
+ *   │ └────▲─────┘   └──────┬───────┘    │    ├──────────┤   ├──────────┤   │
+ *   │      │      empty     │            ├───►│ Thread 2 │◄─►│ FB RAM 2 │◄──┼─► FB host port 2
+ *   │      └────────────────┘            │    ├──────────┤   ├──────────┤   │
+ *   │                                    └───►│ Thread 3 │◄─►│ FB RAM 3 │◄──┼─► FB host port 3
+ *   │                                         └────▲─────┘   └──────────┘   │
+ *   │                                     Texture LUT (shared)              │
+ *   └───────────────────────────────────────────────────────────────────────┘
+ *     APB: frontend, thread 0..3, texture LUT. Texture AXI: one read master per thread.
  *
- * Clocks: the frontend runs on frontend_clk; the orchestrator and the threads run on thread_clk.
- * The orchestrator's input FIFO crosses between the two, so they may be the same clock or
- * unrelated ones. Every APB slave runs on apb_clk and synchronises into its core clock internally.
+ * Clocks: the frontend runs on frontend_clk; the orchestrator, the threads and the frame buffers
+ * run on thread_clk. The orchestrator's input FIFO crosses between the two, so they may be the
+ * same clock or unrelated ones. Every APB slave runs on apb_clk and synchronises into its core
+ * clock internally.
  *
- * Each thread owns one pixel of every 2x2 quad (thread = {y[0], x[0]}) and writes its own slice of
- * the tile buffer, addressed {quad_y, quad_x}. The tile buffer must accept a write every cycle and
- * return a read 3 cycles after the request. Texture reads leave through one AXI4 read master per
- * thread; the texture descriptor table is shared and read by all four threads.
+ * Each thread owns one pixel of every 2x2 quad (thread = {y[0], x[0]}) and its own frame buffer
+ * slice, addressed {quad_y, quad_x}. The thread reads and writes its slice through port 0 of the
+ * frame buffer RAM; port 1 is the host port, for clearing the tile and reading it back. The two
+ * ports are not arbitrated (port 0 wins), so the host may use its port only while the core is
+ * idle. Host reads return data 4 cycles after fb_rd_en and hold it until the next read.
+ * Texture reads leave through one AXI4 read master per thread; the texture descriptor table is
+ * shared and read by all four threads.
  */
 module raster_core (
     // * Clocks and resets * //
@@ -74,14 +78,13 @@ module raster_core (
     output logic [31:0] s_apb_lut_PRDATA,
     output logic        s_apb_lut_PSLVERROR,
 
-    // * Tile buffer, one slice per thread (thread_clk) * //
-    output logic        [NUM_OF_THREADS-1:0][                   31:0] out_fb_color,
-    output logic        [NUM_OF_THREADS-1:0][PIXEL_ADDR_W_THREAD-1:0] out_fb_addr,
-    output logic        [NUM_OF_THREADS-1:0]                          out_fb_valid,
-    output logic        [NUM_OF_THREADS-1:0]                          out_fb_we,
-    output logic        [NUM_OF_THREADS-1:0]                          out_fb_rd_en,
-    output logic        [NUM_OF_THREADS-1:0][PIXEL_ADDR_W_THREAD-1:0] out_fb_rd_addr,
-    input  color_argb_t [NUM_OF_THREADS-1:0]                          in_fb_rd_color,
+    // * Frame buffer host port, one slice per thread (thread_clk, only while the core is idle) * //
+    input  logic [NUM_OF_THREADS-1:0]                          fb_wr_en,
+    input  logic [NUM_OF_THREADS-1:0][PIXEL_ADDR_W_THREAD-1:0] fb_wr_addr,
+    input  logic [NUM_OF_THREADS-1:0][                   31:0] fb_wr_data,
+    input  logic [NUM_OF_THREADS-1:0]                          fb_rd_en,
+    input  logic [NUM_OF_THREADS-1:0][PIXEL_ADDR_W_THREAD-1:0] fb_rd_addr,
+    output logic [NUM_OF_THREADS-1:0][                   31:0] fb_rd_data,
 
     // * Texture memory, one AXI4 read master per thread (thread_clk) * //
     output logic [NUM_OF_THREADS-1:0][ 31:0] tex_m_axi_araddr,
@@ -190,10 +193,22 @@ module raster_core (
   );
 
   //
-  // Threads
+  // Threads, each with its frame buffer slice
   //
 
+  // Frame buffer read latency is 1 + READ_OUT_STAGES: the input register, the BRAM's array register
+  // and DO_REG, and one fabric register per port. That is 4 cycles, the thread's
+  // FRAME_BUFFER_READ_LATECNY.
+  localparam int FbReadOutStages = 3;
+
   for (genvar lane = 0; lane < 4; lane++) begin : g_thread
+    logic [                   31:0] thread_fb_color;
+    logic [PIXEL_ADDR_W_THREAD-1:0] thread_fb_addr;
+    logic                           thread_fb_we;
+    logic                           thread_fb_rd_en;
+    logic [PIXEL_ADDR_W_THREAD-1:0] thread_fb_rd_addr;
+    logic [                   31:0] thread_fb_rd_color;
+
     thread u_thread (
         .clk(thread_clk),
         .rst_n(thread_rst_n),
@@ -201,13 +216,13 @@ module raster_core (
         .ready_out(thread_ready[lane]),
         .in_data(thread_data[lane]),
         .empty(),  // also readable through the thread's busy register
-        .out_fb_color(out_fb_color[lane]),
-        .out_fb_addr(out_fb_addr[lane]),
-        .out_fb_valid(out_fb_valid[lane]),
-        .out_fb_we(out_fb_we[lane]),
-        .out_fb_rd_en(out_fb_rd_en[lane]),
-        .out_fb_rd_addr(out_fb_rd_addr[lane]),
-        .in_fb_rd_color(in_fb_rd_color[lane]),
+        .out_fb_color(thread_fb_color),
+        .out_fb_addr(thread_fb_addr),
+        .out_fb_valid(),  // out_fb_we already excludes fragments that fail the depth test
+        .out_fb_we(thread_fb_we),
+        .out_fb_rd_en(thread_fb_rd_en),
+        .out_fb_rd_addr(thread_fb_rd_addr),
+        .in_fb_rd_color(thread_fb_rd_color),
         .apb_clk(apb_clk),
         .apb_rst_n(apb_rst_n),
         .s_apb_PADDR(s_apb_thread_PADDR[lane]),
@@ -233,6 +248,29 @@ module raster_core (
         .lut_addr(lut_addr[lane]),
         .lut_base(lut_base[lane]),
         .lut_size(lut_size[lane])
+    );
+
+    frame_buffer_ram #(
+        .DATA_WIDTH(32),
+        .ADDR_WIDTH(PIXEL_ADDR_W_THREAD),
+        .READ_OUT_STAGES(FbReadOutStages)
+    ) u_frame_buffer (
+        .clk(thread_clk),
+        .rst_n(thread_rst_n),
+        // Port 0: the thread's blend writes and destination reads
+        .w0_en(thread_fb_we),
+        .w0_addr(thread_fb_addr),
+        .w0_din(thread_fb_color),
+        .r0_en(thread_fb_rd_en),
+        .r0_addr(thread_fb_rd_addr),
+        .r0_dout(thread_fb_rd_color),
+        // Port 1: host
+        .w1_en(fb_wr_en[lane]),
+        .w1_addr(fb_wr_addr[lane]),
+        .w1_din(fb_wr_data[lane]),
+        .r1_en(fb_rd_en[lane]),
+        .r1_addr(fb_rd_addr[lane]),
+        .r1_dout(fb_rd_data[lane])
     );
   end
 

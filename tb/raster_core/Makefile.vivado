@@ -12,7 +12,7 @@ RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/int_modules.sv ../../rtl/delay_pipe.s
       ../../rtl/fp_cmp_le.sv ../../rtl/fx_texture_interpolator.sv ../../rtl/fx_color_interpolator.sv \
       ../../rtl/fragment_shader.sv ../../rtl/blend_unit.sv ../../rtl/z_buffer_ram.sv \
       ../../rtl/texture_address_generator.sv ../../rtl/texture_cache.sv \
-      ../../rtl/generated/ApbThreadRegs.v ../../rtl/thread.sv \
+      ../../rtl/generated/ApbThreadRegs.v ../../rtl/thread.sv ../../rtl/frame_buffer_ram.sv \
       ../../rtl/generated/ApbLutRam.v ../../rtl/raster_core.sv
 
 .DEFAULT_GOAL := synth

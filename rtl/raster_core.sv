@@ -5,200 +5,235 @@
 
 import gpu_types_pkg::*;
 
-// ============================================================================
-// Top-Level Wrapper Instantiating Frontend and Thread Orchestrator
-// ============================================================================
+/*
+ *                          Raster Core Block Diagram
+ *   ┌──────────────────────────────────────────────────────────────┐
+ *   │                                         ┌──────────┐         │
+ *   │                                    ┌───►│ Thread 0 ├─────────┼─► tile buffer 0, texture AXI 0
+ *   │ ┌──────────┐   ┌──────────────┐    │    ├──────────┤         │
+ * ──┼►│ Frontend ├──►│ Orchestrator ├────┼───►│ Thread 1 ├─────────┼─► tile buffer 1, texture AXI 1
+ *   │ └────▲─────┘   └──────┬───────┘    │    ├──────────┤         │
+ *   │      │      empty     │            ├───►│ Thread 2 ├─────────┼─► tile buffer 2, texture AXI 2
+ *   │      └────────────────┘            │    ├──────────┤         │
+ *   │                                    └───►│ Thread 3 ├─────────┼─► tile buffer 3, texture AXI 3
+ *   │                                         └────▲─────┘         │
+ *   │                                     Texture LUT (shared)     │
+ *   └──────────────────────────────────────────────────────────────┘
+ *     APB: frontend, thread 0..3, texture LUT
+ *
+ * Clocks: the frontend runs on frontend_clk; the orchestrator and the threads run on thread_clk.
+ * The orchestrator's input FIFO crosses between the two, so they may be the same clock or
+ * unrelated ones. Every APB slave runs on apb_clk and synchronises into its core clock internally.
+ *
+ * Each thread owns one pixel of every 2x2 quad (thread = {y[0], x[0]}) and writes its own slice of
+ * the tile buffer, addressed {quad_y, quad_x}. The tile buffer must accept a write every cycle and
+ * return a read 3 cycles after the request. Texture reads leave through one AXI4 read master per
+ * thread; the texture descriptor table is shared and read by all four threads.
+ */
 module raster_core (
-    input logic clk,
-    input logic rst_n,
-
+    // * Clocks and resets * //
+    input logic frontend_clk,
+    input logic frontend_rst_n,
+    input logic thread_clk,
+    input logic thread_rst_n,
     input logic apb_clk,
     input logic apb_rst_n,
-    input logic [4:0] s_apb_PADDR,
-    input logic [0:0] s_apb_PSEL,
-    input logic s_apb_PENABLE,
-    output logic s_apb_PREADY,
-    input logic s_apb_PWRITE,
-    input logic [31:0] s_apb_PWDATA,
-    output logic [31:0] s_apb_PRDATA,
-    output logic s_apb_PSLVERROR,
 
-    // Input Vertex Data (Sequential)
-    input vertex_t vertex_in,
+    // * Triangle input (frontend_clk) * //
+    input  logic              valid_in,
+    output logic              ready_out,
+    input  frontend_data_in_t in_data,
 
-    // Tile Identification (Valid with v0)
-    input logic [TILE_ID_W_X-1:0] tile_x_id,
-    input logic [TILE_ID_W_Y-1:0] tile_y_id,
+    // * APB: frontend control and status * //
+    input  logic [ 4:0] s_apb_frontend_PADDR,
+    input  logic        s_apb_frontend_PSEL,
+    input  logic        s_apb_frontend_PENABLE,
+    output logic        s_apb_frontend_PREADY,
+    input  logic        s_apb_frontend_PWRITE,
+    input  logic [31:0] s_apb_frontend_PWDATA,
+    output logic [31:0] s_apb_frontend_PRDATA,
+    output logic        s_apb_frontend_PSLVERROR,
 
-    // Handshake
-    input  logic valid_in,
-    output logic ready_out,
+    // * APB: one register block per thread * //
+    input  logic [NUM_OF_THREADS-1:0][ 7:0] s_apb_thread_PADDR,
+    input  logic [NUM_OF_THREADS-1:0]       s_apb_thread_PSEL,
+    input  logic [NUM_OF_THREADS-1:0]       s_apb_thread_PENABLE,
+    output logic [NUM_OF_THREADS-1:0]       s_apb_thread_PREADY,
+    input  logic [NUM_OF_THREADS-1:0]       s_apb_thread_PWRITE,
+    input  logic [NUM_OF_THREADS-1:0][31:0] s_apb_thread_PWDATA,
+    output logic [NUM_OF_THREADS-1:0][31:0] s_apb_thread_PRDATA,
+    output logic [NUM_OF_THREADS-1:0]       s_apb_thread_PSLVERROR,
 
-    // Output Handshake & Data
-    input  logic           ready_in [4],
-    output logic           valid_out,
-    output logic    [31:0] out_e0 [4],
-    output logic    [31:0] out_e1 [4],
-    output logic    [31:0] out_e2 [4],
-    output logic    [PIXEL_ADDR_W-1:0] out_pixel_id [4],
-    output logic    [6:0]  out_minX_local,
-    output logic    [6:0]  out_minY_local,
-    output logic    [7:0]  out_width,
-    output logic    [7:0]  out_height,
-    output logic    [31:0] out_invArea,
-    output logic    [31:0] out_e0_dx_2x,
-    output logic    [31:0] out_e0_dy_2x,
-    output logic    [31:0] out_e1_dx_2x,
-    output logic    [31:0] out_e1_dy_2x,
-    output logic    [31:0] out_e2_dx_2x,
-    output logic    [31:0] out_e2_dy_2x,
-    output vertex_t        out_v0,
-    output vertex_t        out_v1,
-    output vertex_t        out_v2
+    // * APB: texture descriptor table * //
+    input  logic [ 9:0] s_apb_lut_PADDR,
+    input  logic        s_apb_lut_PSEL,
+    input  logic        s_apb_lut_PENABLE,
+    output logic        s_apb_lut_PREADY,
+    input  logic        s_apb_lut_PWRITE,
+    input  logic [31:0] s_apb_lut_PWDATA,
+    output logic [31:0] s_apb_lut_PRDATA,
+    output logic        s_apb_lut_PSLVERROR,
+
+    // * Tile buffer, one slice per thread (thread_clk) * //
+    output logic        [NUM_OF_THREADS-1:0][                   31:0] out_fb_color,
+    output logic        [NUM_OF_THREADS-1:0][PIXEL_ADDR_W_THREAD-1:0] out_fb_addr,
+    output logic        [NUM_OF_THREADS-1:0]                          out_fb_valid,
+    output logic        [NUM_OF_THREADS-1:0]                          out_fb_we,
+    output logic        [NUM_OF_THREADS-1:0]                          out_fb_rd_en,
+    output logic        [NUM_OF_THREADS-1:0][PIXEL_ADDR_W_THREAD-1:0] out_fb_rd_addr,
+    input  color_argb_t [NUM_OF_THREADS-1:0]                          in_fb_rd_color,
+
+    // * Texture memory, one AXI4 read master per thread (thread_clk) * //
+    output logic [NUM_OF_THREADS-1:0][ 31:0] tex_m_axi_araddr,
+    output logic [NUM_OF_THREADS-1:0][  7:0] tex_m_axi_arlen,
+    output logic [NUM_OF_THREADS-1:0][  2:0] tex_m_axi_arsize,
+    output logic [NUM_OF_THREADS-1:0][  1:0] tex_m_axi_arburst,
+    output logic [NUM_OF_THREADS-1:0]        tex_m_axi_arvalid,
+    input  logic [NUM_OF_THREADS-1:0]        tex_m_axi_arready,
+    input  logic [NUM_OF_THREADS-1:0][127:0] tex_m_axi_rdata,
+    input  logic [NUM_OF_THREADS-1:0][  1:0] tex_m_axi_rresp,
+    input  logic [NUM_OF_THREADS-1:0]        tex_m_axi_rvalid,
+    output logic [NUM_OF_THREADS-1:0]        tex_m_axi_rready,
+    input  logic [NUM_OF_THREADS-1:0]        tex_m_axi_rlast
 );
 
-  // Frontend to Orchestrator connections
-  logic f_valid_out;
-  logic f_ready_in;
-  logic [31:0] f_e0_00, f_e1_00, f_e2_00;
-  logic [31:0] f_e0_10, f_e1_10, f_e2_10;
-  logic [31:0] f_e0_01, f_e1_01, f_e2_01;
-  logic [31:0] f_e0_11, f_e1_11, f_e2_11;
-  logic [31:0] f_e0_dx, f_e0_dy, f_e1_dx, f_e1_dy, f_e2_dx, f_e2_dy;
-  logic [31:0] f_invArea;
-  vertex_t f_v0, f_v1, f_v2;
-  logic [7:0] f_minX_local, f_minY_local;
-  logic [7:0] f_width, f_height;
+  // The orchestrator and the texture table are built for exactly four threads.
+  if (NUM_OF_THREADS != 4) begin : g_thread_count_check
+    $error("raster_core requires NUM_OF_THREADS == 4");
+  end
+
+  //
+  // Frontend
+  //
+
+  logic                  frontend_valid;
+  logic                  orchestrator_ready;
+  orchestrator_data_in_t frontend_data;
+  logic                  orchestrator_empty;
 
   raster_frontend u_frontend (
-      .clk            (clk),
-      .rst_n          (rst_n),
-      .apb_clk        (apb_clk),
-      .apb_rst_n      (apb_rst_n),
-      .s_apb_PADDR    (s_apb_PADDR),
-      .s_apb_PSEL     (s_apb_PSEL),
-      .s_apb_PENABLE  (s_apb_PENABLE),
-      .s_apb_PREADY   (s_apb_PREADY),
-      .s_apb_PWRITE   (s_apb_PWRITE),
-      .s_apb_PWDATA   (s_apb_PWDATA),
-      .s_apb_PRDATA   (s_apb_PRDATA),
-      .s_apb_PSLVERROR(s_apb_PSLVERROR),
-      .vertex_in      (vertex_in),
-      .tile_x_id      (tile_x_id),
-      .tile_y_id      (tile_y_id),
-      .valid_in       (valid_in),
-      .ready_out      (ready_out),
-      .ready_in       (f_ready_in),
-      .valid_out      (f_valid_out),
-      .out_e0_00      (f_e0_00),
-      .out_e1_00      (f_e1_00),
-      .out_e2_00      (f_e2_00),
-      .out_e0_10      (f_e0_10),
-      .out_e1_10      (f_e1_10),
-      .out_e2_10      (f_e2_10),
-      .out_e0_01      (f_e0_01),
-      .out_e1_01      (f_e1_01),
-      .out_e2_01      (f_e2_01),
-      .out_e0_11      (f_e0_11),
-      .out_e1_11      (f_e1_11),
-      .out_e2_11      (f_e2_11),
-      .out_e0_dx_2x   (f_e0_dx),
-      .out_e0_dy_2x   (f_e0_dy),
-      .out_e1_dx_2x   (f_e1_dx),
-      .out_e1_dy_2x   (f_e1_dy),
-      .out_e2_dx_2x   (f_e2_dx),
-      .out_e2_dy_2x   (f_e2_dy),
-      .out_invArea    (f_invArea),
-      .out_v0         (f_v0),
-      .out_v1         (f_v1),
-      .out_v2         (f_v2),
-      .out_minX_local (f_minX_local),
-      .out_minY_local (f_minY_local),
-      .out_width      (f_width),
-      .out_height     (f_height)
+      .clk(frontend_clk),
+      .rst_n(frontend_rst_n),
+      .apb_clk(apb_clk),
+      .apb_rst_n(apb_rst_n),
+      .s_apb_PADDR(s_apb_frontend_PADDR),
+      .s_apb_PSEL(s_apb_frontend_PSEL),
+      .s_apb_PENABLE(s_apb_frontend_PENABLE),
+      .s_apb_PREADY(s_apb_frontend_PREADY),
+      .s_apb_PWRITE(s_apb_frontend_PWRITE),
+      .s_apb_PWDATA(s_apb_frontend_PWDATA),
+      .s_apb_PRDATA(s_apb_frontend_PRDATA),
+      .s_apb_PSLVERROR(s_apb_frontend_PSLVERROR),
+      .valid_in(valid_in),
+      .ready_out(ready_out),
+      .in_data(in_data),
+      .ready_in(orchestrator_ready),
+      .valid_out(frontend_valid),
+      .out_data(frontend_data),
+      .orchestrator_empty(orchestrator_empty),
+      .core_empty()  // also readable through the frontend status register
   );
 
-  logic [31:0] f_e0_arr [4];
-  logic [31:0] f_e1_arr [4];
-  logic [31:0] f_e2_arr [4];
+  //
+  // Thread orchestrator
+  //
 
-  assign f_e0_arr[0] = f_e0_00;
-  assign f_e0_arr[1] = f_e0_10;
-  assign f_e0_arr[2] = f_e0_01;
-  assign f_e0_arr[3] = f_e0_11;
-
-  assign f_e1_arr[0] = f_e1_00;
-  assign f_e1_arr[1] = f_e1_10;
-  assign f_e1_arr[2] = f_e1_01;
-  assign f_e1_arr[3] = f_e1_11;
-
-  assign f_e2_arr[0] = f_e2_00;
-  assign f_e2_arr[1] = f_e2_10;
-  assign f_e2_arr[2] = f_e2_01;
-  assign f_e2_arr[3] = f_e2_11;
-
-  logic o_valid_out [4];
-  logic [31:0] o_e0 [4];
-  logic [31:0] o_e1 [4];
-  logic [31:0] o_e2 [4];
-  logic [PIXEL_ADDR_W-1:0] o_pixel_id [4];
-  logic [31:0] o_invArea;
-  vertex_t o_v0, o_v1, o_v2;
+  logic            thread_valid[4];
+  logic            thread_ready[4];
+  thread_data_in_t thread_data [4];
 
   thread_orchestrator u_orchestrator (
-      .clk           (clk),
-      .rst_n         (rst_n),
-      .valid_in      (f_valid_out),
-      .ready_out     (f_ready_in),
-      .ready_in      (ready_in),
-      .valid_out     (o_valid_out),
-      .init_e0       (f_e0_arr),
-      .init_e1       (f_e1_arr),
-      .init_e2       (f_e2_arr),
-      .e0_dx_2x      (f_e0_dx),
-      .e0_dy_2x      (f_e0_dy),
-      .e1_dx_2x      (f_e1_dx),
-      .e1_dy_2x      (f_e1_dy),
-      .e2_dx_2x      (f_e2_dx),
-      .e2_dy_2x      (f_e2_dy),
-      .minX_local    (f_minX_local),
-      .minY_local    (f_minY_local),
-      .width         (f_width),
-      .height        (f_height),
-      .invArea       (f_invArea),
-      .v0            (f_v0),
-      .v1            (f_v1),
-      .v2            (f_v2),
-      .out_e0        (o_e0),
-      .out_e1        (o_e1),
-      .out_e2        (o_e2),
-      .out_pixel_id  (o_pixel_id),
-      .out_invArea   (o_invArea),
-      .out_v0        (o_v0),
-      .out_v1        (o_v1),
-      .out_v2        (o_v2)
+      .in_clk(frontend_clk),
+      .in_rst_n(frontend_rst_n),
+      .valid_in(frontend_valid),
+      .ready_out(orchestrator_ready),
+      .in_data(frontend_data),
+      .clk(thread_clk),
+      .rst_n(thread_rst_n),
+      .ready_in(thread_ready),
+      .valid_out(thread_valid),
+      .out_data(thread_data),
+      .empty(orchestrator_empty)
   );
 
-  assign out_e0 = o_e0;
-  assign out_e1 = o_e1;
-  assign out_e2 = o_e2;
-  assign out_pixel_id = o_pixel_id;
+  //
+  // Texture descriptor table, one read port per thread
+  //
 
-  assign out_minX_local = f_minX_local[6:0];
-  assign out_minY_local = f_minY_local[6:0];
-  assign out_width      = f_width;
-  assign out_height     = f_height;
+  logic [ 6:0] lut_addr[4];
+  logic [31:0] lut_base[4];
+  logic [ 3:0] lut_size[4];
 
-  assign out_invArea = o_invArea;
-  assign out_e0_dx_2x = f_e0_dx;
-  assign out_e0_dy_2x = f_e0_dy;
-  assign out_e1_dx_2x = f_e1_dx;
-  assign out_e1_dy_2x = f_e1_dy;
-  assign out_e2_dx_2x = f_e2_dx;
-  assign out_e2_dy_2x = f_e2_dy;
-  assign out_v0 = o_v0;
-  assign out_v1 = o_v1;
-  assign out_v2 = o_v2;
-  assign valid_out = o_valid_out[0] || o_valid_out[1] || o_valid_out[2] || o_valid_out[3];
+  ApbLutRam u_texture_lut (
+      .clk(apb_clk),
+      .resetn(apb_rst_n),
+      .s_apb_PADDR(s_apb_lut_PADDR),
+      .s_apb_PSEL(s_apb_lut_PSEL),
+      .s_apb_PENABLE(s_apb_lut_PENABLE),
+      .s_apb_PREADY(s_apb_lut_PREADY),
+      .s_apb_PWRITE(s_apb_lut_PWRITE),
+      .s_apb_PWDATA(s_apb_lut_PWDATA),
+      .s_apb_PRDATA(s_apb_lut_PRDATA),
+      .s_apb_PSLVERROR(s_apb_lut_PSLVERROR),
+      .lut_0_data_addr(lut_addr[0]),
+      .lut_0_base(lut_base[0]),
+      .lut_0_size(lut_size[0]),
+      .lut_1_data_addr(lut_addr[1]),
+      .lut_1_base(lut_base[1]),
+      .lut_1_size(lut_size[1]),
+      .lut_2_data_addr(lut_addr[2]),
+      .lut_2_base(lut_base[2]),
+      .lut_2_size(lut_size[2]),
+      .lut_3_data_addr(lut_addr[3]),
+      .lut_3_base(lut_base[3]),
+      .lut_3_size(lut_size[3])
+  );
+
+  //
+  // Threads
+  //
+
+  for (genvar lane = 0; lane < 4; lane++) begin : g_thread
+    thread u_thread (
+        .clk(thread_clk),
+        .rst_n(thread_rst_n),
+        .valid_in(thread_valid[lane]),
+        .ready_out(thread_ready[lane]),
+        .in_data(thread_data[lane]),
+        .empty(),  // also readable through the thread's busy register
+        .out_fb_color(out_fb_color[lane]),
+        .out_fb_addr(out_fb_addr[lane]),
+        .out_fb_valid(out_fb_valid[lane]),
+        .out_fb_we(out_fb_we[lane]),
+        .out_fb_rd_en(out_fb_rd_en[lane]),
+        .out_fb_rd_addr(out_fb_rd_addr[lane]),
+        .in_fb_rd_color(in_fb_rd_color[lane]),
+        .apb_clk(apb_clk),
+        .apb_rst_n(apb_rst_n),
+        .s_apb_PADDR(s_apb_thread_PADDR[lane]),
+        .s_apb_PSEL(s_apb_thread_PSEL[lane]),
+        .s_apb_PENABLE(s_apb_thread_PENABLE[lane]),
+        .s_apb_PREADY(s_apb_thread_PREADY[lane]),
+        .s_apb_PWRITE(s_apb_thread_PWRITE[lane]),
+        .s_apb_PWDATA(s_apb_thread_PWDATA[lane]),
+        .s_apb_PRDATA(s_apb_thread_PRDATA[lane]),
+        .s_apb_PSLVERROR(s_apb_thread_PSLVERROR[lane]),
+        .zbuf_ready(),  // also readable through the thread's z-buffer clear register
+        .tex_m_axi_araddr(tex_m_axi_araddr[lane]),
+        .tex_m_axi_arlen(tex_m_axi_arlen[lane]),
+        .tex_m_axi_arsize(tex_m_axi_arsize[lane]),
+        .tex_m_axi_arburst(tex_m_axi_arburst[lane]),
+        .tex_m_axi_arvalid(tex_m_axi_arvalid[lane]),
+        .tex_m_axi_arready(tex_m_axi_arready[lane]),
+        .tex_m_axi_rdata(tex_m_axi_rdata[lane]),
+        .tex_m_axi_rresp(tex_m_axi_rresp[lane]),
+        .tex_m_axi_rvalid(tex_m_axi_rvalid[lane]),
+        .tex_m_axi_rready(tex_m_axi_rready[lane]),
+        .tex_m_axi_rlast(tex_m_axi_rlast[lane]),
+        .lut_addr(lut_addr[lane]),
+        .lut_base(lut_base[lane]),
+        .lut_size(lut_size[lane])
+    );
+  end
 
 endmodule

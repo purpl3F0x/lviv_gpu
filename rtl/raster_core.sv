@@ -28,9 +28,9 @@ import gpu_types_pkg::*;
  *
  * Each thread owns one pixel of every 2x2 quad (thread = {y[0], x[0]}) and its own frame buffer
  * slice, addressed {quad_y, quad_x}. The thread reads and writes its slice through port 0 of the
- * frame buffer RAM; port 1 is the host port, for clearing the tile and reading it back. The two
- * ports are not arbitrated (port 0 wins), so the host may use its port only while the core is
- * idle. Host reads return data 4 cycles after fb_rd_en and hold it until the next read.
+ * frame buffer RAM; port 1 is the 64-bit host port, for clearing the tile and reading it back. A
+ * host word holds the slice's pixels {a, 0} (low half) and {a, 1} (high half). The two ports are
+ * not arbitrated (port 0 wins), so the host may use its port only while the core is idle. Host reads return data 4 cycles after fb_rd_en and hold it until the next read.
  * Texture reads leave through one AXI4 read master per thread; the texture descriptor table is
  * shared and read by all four threads.
  */
@@ -80,11 +80,11 @@ module raster_core (
 
     // * Frame buffer host port, one slice per thread (thread_clk, only while the core is idle) * //
     input  logic [NUM_OF_THREADS-1:0]                          fb_wr_en,
-    input  logic [NUM_OF_THREADS-1:0][PIXEL_ADDR_W_THREAD-1:0] fb_wr_addr,
-    input  logic [NUM_OF_THREADS-1:0][                   31:0] fb_wr_data,
+    input  logic [NUM_OF_THREADS-1:0][PIXEL_ADDR_W_THREAD-2:0] fb_wr_addr,
+    input  logic [NUM_OF_THREADS-1:0][                   63:0] fb_wr_data,
     input  logic [NUM_OF_THREADS-1:0]                          fb_rd_en,
-    input  logic [NUM_OF_THREADS-1:0][PIXEL_ADDR_W_THREAD-1:0] fb_rd_addr,
-    output logic [NUM_OF_THREADS-1:0][                   31:0] fb_rd_data,
+    input  logic [NUM_OF_THREADS-1:0][PIXEL_ADDR_W_THREAD-2:0] fb_rd_addr,
+    output logic [NUM_OF_THREADS-1:0][                   63:0] fb_rd_data,
 
     // * Texture memory, one AXI4 read master per thread (thread_clk) * //
     output logic [NUM_OF_THREADS-1:0][ 31:0] tex_m_axi_araddr,
@@ -196,11 +196,6 @@ module raster_core (
   // Threads, each with its frame buffer slice
   //
 
-  // Frame buffer read latency is 1 + READ_OUT_STAGES: the input register, the BRAM's array register
-  // and DO_REG, and one fabric register per port. That is 4 cycles, the thread's
-  // FRAME_BUFFER_READ_LATECNY.
-  localparam int FbReadOutStages = 3;
-
   for (genvar lane = 0; lane < 4; lane++) begin : g_thread
     logic [                   31:0] thread_fb_color;
     logic [PIXEL_ADDR_W_THREAD-1:0] thread_fb_addr;
@@ -250,10 +245,9 @@ module raster_core (
         .lut_size(lut_size[lane])
     );
 
+    // Reads return 4 cycles after the request, the thread's FRAME_BUFFER_READ_LATECNY.
     frame_buffer_ram #(
-        .DATA_WIDTH(32),
-        .ADDR_WIDTH(PIXEL_ADDR_W_THREAD),
-        .READ_OUT_STAGES(FbReadOutStages)
+        .ADDR_WIDTH(PIXEL_ADDR_W_THREAD)
     ) u_frame_buffer (
         .clk(thread_clk),
         .rst_n(thread_rst_n),

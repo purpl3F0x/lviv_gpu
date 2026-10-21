@@ -42,9 +42,12 @@ module axis_skid_buffer #(
     end
   end
 
-  // No reset on the data: skid_valid (from the reset tready register) qualifies it.
+  // The data registers never look at s_axis_tvalid, so their wide enables and select come from
+  // local registers only; the valid flags qualify the data. No reset on the data either.
+
+  // Load whenever the slot is free: when ready drops, it holds the beat accepted on that edge.
   always_ff @(posedge aclk) begin
-    if (s_hsk) begin
+    if (s_axis_tready_reg) begin
       skid_data <= s_axis_tdata;
     end
   end
@@ -57,11 +60,11 @@ module axis_skid_buffer #(
     end
   end
 
-  // Output data — skid has priority when draining a held beat.
+  // Output data: skid has priority when draining a held beat. It may change while m_axis_tvalid is
+  // low; nothing reads it then.
   always_ff @(posedge aclk) begin
     if (!m_axis_tvalid || m_axis_tready) begin
-      if (skid_valid) m_axis_tdata <= skid_data;
-      else if (s_axis_tvalid) m_axis_tdata <= s_axis_tdata;
+      m_axis_tdata <= skid_valid ? skid_data : s_axis_tdata;
     end
   end
 

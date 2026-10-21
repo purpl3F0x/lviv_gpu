@@ -20,25 +20,23 @@ module fp_cmp_le (
   logic [31:0] b_buffer;
   logic [2:0] cmp_result;
 
-  // Returns {lt, gt, eq} for IEEE754 bit-pattern compare used by this pipeline.
+  // Returns {lt, gt, eq} for IEEE754 bit-pattern compare used by this pipeline; -0 equals +0.
+  // Each output is computed on its own, so lt needs no equality compare in series with the
+  // magnitude compare: two parallel carry-chain compares, two zero detects and one LUT.
   function automatic logic [2:0] fp32_cmp_lge(input logic [31:0] a, input logic [31:0] b);
-    logic sa, sb;
+    logic sa, sb, mag_lt, mag_gt, both_zero;
     begin
       sa = a[31];
       sb = b[31];
+      mag_lt = a[30:0] < b[30:0];
+      mag_gt = a[30:0] > b[30:0];
+      both_zero = a[30:0] == '0 && b[30:0] == '0;
 
-      if (a == b) begin
-        fp32_cmp_lge = 3'b001;
-      end else if (sa != sb) begin
-        // Any negative is less than any positive.
-        fp32_cmp_lge = sa ? 3'b100 : 3'b010;
-      end else if (!sa) begin
-        // Positive domain preserves natural unsigned ordering.
-        fp32_cmp_lge = (a < b) ? 3'b100 : 3'b010;
-      end else begin
-        // Negative domain reverses ordering.
-        fp32_cmp_lge = (a > b) ? 3'b100 : 3'b010;
-      end
+      // Different signs: the negative one is less. Same sign: magnitude order, reversed when
+      // negative (equal magnitudes are neither lt nor gt).
+      fp32_cmp_lge[2] = !both_zero && ((sa != sb) ? sa : (sa ? mag_gt : mag_lt));  // lt
+      fp32_cmp_lge[1] = !both_zero && ((sa != sb) ? sb : (sa ? mag_lt : mag_gt));  // gt
+      fp32_cmp_lge[0] = both_zero || a == b;  // eq
     end
   endfunction
 

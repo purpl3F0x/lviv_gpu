@@ -19,7 +19,8 @@ module axis_skid_buffer #(
 );
 
   logic [WIDTH-1:0] skid_data;
-  logic             s_axis_tready_reg;
+  // Replicated: it is the stall enable of the stage that feeds the skid.
+  (* max_fanout = 256 *) logic s_axis_tready_reg;
   logic             skid_valid;
 
   assign s_axis_tready = s_axis_tready_reg;

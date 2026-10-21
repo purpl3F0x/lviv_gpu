@@ -112,9 +112,23 @@ std::vector<Vertex_ObjectSpace> loadOBJ(const std::string &filename)
     return vertices;
 }
 
+// stb wants R, G, B, A bytes; an ARGB word sits in memory as B, G, R, A, so it is repacked.
+void savePngArgb(const char *filename, int width, int height, const uint32_t *argb)
+{
+    std::vector<uint8_t> rgba(static_cast<size_t>(width) * height * 4);
+    for (size_t i = 0; i < rgba.size() / 4; ++i)
+    {
+        rgba[4 * i + 0] = (argb[i] >> 16) & 0xFF;
+        rgba[4 * i + 1] = (argb[i] >> 8) & 0xFF;
+        rgba[4 * i + 2] = argb[i] & 0xFF;
+        rgba[4 * i + 3] = argb[i] >> 24;
+    }
+    stbi_write_png(filename, width, height, 4, rgba.data(), width * 4);
+}
+
 void savePNG(const Framebuffer &fb, const char *filename)
 {
-    stbi_write_png(filename, fb.width, fb.height, 4, fb.colorBuffer.data(), fb.width * 4);
+    savePngArgb(filename, fb.width, fb.height, fb.colorBuffer.data());
 }
 
 int main(int argc, char **argv)
@@ -122,6 +136,7 @@ int main(int argc, char **argv)
     bool alphaBlend = false;
     std::string frontendInputsCsv;
     std::string frontendExpectedCsv;
+    std::string rasterCoreCsv;
     for (int argument = 1; argument < argc; ++argument)
     {
         if (std::string(argv[argument]) == "--alpha-blend")
@@ -130,10 +145,13 @@ int main(int argc, char **argv)
             frontendInputsCsv = argv[++argument];
         else if (std::string(argv[argument]) == "--frontend-expected-csv" && argument + 1 < argc)
             frontendExpectedCsv = argv[++argument];
+        else if (std::string(argv[argument]) == "--raster-core-csv" && argument + 1 < argc)
+            rasterCoreCsv = argv[++argument];
         else
         {
             std::cerr << "Usage: " << argv[0]
-                      << " [--alpha-blend] [--frontend-inputs-csv PATH --frontend-expected-csv PATH]\n";
+                      << " [--alpha-blend] [--frontend-inputs-csv PATH --frontend-expected-csv PATH]"
+                         " [--raster-core-csv PATH]\n";
             return 1;
         }
     }
@@ -258,6 +276,11 @@ int main(int argc, char **argv)
         rasterizer.dumpFrontendInputCsv(frontendInputsCsv);
         rasterizer.dumpFrontendExpectedCsv(frontendExpectedCsv);
         std::cout << "Wrote " << frontendInputsCsv << " and " << frontendExpectedCsv << std::endl;
+    }
+    if (!rasterCoreCsv.empty())
+    {
+        rasterizer.dumpRasterCoreCsv(rasterCoreCsv);
+        std::cout << "Wrote " << rasterCoreCsv << std::endl;
     }
 
     auto end_time = std::chrono::high_resolution_clock::now();

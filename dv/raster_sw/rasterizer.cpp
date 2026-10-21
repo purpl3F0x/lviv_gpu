@@ -81,6 +81,52 @@ void Rasterizer::dumpFrontendExpectedCsv(const std::string &path) const
     }
 }
 
+// One row per (triangle, bin), in bin order: everything raster_core's frontend_data_in_t takes. The
+// render state is the rasterizer's global state, written per row because the hardware takes it per
+// triangle. Enum columns use the RTL encodings (gpu_types_pkg.sv); colours are ARGB hex.
+void Rasterizer::dumpRasterCoreCsv(const std::string &path) const
+{
+    // gpu_types_pkg.sv encodings
+    constexpr int TexIdNone = 0x80, TexIdBound = 0;
+    constexpr int FragmentColor = 5; // fragment_op_t COLOR; REPLACE..ADD match TexEnvMode
+    constexpr int TextureClamp = 0, TextureTile = 1;
+    constexpr int BlendZero = 0, BlendOne = 1, BlendSrcAlpha = 6, BlendOneMinusSrcAlpha = 7;
+    constexpr int DepthLess = 1; // rasterizeTriangle passes z < stored
+
+    const Texture *texture = textureUnit.enabled ? textureUnit.boundTexture : nullptr;
+    const int texId = texture ? TexIdBound : TexIdNone;
+    const int textureFunction = texture ? static_cast<int>(textureUnit.envMode) : FragmentColor;
+    const int modeU = texture && texture->wrapModeS == TexWrapMode::CLAMP ? TextureClamp : TextureTile;
+    const int modeV = texture && texture->wrapModeT == TexWrapMode::CLAMP ? TextureClamp : TextureTile;
+    const int sfactor = alphaBlendingEnabled ? BlendSrcAlpha : BlendOne;
+    const int dfactor = alphaBlendingEnabled ? BlendOneMinusSrcAlpha : BlendZero;
+
+    std::ofstream csv(path);
+    if (!csv)
+        throw std::runtime_error("Could not open raster core CSV: " + path);
+
+    csv << "transaction_id,bin_min_x,bin_min_y";
+    for (int v = 0; v < 3; ++v)
+        for (const char *field : {"x", "y", "z", "w", "u", "v", "color"})
+            csv << ",v" << v << '_' << field;
+    csv << ",tex_id,texture_mode_u,texture_mode_v,texture_function,sfactor_op,dfactor_op,depth_func\n";
+
+    csv << std::setprecision(std::numeric_limits<float>::max_digits10);
+    for (size_t index = 0; index < frontend_vectors.size(); ++index)
+    {
+        const FrontendVector &vector = frontend_vectors[index];
+        csv << index << ',' << vector.inputs[6] << ',' << vector.inputs[7];
+        for (const Vertex_ScreenSpace &vertex : vector.vertices)
+        {
+            csv << ',' << vertex.position.x << ',' << vertex.position.y << ',' << vertex.position.z << ','
+                << vertex.position.w << ',' << vertex.texcoord_over_w.x << ',' << vertex.texcoord_over_w.y << ','
+                << std::hex << std::setw(8) << std::setfill('0') << vertex.color << std::dec << std::setfill(' ');
+        }
+        csv << ',' << texId << ',' << modeU << ',' << modeV << ',' << textureFunction << ',' << sfactor << ','
+            << dfactor << ',' << DepthLess << '\n';
+    }
+}
+
 // -----------------------------------------------------------------------------
 // STEP 4: Tile Binning
 // -----------------------------------------------------------------------------
@@ -346,6 +392,7 @@ void Rasterizer::recordFrontendVector(const Vertex_ScreenSpace &v0, const Vertex
         v2.texcoord_over_w.x,
         v2.texcoord_over_w.y,
     };
+    vector.vertices = {v0, v1, v2};
     frontend_vectors.push_back(vector);
 }
 

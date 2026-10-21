@@ -42,6 +42,7 @@ struct Bin
 struct FrontendVector
 {
     std::array<float, 16> inputs;
+    std::array<Vertex_ScreenSpace, 3> vertices; // the full triangle, for the raster core CSV
     struct ExpectedOutputs
     {
         float inv_area;
@@ -101,6 +102,7 @@ class Rasterizer
 
     void dumpFrontendInputCsv(const std::string &path) const;
     void dumpFrontendExpectedCsv(const std::string &path) const;
+    void dumpRasterCoreCsv(const std::string &path) const;
 
     // Execute the binned pipeline
     void flush(bool dump_bins);

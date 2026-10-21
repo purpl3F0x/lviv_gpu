@@ -1,8 +1,6 @@
 # Vivado flows for the raster core (frontend, orchestrator, four threads), using the real Xilinx IP:
-#   out-of-context synth/impl (scripts/vivado/ooc_flow.tcl). There is no testbench yet.
-# Usage: make -f Makefile.vivado [synth|impl|synth_gui|impl_gui|ooc_clean|clean]
-
-include ../../scripts/vivado/vivado.mk
+#   xsim simulation (scripts/vivado/xsim.mk) and out-of-context synth/impl (below, scripts/vivado/ooc_flow.tcl).
+# Usage: make -f Makefile.vivado [sim|gui_sim|synth|impl|synth_gui|impl_gui|ooc_clean|ip|clean|distclean]
 
 RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/int_modules.sv ../../rtl/delay_pipe.sv \
       ../../rtl/delay_pipe_fifo.sv ../../rtl/axis_skid_buffer.sv ../../rtl/fp_wrappers.sv \
@@ -16,6 +14,33 @@ RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/int_modules.sv ../../rtl/delay_pipe.s
       ../../rtl/generated/ApbLutRam.v ../../rtl/raster_core.sv
 
 .DEFAULT_GOAL := synth
+include ../../scripts/vivado/xsim.mk
+
+.PHONY: sim gui_sim png
+
+MAGICK = magick
+FRAME = $(CURDIR)/raster_core.tga
+# Any image ImageMagick reads (square, a power of two, up to 256 x 256) becomes texture.tga here.
+TEXTURE_SRC ?= ../../dv/raster_sw/texture_64x64.jpg
+TEXTURE = texture.tga
+
+# xsim runs in the work dir, so the CSV and the TGAs use absolute paths.
+sim gui_sim: TOP = tb_raster_core
+sim gui_sim: TB_SRCS = tb_raster_core.sv ../common/axi_ram.v
+sim gui_sim: SIM_ARGS = --testplusarg "INPUTS=$(REPO_ROOT)/dv/raster_sw/raster_core_inputs.csv" --testplusarg "TEXTURE=$(CURDIR)/$(TEXTURE)" --testplusarg "OUT=$(FRAME)"
+
+# The texture is listed first so it exists before run starts xsim.
+sim: $(TEXTURE) run
+	$(MAKE) -f Makefile.vivado png
+gui_sim: $(TEXTURE) gui
+
+# Uncompressed 32-bit TGA; an image without alpha gets an opaque one, as stbi_load(..., 4) gives.
+$(TEXTURE): $(TEXTURE_SRC)
+	$(MAGICK) $< -alpha set -depth 8 -compress none $@
+
+# Convert the last frame without re-running the simulation.
+png:
+	$(MAGICK) $(FRAME) $(FRAME:.tga=.png)
 
 # ---------------------------------------------------------------------------
 # Out-of-context synthesis + implementation on ZCU104
@@ -60,7 +85,7 @@ $(call MKDIR,$(LOG_DIR))
 cd $(OOC_DIR) && $(VIVADO) -mode batch -nojournal -log $(LOG_DIR)/ooc_$(OOC_TOP).log -source $(VIVADO_MK_DIR)/ooc_flow.tcl -tclargs $(OOC_ARGS)
 endef
 
-.PHONY: synth impl synth_gui impl_gui ooc_clean clean
+.PHONY: synth impl synth_gui impl_gui ooc_clean
 
 synth: $(SYNTH_DCP)
 	$(if $(GUI),$(call OPEN_GUI,$(SYNTH_DCP)))
@@ -89,5 +114,5 @@ $(IMPL_DCP): $(SYNTH_DEPS) $(SYNTH_DCP) | $(OOC_DIR)
 ooc_clean:
 	$(call RMDIR,$(OOC_DIR))
 
+# xsim.mk's clean removes the xsim work dir and logs; also drop the OOC checkpoints.
 clean: ooc_clean
-	$(call RMDIR,$(LOG_DIR))

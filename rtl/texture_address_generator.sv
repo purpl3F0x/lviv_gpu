@@ -36,7 +36,9 @@ module texture_address_generator (
     // Quantize 10.36 fraction to 0.12 by taking the most-significant fractional bits.
     frac_q = frac_full[UvInFracW-1-:UvFracW];
 
-    unique case (mode)
+    // unique0, not unique: the unreset mode registers hold X until the first token, and unique
+    // would report every such cycle in simulation. Both modes are covered either way.
+    unique0 case (mode)
       TEXTURE_TILE: begin
         normalize_uv = frac_q;
       end

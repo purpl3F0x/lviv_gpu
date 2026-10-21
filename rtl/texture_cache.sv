@@ -214,8 +214,9 @@ module texture_cache #(
     end
   end
 
-  // Reset register
-  (*dont_touch = "true" *) reg rst_reg;
+  // Reset register. Starts asserted, so the first clock edge already resets the cache rather than
+  // running it from an X reset.
+  (*dont_touch = "true" *) reg rst_reg = 1'b0;
   always_ff @(posedge clk) begin
     rst_reg <= !(!rst_n | flush);
   end
@@ -387,7 +388,7 @@ module texture_cache #(
       .clk(clk),
       .rst_n(rst_reg),
       // .flush(flush),
-      .flush(0),  // temp fix
+git      .flush(1'b0),  // temp fix // TODO: lot of fixes here (we can break AXI in cache flush)
       .lookup_en(lookup_fire),
       .lookup_tag(request_stage_tag),
       .lookup_hit_found(tag_lookup_hit_found),

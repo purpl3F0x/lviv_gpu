@@ -199,7 +199,15 @@ module thread_orchestrator (
   InmodeAD = 5'b00100;  // dx + dy
 
   // On load each lane adds its pixel's offset inside the 2x2 group (lane = {ly, lx}).
-  localparam logic [3:0][4:0] LoadInmode = {InmodeAD, InmodeD, InmodeA, InmodeZero};
+  // A function, not an array parameter: Icarus supports neither packed nor unpacked ones.
+  function automatic logic [4:0] load_inmode(input int lane_idx);
+    case (lane_idx)
+      0: return InmodeZero;
+      1: return InmodeA;
+      2: return InmodeD;
+      default: return InmodeAD;
+    endcase
+  endfunction
   // A group step moves two pixels.
   localparam logic signed [17:0] LoadScale = 18'sd1024, StepScale = 18'sd2048;
 
@@ -222,11 +230,13 @@ module thread_orchestrator (
   end
 
   // init and the load select enter at the DSP's ALU stage, two advancing cycles after issue.
-  // Shared by the four lanes.
+  // Shared by the four lanes. Copied per element: Icarus does not support whole-array assignment.
   always_ff @(posedge clk) begin
     if (advance) begin
-      init_q[0] <= init;
-      init_q[1] <= init_q[0];
+      for (int e = 0; e < 3; e++) begin
+        init_q[0][e] <= init[e];
+        init_q[1][e] <= init_q[0][e];
+      end
       load_q <= {load_q[0], issue_op == Load};
     end
   end
@@ -239,6 +249,9 @@ module thread_orchestrator (
   end
 
   for (genvar lane = 0; lane < 4; lane++) begin : g_lane
+    // Evaluated here, not in the port list: Icarus loses the genvar after a call there.
+    localparam logic [4:0] LaneLoadInmode = load_inmode(lane);
+
     for (genvar edge_idx = 0; edge_idx < 3; edge_idx++) begin : g_edge
       orchestrator_alu u_alu (
           .clk(clk),
@@ -246,7 +259,7 @@ module thread_orchestrator (
           .a(dx[edge_idx]),
           .d(dy[edge_idx]),
           .b(issue_op == Load ? LoadScale : StepScale),
-          .inmode(issue_op == Load ? LoadInmode[lane] : step_inmode),
+          .inmode(issue_op == Load ? LaneLoadInmode : step_inmode),
           .c(init_q[1][edge_idx]),
           .load(load_q[1]),
           .result(edges[lane][edge_idx])
@@ -328,7 +341,6 @@ module thread_orchestrator (
   logic [3:0] fifo_almost_full;
   logic [3:0][$clog2(ThreadFifoDepth):0] thread_fill;
   logic out_fire;
-  thread_data_in_t fifo_wdata[4];
 
   assign out_fire = valid_pipe[PipeLatency-1] && advance;
 
@@ -341,35 +353,37 @@ module thread_orchestrator (
   for (genvar lane = 0; lane < 4; lane++) begin : g_thread_fifo
     logic fifo_empty;
     logic [$bits(thread_data_in_t)-1:0] rdata;
+    // One struct per lane: Icarus cannot write fields of an unpacked array of structs.
+    thread_data_in_t fifo_wdata;
 
     always_comb begin
-      fifo_wdata[lane].addr = delay_out.addr;
-      fifo_wdata[lane].tex_id = delay_out.tex_id;
-      fifo_wdata[lane].texture_mode_u = delay_out.texture_mode_u;
-      fifo_wdata[lane].texture_mode_v = delay_out.texture_mode_v;
-      fifo_wdata[lane].texture_function = delay_out.texture_function;
-      fifo_wdata[lane].sfactor_op = delay_out.sfactor_op;
-      fifo_wdata[lane].dfactor_op = delay_out.dfactor_op;
-      fifo_wdata[lane].depth_func = delay_out.depth_func;
-      fifo_wdata[lane].inv_area = delay_out.inv_area;
-      fifo_wdata[lane].e0 = results[lane][0];
-      fifo_wdata[lane].e1 = results[lane][1];
-      fifo_wdata[lane].e2 = results[lane][2];
-      fifo_wdata[lane].v0_u = delay_out.v0_u;
-      fifo_wdata[lane].v0_v = delay_out.v0_v;
-      fifo_wdata[lane].v1_u = delay_out.v1_u;
-      fifo_wdata[lane].v1_v = delay_out.v1_v;
-      fifo_wdata[lane].v2_u = delay_out.v2_u;
-      fifo_wdata[lane].v2_v = delay_out.v2_v;
-      fifo_wdata[lane].v0_w = delay_out.v0_w;
-      fifo_wdata[lane].v0_z = delay_out.v0_z;
-      fifo_wdata[lane].v1_w = delay_out.v1_w;
-      fifo_wdata[lane].v1_z = delay_out.v1_z;
-      fifo_wdata[lane].v2_w = delay_out.v2_w;
-      fifo_wdata[lane].v2_z = delay_out.v2_z;
-      fifo_wdata[lane].v0_color = delay_out.v0_color;
-      fifo_wdata[lane].v1_color = delay_out.v1_color;
-      fifo_wdata[lane].v2_color = delay_out.v2_color;
+      fifo_wdata.addr = delay_out.addr;
+      fifo_wdata.tex_id = delay_out.tex_id;
+      fifo_wdata.texture_mode_u = delay_out.texture_mode_u;
+      fifo_wdata.texture_mode_v = delay_out.texture_mode_v;
+      fifo_wdata.texture_function = delay_out.texture_function;
+      fifo_wdata.sfactor_op = delay_out.sfactor_op;
+      fifo_wdata.dfactor_op = delay_out.dfactor_op;
+      fifo_wdata.depth_func = delay_out.depth_func;
+      fifo_wdata.inv_area = delay_out.inv_area;
+      fifo_wdata.e0 = results[lane][0];
+      fifo_wdata.e1 = results[lane][1];
+      fifo_wdata.e2 = results[lane][2];
+      fifo_wdata.v0_u = delay_out.v0_u;
+      fifo_wdata.v0_v = delay_out.v0_v;
+      fifo_wdata.v1_u = delay_out.v1_u;
+      fifo_wdata.v1_v = delay_out.v1_v;
+      fifo_wdata.v2_u = delay_out.v2_u;
+      fifo_wdata.v2_v = delay_out.v2_v;
+      fifo_wdata.v0_w = delay_out.v0_w;
+      fifo_wdata.v0_z = delay_out.v0_z;
+      fifo_wdata.v1_w = delay_out.v1_w;
+      fifo_wdata.v1_z = delay_out.v1_z;
+      fifo_wdata.v2_w = delay_out.v2_w;
+      fifo_wdata.v2_z = delay_out.v2_z;
+      fifo_wdata.v0_color = delay_out.v0_color;
+      fifo_wdata.v1_color = delay_out.v1_color;
+      fifo_wdata.v2_color = delay_out.v2_color;
     end
 
     sync_fifo #(
@@ -378,7 +392,7 @@ module thread_orchestrator (
     ) u_fifo (
         .clk(clk),
         .rst_n(rst_n),
-        .data_i(fifo_wdata[lane]),
+        .data_i(fifo_wdata),
         .wr_en(out_fire),
         .rd_en(ready_in[lane]),
         .data_o(rdata),

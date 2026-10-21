@@ -13,7 +13,9 @@
 #include <verilated.h>
 #include "Vthread_verilator_wrap.h"
 #include "Vthread_verilator_wrap___024root.h"
-#include "../../dv/raster_sw/stb_image_write.h"
+
+// raster_sw/main.cpp: writes ARGB words as a PNG.
+extern void savePngArgb(const char *filename, int width, int height, const uint32_t *argb);
 
 namespace {
 
@@ -782,7 +784,7 @@ void threadCmpSaveReferenceImage(const char* path)
     if (g_ref_width <= 0 || g_ref_height <= 0) {
         return;
     }
-    stbi_write_png(path, g_ref_width, g_ref_height, 4, g_ref_color.data(), g_ref_width * 4);
+    savePngArgb(path, g_ref_width, g_ref_height, g_ref_color.data());
 }
 
 void Rasterizer::rasterizeTriangle(const Vertex_ScreenSpace& v0, const Vertex_ScreenSpace& v1,

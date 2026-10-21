@@ -4,8 +4,12 @@ A work-in-progress FPGA GPU in SystemVerilog, with a C++ reference rasterizer.
 
 ## Block Diagram
 <p align="center">
-<img src="docs/raster_core_block_diagram.svg" alt="Raster core block diagram" style="width:100%;max-width: 400px">
+<img src="raster_core_block_diagram.svg" alt="Raster core block diagram" style="width:100%;max-width: 400px">
 </p>
+
+## Rendering Demo
+
+<img src="rendering_animation.gif">
 
 ## Layout
 

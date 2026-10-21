@@ -78,6 +78,19 @@ package gpu_types_pkg;
     TEXTURE_TILE  = 1'b1
   } texture_address_mode_t;
 
+  // Depth test function, in OpenGL order (the low 3 bits of GL_NEVER..GL_ALWAYS). Each value is a
+  // mask of the compare results {gt, eq, lt} that pass, for the fragment's z against the stored z.
+  typedef enum logic [2:0] {
+    DEPTH_NEVER    = 3'b000,
+    DEPTH_LESS     = 3'b001,
+    DEPTH_EQUAL    = 3'b010,
+    DEPTH_LEQUAL   = 3'b011,
+    DEPTH_GREATER  = 3'b100,
+    DEPTH_NOTEQUAL = 3'b101,
+    DEPTH_GEQUAL   = 3'b110,
+    DEPTH_ALWAYS   = 3'b111
+  } depth_func_t;
+
   typedef struct packed {
     logic [7:0] a;  // Alpha
     logic [7:0] r;  // Red
@@ -124,6 +137,7 @@ package gpu_types_pkg;
     fragment_op_t texture_function;
     blend_op_t sfactor_op;
     blend_op_t dfactor_op;
+    depth_func_t depth_func;
   } frontend_data_in_t;
 
   // Thread ingress token after frontend preprocessing.
@@ -136,6 +150,7 @@ package gpu_types_pkg;
     fragment_op_t texture_function;
     blend_op_t sfactor_op;
     blend_op_t dfactor_op;
+    depth_func_t depth_func;
     logic [31:0] inv_area;
     logic [31:0] e2;
     logic [31:0] e1;
@@ -194,6 +209,7 @@ package gpu_types_pkg;
     fragment_op_t texture_function;
     blend_op_t sfactor_op;
     blend_op_t dfactor_op;
+    depth_func_t depth_func;
     float_t inv_area;
 
     float_t v0_w;

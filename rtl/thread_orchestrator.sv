@@ -55,6 +55,7 @@ module thread_orchestrator (
     fragment_op_t texture_function;
     blend_op_t sfactor_op;
     blend_op_t dfactor_op;
+    depth_func_t depth_func;
     float_t inv_area;
     fx_5_13_t v0_u, v0_v, v1_u, v1_v, v2_u, v2_v;
     float_t v0_w, v0_z, v1_w, v1_z, v2_w, v2_z;
@@ -280,6 +281,7 @@ module thread_orchestrator (
     delay_in.texture_function = triangle.texture_function;
     delay_in.sfactor_op = triangle.sfactor_op;
     delay_in.dfactor_op = triangle.dfactor_op;
+    delay_in.depth_func = triangle.depth_func;
     delay_in.inv_area = triangle.inv_area;
     delay_in.v0_u = triangle.v0_u;
     delay_in.v0_v = triangle.v0_v;
@@ -341,6 +343,7 @@ module thread_orchestrator (
       fifo_wdata[lane].texture_function = delay_out.texture_function;
       fifo_wdata[lane].sfactor_op = delay_out.sfactor_op;
       fifo_wdata[lane].dfactor_op = delay_out.dfactor_op;
+      fifo_wdata[lane].depth_func = delay_out.depth_func;
       fifo_wdata[lane].inv_area = delay_out.inv_area;
       fifo_wdata[lane].e0 = results[lane][0];
       fifo_wdata[lane].e1 = results[lane][1];

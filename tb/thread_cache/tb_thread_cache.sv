@@ -352,6 +352,7 @@ module tb_thread_cache;
       token.texture_mode_u = TEXTURE_CLAMP;
       token.texture_mode_v = TEXTURE_CLAMP;
       token.texture_function = REPLACE;
+      token.depth_func = DEPTH_LESS;
       token.inv_area = fbits(1.0);
       token.e0 = fbits(1.0);
       token.e1 = fbits(0.0);

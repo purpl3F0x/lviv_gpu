@@ -125,6 +125,7 @@ struct ThreadToken {
     uint32_t texture_function;
     uint32_t sfactor_op = 1;
     uint32_t dfactor_op = 0;
+    uint32_t depth_func = 1;  // DEPTH_LESS
     uint32_t inv_area;
     uint32_t e2;
     uint32_t e1;
@@ -674,6 +675,7 @@ class ThreadRasterCore {
         dut_[tid]->in_texture_function = t.texture_function;
         dut_[tid]->in_sfactor_op = t.sfactor_op;
         dut_[tid]->in_dfactor_op = t.dfactor_op;
+        dut_[tid]->in_depth_func = t.depth_func;
         dut_[tid]->in_inv_area = t.inv_area;
         dut_[tid]->in_e2 = t.e2;
         dut_[tid]->in_e1 = t.e1;
@@ -713,6 +715,7 @@ class ThreadRasterCore {
         dut_[tid]->in_texture_function = 5; 
         dut_[tid]->in_sfactor_op = 1;
         dut_[tid]->in_dfactor_op = 0;
+        dut_[tid]->in_depth_func = 1;
         dut_[tid]->in_inv_area = fbits(1.0f);
         dut_[tid]->in_e2 = 0;
         dut_[tid]->in_e1 = 0;

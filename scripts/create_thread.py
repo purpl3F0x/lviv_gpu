@@ -26,7 +26,8 @@ DEFAULT_LATENCIES = {
     "fp_mul": 8,
     "fp_fma": 19,
     "fp_recip": 28,
-    "fp_cmp": 2,
+    # fp_cmp_le: input registers, lt/gt/eq, function select.
+    "fp_cmp": 3,
     "mux": 1,
     "mem_read": 1,
     "mem_write": 1,
@@ -53,6 +54,17 @@ _LEAF_TYPE_WIDTHS = {
     "color_argb_t": 32,
     "fx_texture": 18,
     "fx_2_23": 25,
+    "depth_func_t": 3,
+}
+
+# Constant compare function for each fixed compare kind (depth_func_t mask of {gt, eq, lt}).
+_CMP_KIND_FUNC = {
+    "lt": "DEPTH_LESS",
+    "le": "DEPTH_LEQUAL",
+    "gt": "DEPTH_GREATER",
+    "ge": "DEPTH_GEQUAL",
+    "eq": "DEPTH_EQUAL",
+    "ne": "DEPTH_NOTEQUAL",
 }
 
 
@@ -310,9 +322,13 @@ class HardwareDAG:
         self.expression_cache[cache_key] = node_id
         return node_id
 
-    def add_compare_operation(self, cmp_kind, left, right, expr):
-        if cmp_kind not in ("lt", "le", "gt", "ge", "eq", "ne"):
+    def add_compare_operation(self, cmp_kind, left, right, expr, func=None):
+        """Compare left against right. cmp_kind "func" takes the function from the func operand
+        (a depth_func_t signal, the third input edge); the other kinds use a constant function."""
+        if cmp_kind not in ("lt", "le", "gt", "ge", "eq", "ne", "func"):
             raise ValueError(f"Unsupported compare kind: {cmp_kind}")
+        if (cmp_kind == "func") != (func is not None):
+            raise ValueError("A func operand is required exactly for cmp_kind 'func'")
 
         valid_expr = self._merge_valid_expr(
             self.global_valid_expr,
@@ -325,7 +341,8 @@ class HardwareDAG:
         node_id = self._new_node(
             "fp_cmp", expr, cmp_kind=cmp_kind, valid_expr=valid_expr
         )
-        self._add_edges(node_id, (left, right), tuple(self.control_dependencies))
+        operands = (left, right) if func is None else (left, right, func)
+        self._add_edges(node_id, operands, tuple(self.control_dependencies))
         self.expression_cache[cache_key] = node_id
         return node_id
 
@@ -989,34 +1006,20 @@ class HardwareDAG:
             elif info.op_type == "fp_cmp":
                 a = input_ref_by_edge[(node, 0)]
                 b = input_ref_by_edge[(node, 1)]
-                if info.cmp_kind == "le":
-                    lines.append(f"fp_cmp_le u_{unit} (")
-                    lines.append("    .aclk(clk),")
-                    lines.append("    .aclken(pipe_en_internal),")
-                    lines.append(f"    .s_axis_a({a}),")
-                    lines.append("    //   .s_axis_a_valid(),")
-                    lines.append(f"    .s_axis_b({b}),")
-                    lines.append("    //   .s_axis_b_valid(),")
-                    lines.append(f"    .m_axis_res({out_wire}[0])")
-                    lines.append("    //   .m_axis_tvalid()")
-                    lines.append(");")
+                # Every compare kind uses fp_cmp_le: "func" takes the per-token function from its
+                # third input, the fixed kinds a constant one.
+                if info.cmp_kind == "func":
+                    func = f"depth_func_t'({input_ref_by_edge[(node, 2)]})"
                 else:
-                    cmp_map = {
-                        "lt": "3'd0",
-                        "le": "3'd1",
-                        "gt": "3'd2",
-                        "ge": "3'd3",
-                        "eq": "3'd4",
-                        "ne": "3'd5",
-                    }
-                    cmp_op = cmp_map.get(info.cmp_kind, "3'd1")
-                    lines.append(f"fp_cmp #(.LATENCY(1)) u_{unit} (")
-                    lines.append("    .aclk(clk), .aclken(pipe_en_internal),")
-                    lines.append(f"    .cmp_op({cmp_op}),")
-                    lines.append(f"    .valid_in({valid_in}),")
-                    lines.append(f"    .a({a}), .b({b}),")
-                    lines.append(f"    .result({out_wire}[0])")
-                    lines.append(");")
+                    func = _CMP_KIND_FUNC[info.cmp_kind]
+                lines.append(f"fp_cmp_le u_{unit} (")
+                lines.append("    .aclk(clk),")
+                lines.append("    .aclken(pipe_en_internal),")
+                lines.append(f"    .s_axis_a({a}),")
+                lines.append(f"    .s_axis_b({b}),")
+                lines.append(f"    .func({func}),")
+                lines.append(f"    .m_axis_res({out_wire}[0])")
+                lines.append(");")
             elif info.op_type == "fx_texture_interpolate":
                 colors = [input_ref_by_edge[(node, i)] for i in (0, 2, 4)]
                 weights = [input_ref_by_edge[(node, i)] for i in (1, 3, 5)]
@@ -1447,6 +1450,23 @@ class Signal:
         )
 
     @staticmethod
+    def depth_compare(a, b, func):
+        """a <func> b, with func a per-token depth_func_t signal (programmable depth test)."""
+        a._check_binary(b)
+        if not isinstance(func, Signal) or func.type != "depth_func_t":
+            raise TypeError("depth_compare expects a depth_func_t function signal")
+        if func.dag is not a.dag:
+            raise ValueError("depth_compare signals must belong to the same DAG")
+        expr = f"depth_compare({a.expr}, {b.expr}, {func.expr})"
+        node_id = a.dag.add_compare_operation("func", a, b, expr, func=func)
+        return PredicateSignal(
+            a.dag,
+            hw_id=node_id,
+            expr=expr,
+            valid_expr=a.dag.ops[node_id].valid_expr,
+        )
+
+    @staticmethod
     def mem_read(addr, after=None, lead_cycles=0):
         if not isinstance(addr, Signal):
             raise TypeError("mem_read requires a Signal address operand")
@@ -1533,7 +1553,7 @@ if __name__ == "__main__":
         "fp_mul": 8,
         "fp_fma": 16,
         "fp_recip": 29,
-        "fp_cmp": 2,
+        "fp_cmp": 3,
         "fp_to_fx2_23": 3,
         "mem_read": 3,
         "mem_write": 1,
@@ -1574,6 +1594,8 @@ if __name__ == "__main__":
     v2_color = Signal(dag, name="v2_color", type="color_argb_t")
 
     inv_area = Signal(dag, name="inv_area")
+    # Per-triangle depth test function (depth_func_t).
+    depth_func = Signal(dag, name="depth_func", type="depth_func_t")
 
     # Arithmetic path
     iw0 = e0 * inv_area
@@ -1607,7 +1629,7 @@ if __name__ == "__main__":
     current_z = Signal.mem_read(addr, after=z, lead_cycles=1)
     # Depth test qualifier is computed, but pipeline is not fail-fast gated.
     # Decision whether to use outputs is made at the end of the pipeline.
-    comp_z = z <= current_z
+    comp_z = Signal.depth_compare(z, current_z, depth_func)
 
     # Fail-fast behavior: if condition is false for a token,
     # all later operations in the graph are discarded for that token.

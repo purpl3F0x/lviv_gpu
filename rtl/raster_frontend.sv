@@ -57,6 +57,7 @@ module raster_frontend (
     fragment_op_t texture_function;
     blend_op_t sfactor_op;
     blend_op_t dfactor_op;
+    depth_func_t depth_func;
     float_t v0_z;
     float_t v0_w;
     color_argb_t v0_color;
@@ -196,6 +197,7 @@ module raster_frontend (
     passthrough_in.texture_function = input_skid_data.texture_function;
     passthrough_in.sfactor_op = input_skid_data.sfactor_op;
     passthrough_in.dfactor_op = input_skid_data.dfactor_op;
+    passthrough_in.depth_func = input_skid_data.depth_func;
     passthrough_in.v0_z = input_skid_data.v0.position.z;
     passthrough_in.v0_w = input_skid_data.v0.position.w;
     passthrough_in.v0_color = input_skid_data.v0.color;
@@ -247,6 +249,7 @@ module raster_frontend (
   assign output_data_internal.texture_function = passthrough_out.texture_function;
   assign output_data_internal.sfactor_op = passthrough_out.sfactor_op;
   assign output_data_internal.dfactor_op = passthrough_out.dfactor_op;
+  assign output_data_internal.depth_func = passthrough_out.depth_func;
   assign output_data_internal.v0_w = passthrough_out.v0_w;
   assign output_data_internal.v0_z = passthrough_out.v0_z;
   assign output_data_internal.v0_color = passthrough_out.v0_color;

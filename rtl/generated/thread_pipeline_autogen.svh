@@ -70,8 +70,8 @@ assign comp_z_tdata = fp_cmp_1_pred;
 // fp_fma_4         -> fp_fma_4          out=fp_fma_4_res        start= 32  end= 48  valid=(pipe_en)  expr=fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area))))
 // mem_read_1       -> mem_read_1        out=mem_read_1_rdata    start= 47  end= 50  valid=(pipe_en)  expr=mem_read(addr)
 // fp_recip_1       -> fp_recip_1        out=fp_recip_1_out      start= 48  end= 77  valid=(pipe_en)  expr=(1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area)))))
-// fp_cmp_1         -> fp_cmp_1          out=fp_cmp_1_pred       start= 50  end= 52  valid=(pipe_en)  expr=(fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))) <= mem_read(addr))
-// mem_write_1      -> mem_write_1       out=mem_write_1_pred    start= 52  end= 53  valid=(pipe_en)  expr=mem_write(addr, fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))))
+// fp_cmp_1         -> fp_cmp_1          out=fp_cmp_1_pred       start= 50  end= 53  valid=(pipe_en)  expr=depth_compare(fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))), mem_read(addr), depth_func)
+// mem_write_1      -> mem_write_1       out=mem_write_1_pred    start= 53  end= 54  valid=(pipe_en)  expr=mem_write(addr, fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))))
 // fp_mul_5         -> fp_mul_8          out=fp_mul_8_res        start= 77  end= 85  valid=(pipe_en)  expr=((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))
 // fp_mul_7         -> fp_mul_9          out=fp_mul_9_res        start= 77  end= 85  valid=(pipe_en)  expr=((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))
 // fp_mul_9         -> fp_mul_10         out=fp_mul_10_res       start= 77  end= 85  valid=(pipe_en)  expr=((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v2_w * (e2 * inv_area)))
@@ -103,8 +103,9 @@ logic [31:0] align_v2_z_to_fp_fma_4_i0_d32;
 logic [31:0] align_fp_mul_3_to_fp_fma_4_i1_d24;
 logic [THREAD_ADDR_W-1:0] align_addr_to_mem_read_1_i0_d47;
 logic [31:0] align_fp_fma_4_to_fp_cmp_1_i0_d2;
-logic [THREAD_ADDR_W-1:0] align_addr_to_mem_write_1_i0_d52;
-logic [31:0] align_fp_fma_4_to_mem_write_1_i1_d4;
+logic [2:0] align_depth_func_to_fp_cmp_1_i2_d50;
+logic [THREAD_ADDR_W-1:0] align_addr_to_mem_write_1_i0_d53;
+logic [31:0] align_fp_fma_4_to_mem_write_1_i1_d5;
 logic [31:0] align_fp_mul_4_to_fp_mul_5_i1_d61;
 logic [31:0] align_fp_mul_6_to_fp_mul_7_i1_d61;
 logic [31:0] align_fp_mul_8_to_fp_mul_9_i1_d61;
@@ -136,8 +137,9 @@ assign {align_v2_w_to_fp_fma_2_i0_d32, align_fp_mul_3_to_fp_fma_2_i1_d24} = alig
 delay_pipe #(.WIDTH(32), .STAGES(32)) u_align_v2_z_to_fp_fma_4_i0_d32_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v2_z), .data_out(align_v2_z_to_fp_fma_4_i0_d32));
 delay_pipe #(.WIDTH(THREAD_ADDR_W), .STAGES(47)) u_align_addr_to_mem_read_1_i0_d47_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.addr[THREAD_ADDR_W-1:0]), .data_out(align_addr_to_mem_read_1_i0_d47));
 delay_pipe #(.WIDTH(32), .STAGES(2)) u_align_fp_fma_4_to_fp_cmp_1_i0_d2_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_fma_4_res), .data_out(align_fp_fma_4_to_fp_cmp_1_i0_d2));
-delay_pipe #(.WIDTH(THREAD_ADDR_W), .STAGES(5)) u_align_addr_to_mem_write_1_i0_d52_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(align_addr_to_mem_read_1_i0_d47), .data_out(align_addr_to_mem_write_1_i0_d52));
-delay_pipe #(.WIDTH(32), .STAGES(4)) u_align_fp_fma_4_to_mem_write_1_i1_d4_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_fma_4_res), .data_out(align_fp_fma_4_to_mem_write_1_i1_d4));
+delay_pipe #(.WIDTH(3), .STAGES(50)) u_align_depth_func_to_fp_cmp_1_i2_d50_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.depth_func), .data_out(align_depth_func_to_fp_cmp_1_i2_d50));
+delay_pipe #(.WIDTH(THREAD_ADDR_W), .STAGES(6)) u_align_addr_to_mem_write_1_i0_d53_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(align_addr_to_mem_read_1_i0_d47), .data_out(align_addr_to_mem_write_1_i0_d53));
+delay_pipe #(.WIDTH(32), .STAGES(5)) u_align_fp_fma_4_to_mem_write_1_i1_d5_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_fma_4_res), .data_out(align_fp_fma_4_to_mem_write_1_i1_d5));
 logic [96-1:0] align_s16_d61_in, align_s16_d61_out;
 assign align_s16_d61_in = {fp_mul_5_res, fp_mul_6_res, fp_mul_7_res};
 delay_pipe #(.WIDTH(96), .STAGES(61)) u_align_s16_d61 (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(align_s16_d61_in), .data_out(align_s16_d61_out));
@@ -246,17 +248,15 @@ fp_cmp_le u_fp_cmp_1 (
     .aclk(clk),
     .aclken(pipe_en_internal),
     .s_axis_a(align_fp_fma_4_to_fp_cmp_1_i0_d2),
-    //   .s_axis_a_valid(),
     .s_axis_b(mem_read_1_rdata),
-    //   .s_axis_b_valid(),
+    .func(depth_func_t'(align_depth_func_to_fp_cmp_1_i2_d50)),
     .m_axis_res(fp_cmp_1_pred[0])
-    //   .m_axis_tvalid()
 );
-assign mem_write_1_fire = valid_pipe[52];
+assign mem_write_1_fire = valid_pipe[53];
 assign mem_write_1_pred[0] = (fp_cmp_1_pred[0]);
 assign z_wr_en = mem_write_1_fire && mem_write_1_pred[0] && pipe_en_internal;
-assign z_wr_addr = align_addr_to_mem_write_1_i0_d52;
-assign z_wr_data = align_fp_fma_4_to_mem_write_1_i1_d4;
+assign z_wr_addr = align_addr_to_mem_write_1_i0_d53;
+assign z_wr_data = align_fp_fma_4_to_mem_write_1_i1_d5;
 fp_mul #(.LATENCY(8)) u_fp_mul_8 (
     .aclk(clk), .aclken(pipe_en_internal),
     // .valid_in(valid_pipe[78]),
@@ -342,7 +342,7 @@ logic [THREAD_ADDR_W + $bits(blend_op_t) + $bits(blend_op_t) + 13-1:0] bundle_s0
 assign bundle_s0_d94_in = {addr_tdata, tex_id_tdata, texture_mode_u_tdata, texture_mode_v_tdata, texture_function_tdata, sfactor_op_tdata, dfactor_op_tdata};
 delay_pipe #(.WIDTH(THREAD_ADDR_W + $bits(blend_op_t) + $bits(blend_op_t) + 13), .STAGES(94)) u_bundle_s0_d94 (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(bundle_s0_d94_in), .data_out(bundle_s0_d94_out));
 assign {addr_bundle_tdata, tex_id_bundle_tdata, texture_mode_u_bundle_tdata, texture_mode_v_bundle_tdata, texture_function_bundle_tdata, sfactor_op_bundle_tdata, dfactor_op_bundle_tdata} = bundle_s0_d94_out;
-delay_pipe #(.WIDTH(1), .STAGES(42)) u_align_comp_z_to_output_bundle_d42 (.clk(clk), .rst_n(rst_reg), .clken(pipe_en_internal), .data_in(comp_z_tdata), .data_out(comp_z_bundle_tdata));
+delay_pipe #(.WIDTH(1), .STAGES(41)) u_align_comp_z_to_output_bundle_d41 (.clk(clk), .rst_n(rst_reg), .clken(pipe_en_internal), .data_in(comp_z_tdata), .data_out(comp_z_bundle_tdata));
 
 assign output_bundle_tdata = {texcoord_u_tdata, texcoord_v_tdata, addr_bundle_tdata, tex_id_bundle_tdata, texture_mode_u_bundle_tdata, texture_mode_v_bundle_tdata, texture_function_bundle_tdata, sfactor_op_bundle_tdata, dfactor_op_bundle_tdata, color_tdata, comp_z_bundle_tdata};
 assign output_bundle_tvalid = valid_pipe[94];

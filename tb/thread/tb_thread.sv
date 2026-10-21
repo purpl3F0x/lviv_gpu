@@ -317,7 +317,13 @@ module tb_thread;
     tok.texture_mode_v = TEXTURE_TILE;
     tok.sfactor_op = ONE;
     tok.dfactor_op = ZERO;
+    tok.depth_func = DEPTH_LESS;
     return tok;
+  endfunction
+
+  // Depth test model: func is a mask of the {gt, eq, lt} results that pass.
+  function automatic bit depth_pass(input depth_func_t func, input real z, input real stored);
+    return (func[0] && z < stored) || (func[1] && z == stored) || (func[2] && z > stored);
   endfunction
 
   task automatic random_blend(inout thread_data_in_t tok);
@@ -400,7 +406,7 @@ module tb_thread;
 
     z = fr(tok.v0_z) * lam[0] + fr(tok.v1_z) * lam[1] + fr(tok.v2_z) * lam[2];
     f.addr = tok.addr;
-    f.pass = z < z_model[tok.addr];
+    f.pass = depth_pass(depth_func_t'(tok.depth_func), z, z_model[tok.addr]);
     if (f.pass) begin
       z_model[tok.addr] = z;
       depth_addr_q.push_back(tok.addr);
@@ -548,6 +554,8 @@ module tb_thread;
       z = z_model[addr] + ($urandom_range(0, 1) ? 0.05 : -0.05);
       tok = random_pixel(addr, 1'b1, z);
       random_blend(tok);
+      // Every depth function; z differs from the stored value by +-0.05, so lt / gt decide it.
+      tok.depth_func = depth_func_t'($urandom_range(0, 7));
       expect_fragment(tok, 1'b0, 32'h0, ColourTol);
       send(tok);
     end

@@ -291,6 +291,7 @@ module tb_raster_frontend_csv;
         in_data.v1.v = to_fp32(v1_v);
         in_data.v2.u = to_fp32(v2_u);
         in_data.v2.v = to_fp32(v2_v);
+        in_data.depth_func = depth_func_t'($urandom_range(7));
         if (((bin_min_x_value % TILE_SIZE_X) != 0)
             || ((bin_min_y_value % TILE_SIZE_Y) != 0)
             || (bin_max_x_value != bin_min_x_value + TILE_SIZE_X - 1)
@@ -380,6 +381,12 @@ module tb_raster_frontend_csv;
               out_data.minY_local,
               expected_min_y_local
           );
+        if (out_data.single_group !== (expected_width == 0 && expected_height == 0))
+          $fatal(1, "row %0d single_group mismatch: got %b", transaction_id,
+                 out_data.single_group);
+        if (out_data.depth_func !== in_data.depth_func)
+          $fatal(1, "row %0d depth_func mismatch: got %0d expected %0d", transaction_id,
+                 out_data.depth_func, in_data.depth_func);
 
         check_close("v0_u", fx5_13_to_real(out_data.v0_u), exp_v0_u);
         check_close("v0_v", fx5_13_to_real(out_data.v0_v), exp_v0_v);

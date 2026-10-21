@@ -17,6 +17,7 @@ module thread_verilator_wrap (
     input  logic [2:0]               in_texture_function,
     input  logic [3:0]               in_sfactor_op,
     input  logic [3:0]               in_dfactor_op,
+    input  logic [2:0]               in_depth_func,
     input  logic [31:0]              in_inv_area,
     input  logic [31:0]              in_e2,
     input  logic [31:0]              in_e1,
@@ -154,6 +155,7 @@ module thread_verilator_wrap (
   assign in_data.texture_function = gpu_types_pkg::fragment_op_t'(in_texture_function);
   assign in_data.sfactor_op = gpu_types_pkg::blend_op_t'(in_sfactor_op);
   assign in_data.dfactor_op = gpu_types_pkg::blend_op_t'(in_dfactor_op);
+  assign in_data.depth_func = gpu_types_pkg::depth_func_t'(in_depth_func);
   assign in_data.inv_area = in_inv_area;
   assign in_data.e2 = in_e2;
   assign in_data.e1 = in_e1;

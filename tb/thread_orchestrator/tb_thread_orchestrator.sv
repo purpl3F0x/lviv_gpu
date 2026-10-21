@@ -95,6 +95,7 @@ module tb_thread_orchestrator #(
     tdata.texture_function = fragment_op_t'($urandom_range(5));
     tdata.sfactor_op = blend_op_t'($urandom_range(9));
     tdata.dfactor_op = blend_op_t'($urandom_range(9));
+    tdata.depth_func = depth_func_t'($urandom_range(7));
     tdata.inv_area = $urandom;
     tdata.v0_w = $urandom;
     tdata.v0_z = $urandom;
@@ -113,6 +114,7 @@ module tb_thread_orchestrator #(
     token.texture_function = tdata.texture_function;
     token.sfactor_op = tdata.sfactor_op;
     token.dfactor_op = tdata.dfactor_op;
+    token.depth_func = tdata.depth_func;
     token.inv_area = tdata.inv_area;
     token.v0_u = tdata.v0_u;
     token.v0_v = tdata.v0_v;

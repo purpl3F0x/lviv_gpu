@@ -36,8 +36,9 @@ module thread_orchestrator (
 );
 
   localparam int AccumulatorLatency = 4;
+  localparam int EdgeRegLatency = 1;  // fabric register between the DSP P output and the converter
   localparam int ConverterLatency = 7;
-  localparam int PipeLatency = AccumulatorLatency + ConverterLatency;
+  localparam int PipeLatency = AccumulatorLatency + EdgeRegLatency + ConverterLatency;
   localparam int InFifoDepth = 32;  // On US+ any less than 32 wastes resources
   localparam int ThreadFifoDepth = 32;
 
@@ -202,7 +203,7 @@ module thread_orchestrator (
   // A group step moves two pixels.
   localparam logic signed [17:0] LoadScale = 18'sd1024, StepScale = 18'sd2048;
 
-  fx_28_20_t init[3], edges[4][3];
+  fx_28_20_t init[3], edges[4][3], edges_q[4][3];
   fx_28_20_t init_q[2][3];
   fx_14_10_t dx[3], dy[3];
   logic [4:0] step_inmode;
@@ -251,13 +252,19 @@ module thread_orchestrator (
           .result(edges[lane][edge_idx])
       );
 
+      // The DSP's P output only reaches this register, so the route into the converter's fabric
+      // logic starts from a flop the placer can put next to it.
+      always_ff @(posedge clk) begin
+        if (advance) edges_q[lane][edge_idx] <= edges[lane][edge_idx];
+      end
+
       fx28_20_to_fp32 #(
           .LATENCY(ConverterLatency)
       ) u_converter (
           .aclk(clk),
           .aclken(advance),
-          .s_axis_a_tvalid(valid_pipe[AccumulatorLatency-1]),
-          .s_axis_a_tdata(edges[lane][edge_idx]),
+          .s_axis_a_tvalid(valid_pipe[AccumulatorLatency+EdgeRegLatency-1]),
+          .s_axis_a_tdata(edges_q[lane][edge_idx]),
           .m_axis_result_tvalid(),
           .m_axis_result_tdata(results[lane][edge_idx])
       );

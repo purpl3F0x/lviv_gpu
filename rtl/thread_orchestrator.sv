@@ -66,11 +66,10 @@ module thread_orchestrator (
   // Input FIFO (frontend clock to orchestrator clock)
   //
 
-  logic [$bits(orchestrator_data_in_t)-1:0] triangle_bits;
+  logic [$bits(orchestrator_data_in_t)-1:0] fifo_bits, triangle_bits;
   orchestrator_data_in_t triangle;
-  logic in_empty, triangle_valid, triangle_pop, in_full;
+  logic in_empty, head_ready, triangle_valid, triangle_pop, in_full;
 
-  // data_o holds the head triangle until its last group issues, then the next one follows.
   async_fifo #(
       .DATA_WIDTH($bits(orchestrator_data_in_t)),
       .FIFO_DEPTH(InFifoDepth)
@@ -84,15 +83,31 @@ module thread_orchestrator (
       .fill_cnt(),
       .rd_clk(clk),
       .rd_rst_n(rst_n),
-      .rd_en(triangle_pop),
-      .data_o(triangle_bits),
+      .rd_en(head_ready),
+      .data_o(fifo_bits),
       .rd_fill_cnt(),
       .fifo_empty(in_empty)
   );
 
+  // The FIFO's read side sits next to its LUTRAM, which can be far from the traversal. This skid
+  // gives the placer a register stage next to the traversal: the FIFO's empty flag and data only
+  // reach its control flops and data registers, and its registered ready pops the FIFO.
+  // m_axis_tdata holds the head triangle until its last group issues, then the next one follows.
+  axis_skid_buffer #(
+      .WIDTH($bits(orchestrator_data_in_t))
+  ) u_head_skid (
+      .aclk(clk),
+      .aresetn(rst_n),
+      .s_axis_tdata(fifo_bits),
+      .s_axis_tvalid(!in_empty),
+      .s_axis_tready(head_ready),
+      .m_axis_tdata(triangle_bits),
+      .m_axis_tvalid(triangle_valid),
+      .m_axis_tready(triangle_pop)
+  );
+
   assign ready_out = !in_full;
   assign triangle = orchestrator_data_in_t'(triangle_bits);
-  assign triangle_valid = !in_empty;
 
   //
   // Snake traversal
@@ -377,7 +392,8 @@ module thread_orchestrator (
   // data_o, and fifo_empty would report that gap as empty.
   always_ff @(posedge clk) begin
     if (!rst_n) empty <= 1'b1;
-    else empty <= in_empty && !(|valid_pipe) && (thread_fill == '0);
+    else
+      empty <= in_empty && head_ready && !triangle_valid && !(|valid_pipe) && (thread_fill == '0);
   end
 
 endmodule

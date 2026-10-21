@@ -8,6 +8,7 @@ SV_SRCS := $(ROOT_DIR)/rtl/gpu_types_pkg.sv \
            $(ROOT_DIR)/rtl/fp_wrappers.sv \
            $(ROOT_DIR)/rtl/orchestrator_alu.sv \
            $(ROOT_DIR)/rtl/async_fifo.sv \
+           $(ROOT_DIR)/rtl/axis_skid_buffer.sv \
            $(ROOT_DIR)/rtl/sync_fifo.sv \
            $(ROOT_DIR)/rtl/delay_pipe_fifo.sv \
            $(ROOT_DIR)/rtl/thread_orchestrator.sv \

@@ -9,6 +9,14 @@ if {![info exists ::untraced]} { set ::untraced 1; source -notrace [info script]
 
 set flow_start [clock seconds]
 source [lindex $argv 0]
+
+# Use every core Vivado will take (general.maxThreads is capped at 32; the default is 2 on Windows).
+if {[info exists ::env(NUMBER_OF_PROCESSORS)]} {
+  set ncpu $::env(NUMBER_OF_PROCESSORS)
+} else {
+  set ncpu [exec nproc]
+}
+set_param general.maxThreads [expr {min($ncpu, 32)}]
 set script_dir [file dirname [file normalize [info script]]]
 
 set synth_dcp $out_dir/${top}_synth.dcp

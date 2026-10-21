@@ -70,7 +70,8 @@ module thread (
   logic cache_flush;
 
   // Reset register (HW && SW reset)
-  (* dont_touch = "true" *) reg rst_reg;
+  // keep rather than dont_touch, so Vivado may still replicate it for fanout.
+  (* keep = "true", max_fanout = 256 *) reg rst_reg;
   always_ff @(posedge clk) begin
     rst_reg <= !(!rst_n | thread_soft_reset);  // keep active low behavior
   end

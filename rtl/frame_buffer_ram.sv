@@ -51,56 +51,38 @@ module frame_buffer_ram #(
   localparam unsigned BankDepth = 1 << BankAw;
 
   // -------------------------------------------------------------------------
-  // 1. Input Register Stage
+  // 1. Port Select + Input Register Stage
   // -------------------------------------------------------------------------
-  reg r_w0_en, r_w1_en;
-  reg [ADDR_WIDTH-1:0] r_w0_addr;
-  reg [    BankAw-1:0] r_w1_addr;
-  reg [          31:0] r_w0_din;
-  reg [          63:0] r_w1_din;
+  // The port selects sit in front of the input registers, so the BRAM pins are
+  // driven straight from flip-flops. W0 presents its word to both halves and
+  // writes only the one picked by its address LSB; W1 writes both halves.
+  reg [       1:0] ram_wea;
+  reg [BankAw-1:0] ram_addra;
+  reg [      63:0] ram_dia;
 
-  reg r_r0_en, r_r1_en;
-  reg [ADDR_WIDTH-1:0] r_r0_addr;
-  reg [    BankAw-1:0] r_r1_addr;
+  reg              ram_enb;
+  reg [BankAw-1:0] ram_addrb;
+  reg              r0_lsb;  // r0_addr[0], for R0's half select
 
   always @(posedge clk) begin
     if (!rst_n) begin
-      r_w0_en <= 1'b0;
-      r_w1_en <= 1'b0;
-      r_r0_en <= 1'b0;
-      r_r1_en <= 1'b0;
+      ram_wea <= 2'b00;
+      ram_enb <= 1'b0;
     end else begin
-      r_w0_en <= w0_en;
-      r_w1_en <= w1_en;
-      r_r0_en <= r0_en;
-      r_r1_en <= r1_en;
+      ram_wea <= w0_en ? (w0_addr[0] ? 2'b10 : 2'b01) : {2{w1_en}};
+      ram_enb <= r0_en | r1_en;
     end
   end
 
   always @(posedge clk) begin
-    r_w0_addr <= w0_addr;
-    r_w1_addr <= w1_addr;
-    r_w0_din  <= w0_din;
-    r_w1_din  <= w1_din;
-
-    r_r0_addr <= r0_addr;
-    r_r1_addr <= r1_addr;
+    ram_addra <= w0_en ? w0_addr[ADDR_WIDTH-1:1] : w1_addr;
+    ram_dia   <= w0_en ? {2{w0_din}} : w1_din;
+    ram_addrb <= r0_en ? r0_addr[ADDR_WIDTH-1:1] : r1_addr;
+    r0_lsb    <= r0_addr[0];
   end
 
   // -------------------------------------------------------------------------
-  // 2. Drive BRAM Pins from Registered Signals
-  // -------------------------------------------------------------------------
-  // W0 presents its word to both halves and writes only the one picked by its
-  // address LSB; W1 writes both halves.
-  wire [       1:0] ram_wea = r_w0_en ? (r_w0_addr[0] ? 2'b10 : 2'b01) : {2{r_w1_en}};
-  wire [BankAw-1:0] ram_addra = r_w0_en ? r_w0_addr[ADDR_WIDTH-1:1] : r_w1_addr;
-  wire [      63:0] ram_dia = r_w0_en ? {2{r_w0_din}} : r_w1_din;
-
-  wire              ram_enb = r_r0_en | r_r1_en;
-  wire [BankAw-1:0] ram_addrb = r_r0_en ? r_r0_addr[ADDR_WIDTH-1:1] : r_r1_addr;
-
-  // -------------------------------------------------------------------------
-  // 3. BRAM Storage & Output Stages
+  // 2. BRAM Storage & Output Stages
   // -------------------------------------------------------------------------
   (* ram_style = "block", cascade_height = 1 *) reg [63:0] mem[BankDepth];
 
@@ -141,14 +123,14 @@ module frame_buffer_ram #(
   // DO_REG so it always matches bram_dout_reg.
   reg r0_sel_core, r0_sel_dout;
   always @(posedge clk) begin
-    if (ram_enb) r0_sel_core <= r_r0_addr[0];
+    if (ram_enb) r0_sel_core <= r0_lsb;
     if (ram_enb_d1) r0_sel_dout <= r0_sel_core;
   end
 
   wire [31:0] r0_word = r0_sel_dout ? bram_dout_reg[63:32] : bram_dout_reg[31:0];
 
   // -------------------------------------------------------------------------
-  // 4. Per-Port Output Registers
+  // 3. Per-Port Output Registers
   // -------------------------------------------------------------------------
   // One fabric register per port after DO_REG. Each loads only on its own
   // port's reads, so it holds that port's last read data.

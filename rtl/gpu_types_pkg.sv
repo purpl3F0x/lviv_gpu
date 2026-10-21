@@ -174,6 +174,9 @@ package gpu_types_pkg;
     // Last 2x2 group offset (group count - 1); zero represents one group.
     tile_addr_x_t width;
     tile_addr_y_t height;
+    // width == 0 && height == 0: the first group is also the last. Precomputed by the frontend so
+    // the orchestrator's pop decision needs no compare on the FIFO output.
+    logic single_group;
 
     // Fixed Point UVs
     fx_5_13_t v0_v;

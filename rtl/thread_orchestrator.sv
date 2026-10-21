@@ -98,7 +98,7 @@ module thread_orchestrator (
   // Snake traversal
   //
 
-  (*max_fanout=1000*) logic advance;
+  (*max_fanout=250*) logic advance;
 
   logic issue, issue_last, issue_down;
   logic [1:0] issue_op;
@@ -124,7 +124,7 @@ module thread_orchestrator (
       issue_y = triangle.minY_local;
       issue_op = Load;
       issue_down = 1'b0;
-      issue_last = triangle.width == 0 && triangle.height == 0;
+      issue_last = triangle.single_group;
       cols_left = triangle.width;
       rows_left = triangle.height;
       dir_right = 1'b1;

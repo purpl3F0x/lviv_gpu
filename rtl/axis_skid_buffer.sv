@@ -41,10 +41,9 @@ module axis_skid_buffer #(
     end
   end
 
+  // No reset on the data: skid_valid (from the reset tready register) qualifies it.
   always_ff @(posedge aclk) begin
-    if (!aresetn) begin
-      skid_data <= '0;
-    end else if (s_hsk) begin
+    if (s_hsk) begin
       skid_data <= s_axis_tdata;
     end
   end

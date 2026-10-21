@@ -47,7 +47,7 @@ module raster_frontend (
     output orchestrator_data_in_t out_data,
 
     // * Status Signal * //
-    input logic orchestrator_empty,   // We use the APB of the frontend since it's just 1 signal
+    input  logic orchestrator_empty,  // We use the APB of the frontend since it's just 1 signal
     output logic core_empty
 );
   typedef struct packed {
@@ -98,7 +98,8 @@ module raster_frontend (
   screen_addr_y_t bb_max_y;
 
   // Buffer reset and combine it with the software reset.
-  (*dont_touch = "true" *) logic local_reset_n;
+  // keep rather than dont_touch, so Vivado may still replicate it for fanout.
+  (* keep = "true", max_fanout = 256 *) reg local_reset_n;
   always_ff @(posedge clk) begin
     local_reset_n <= rst_n & ~frontend_sw_reset;
   end
@@ -255,6 +256,8 @@ module raster_frontend (
   assign output_data_internal.v2_w = passthrough_out.v2_w;
   assign output_data_internal.v2_z = passthrough_out.v2_z;
   assign output_data_internal.v2_color = passthrough_out.v2_color;
+  assign output_data_internal.single_group = output_data_internal.width == '0 &&
+                                             output_data_internal.height == '0;
 
   axis_skid_buffer #(
       .WIDTH(OutputWidth)

@@ -26,7 +26,9 @@ module async_fifo #(
   localparam int ADDR_W = $clog2(FIFO_DEPTH);
   localparam int NFF = 2;
 
-  logic [ADDR_W:0] rd_addr, next_rd_addr;
+  // Replicated: each bit drives every LUTRAM primitive's read address pins.
+  (* max_fanout = 64 *) logic [ADDR_W:0] rd_addr;
+  logic [ADDR_W:0] next_rd_addr;
   logic [ADDR_W:0] wr_addr, next_wr_addr;
   logic [ADDR_W:0] rgray, wgray;
   logic [ADDR_W:0] rd_wbin, wr_rbin;

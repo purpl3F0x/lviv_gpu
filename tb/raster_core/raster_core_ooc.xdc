@@ -4,7 +4,7 @@
 create_clock -name frontend_clk -period 3.333 [get_ports frontend_clk]
 
 # Thread clock (orchestrator and threads): 600 MHz
-create_clock -name thread_clk -period 1.667 [get_ports thread_clk]
+create_clock -name thread_clk -period 1.5 [get_ports thread_clk]
 
 # APB clock: 150 MHz
 create_clock -name apb_clk -period 6.667 [get_ports apb_clk]

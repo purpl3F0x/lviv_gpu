@@ -82,6 +82,7 @@ module tb_thread_orchestrator #(
     tdata.minY_local = TILE_ADDR_Y'(min_y);
     tdata.width = TILE_ADDR_X'(w);
     tdata.height = TILE_ADDR_Y'(h);
+    tdata.single_group = w == 0 && h == 0;
     tdata.v0_u = 18'($urandom);
     tdata.v0_v = 18'($urandom);
     tdata.v1_u = 18'($urandom);

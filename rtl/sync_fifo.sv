@@ -2,8 +2,8 @@
 //
 //  Synchronous first-word-fall-through FIFO with a registered output and no empty bypass.
 //  - data_o is valid whenever fifo_empty is low; rd_en pops it (valid/ready style).
-//  - fill_cnt counts every stored entry, including those in the read pipeline and data_o,
-//    so it can be non-zero while fifo_empty is still high.
+//  - fill_cnt counts every accepted entry, including those in the write register, the read pipeline
+//    and data_o, so it can be non-zero while fifo_empty is still high.
 //  - Writes while full and reads while empty are ignored.
 //
 //  RAM_STYLE   Vivado ram_style for the storage: "distributed" (LUTRAM), "block" (BRAM),
@@ -11,13 +11,15 @@
 //  OUTPUT_REGS Extra output pipeline registers after the RAM read register. For BRAM/URAM the first
 //              one is packed into the primitive (DOB_REG / OREG; URAM wants at least 1), the rest
 //              are fabric FFs, e.g. to cover routing to a distant consumer. For LUTRAM all are FFs.
-//              Read latency is 1 + OUTPUT_REGS, write-to-data_o latency is 2 + OUTPUT_REGS.
+//              Read latency is 1 + OUTPUT_REGS, write-to-data_o latency is 3 + OUTPUT_REGS.
 //              Entries in flight count against FIFO_DEPTH, so sustained one-per-cycle streaming
-//              needs FIFO_DEPTH >= 3 + OUTPUT_REGS.
+//              needs FIFO_DEPTH >= 4 + OUTPUT_REGS.
 //
-//  The read pipeline moves on one shared enable (output register free or being popped; the RAM read
-//  itself only when it holds data), so every stage maps onto the RAM's clock-enabled registers with
-//  no fabric skid buffer. The cost is that rd_en drives those enables combinationally.
+//  Writes go through an input register, so the RAM write enable and data come straight from
+//  flip-flops. The read pipeline moves on one shared enable (output register free or being popped;
+//  the RAM read itself only when it holds data, a registered flag), so every stage maps onto the
+//  RAM's clock-enabled registers with no fabric skid buffer. The cost is that rd_en drives those
+//  enables combinationally.
 
 `timescale 1ns / 1ns
 
@@ -56,27 +58,55 @@ module sync_fifo #(
       $fatal(1, "sync_fifo RAM_STYLE must be distributed, block, ultra, registers or auto");
   end
 
-  // A read never targets the slot being written (that would need DEPTH entries in the RAM while a
-  // write is accepted, which full prevents), so no read-during-write logic is needed.
+  // A read never targets the slot being written: it only reads entries already in the RAM, and the
+  // RAM can hold FIFO_DEPTH of them only while nothing is being written. No read-during-write logic
+  // is needed.
   (* ram_style = RAM_STYLE, rw_addr_collision = "no" *) logic [DATA_WIDTH-1:0] mem[FIFO_DEPTH];
 
   // Emptiness comes from fill_cnt, so the pointers only index the RAM and need no wrap bit.
-  logic [AddrW-1:0] wr_addr, rd_addr;
+  // Replicated: each bit drives every RAM primitive's address pins.
+  (* max_fanout = 64 *) logic [AddrW-1:0] wr_addr, rd_addr;
   // Keep the output stages as real FFs; with a shared enable Vivado would otherwise pack them into SRLs.
   (* shreg_extract = "no" *) logic [DATA_WIDTH-1:0] rd_pipe[ReadLatency];
   logic [ReadLatency-1:0] pipe_valid;
-  logic write_fire, read_fire, advance, refill;
+  logic write_fire, read_fire, advance;
+  (* max_fanout = 64 *) logic refill;
+
+  // Write input register
+  (* max_fanout = 64 *) logic wr_valid_q;
+  logic [DATA_WIDTH-1:0] wr_data_q;
+
+  // Entries in the RAM not yet moved into the read pipeline, and its registered non-zero flag.
+  logic [AddrW:0] ram_cnt, ram_cnt_next;
+  logic ram_has_data;
 
   assign write_fire = wr_en && !fifo_full;
   assign read_fire = rd_en && pipe_valid[ReadLatency-1];
   // The read pipeline moves whenever the output register is free or being popped.
   assign advance = !pipe_valid[ReadLatency-1] || read_fire;
-  // The RAM holds data when not every stored entry is already in the read pipeline.
-  assign refill = advance && (fill_cnt != (AddrW + 1)'($countones(pipe_valid)));
+  assign refill = advance && ram_has_data;
+  assign ram_cnt_next = ram_cnt + (AddrW + 1)'(wr_valid_q) - (AddrW + 1)'(refill);
+
+  always_ff @(posedge clk) begin
+    if (!rst_n) wr_valid_q <= 1'b0;
+    else wr_valid_q <= write_fire;
+  end
+
+  always_ff @(posedge clk) if (write_fire) wr_data_q <= data_i;
+
+  always_ff @(posedge clk) begin
+    if (!rst_n) begin
+      ram_cnt <= '0;
+      ram_has_data <= 1'b0;
+    end else begin
+      ram_cnt <= ram_cnt_next;
+      ram_has_data <= ram_cnt_next != '0;
+    end
+  end
 
   always_ff @(posedge clk) begin
     if (!rst_n) wr_addr <= '0;
-    else if (write_fire) wr_addr <= wr_addr + 1'b1;
+    else if (wr_valid_q) wr_addr <= wr_addr + 1'b1;
   end
 
   always_ff @(posedge clk) begin
@@ -85,7 +115,7 @@ module sync_fifo #(
   end
 
   // Write
-  always_ff @(posedge clk) if (write_fire) mem[wr_addr] <= data_i;
+  always_ff @(posedge clk) if (wr_valid_q) mem[wr_addr] <= wr_data_q;
 
   // Read
   always_ff @(posedge clk) if (refill) rd_pipe[0] <= mem[rd_addr];

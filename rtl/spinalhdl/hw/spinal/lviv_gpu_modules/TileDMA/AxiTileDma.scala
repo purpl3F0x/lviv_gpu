@@ -9,17 +9,21 @@ import spinal.lib.bus.regif.AccessType._
 import spinal.lib.fsm._
 
 // =============================================================================
-// Tiled RAM (BRAM) Direct Read Port Interface (Operates in ramClock domain)
+// Tiled RAM (BRAM) Direct Port Interface (Operates in ramClock domain): reads for the write-back,
+// and writes that leave CLEAR_VALUE behind them (and fill the RAM on CLEAR)
 // =============================================================================
-case class TileRamReadPort(addrWidth: Int, dataWidth: Int) extends Bundle with IMasterSlave {
+case class TileRamPort(addrWidth: Int, dataWidth: Int) extends Bundle with IMasterSlave {
   val clk = Bool()
   val rst = Bool()
   val en = Bool()
   val addr = UInt(addrWidth bits)
   val dout = Bits(dataWidth bits)
+  val wr_en = Bool()
+  val wr_addr = UInt(addrWidth bits)
+  val wr_data = Bits(dataWidth bits)
 
   override def asMaster(): Unit = {
-    out(clk, rst, en, addr)
+    out(clk, rst, en, addr, wr_en, wr_addr, wr_data)
     in(dout)
   }
 }
@@ -130,9 +134,9 @@ class AxiTileDma(
     // 2. AXI4 Full Write Master Interface to DRAM (AXI clock domain)
     val m_axi = master(Axi4WriteOnly(config.getAxi4Config))
 
-    // 3. Per-thread 2x2 quad Tiled RAM (BRAM) Read Ports (Operate in high-frequency ramClock domain)
+    // 3. Per-thread 2x2 quad Tiled RAM (BRAM) Ports (Operate in high-frequency ramClock domain)
     val tile_ram =
-      Vec.fill(config.quadThreads)(master(TileRamReadPort(config.threadByteAddrWidth, config.threadDataWidth)))
+      Vec.fill(config.quadThreads)(master(TileRamPort(config.threadByteAddrWidth, config.threadDataWidth)))
 
     // 4. Interrupt Outputs (AXI clock domain)
     val irq = out Bool ()
@@ -230,6 +234,11 @@ class AxiTileDma(
     W1P,
     doc = "Software reset for DMA FSM and tile position (deferred until the active transfer completes)"
   )
+  val CLEAR = REG_CTRL.field(
+    Bool(),
+    W1P,
+    doc = "Fill the four tile RAMs with CLEAR_VALUE, STATUS.CLEAR_BUSY until done (ignored while BUSY or CLEAR_BUSY)"
+  )
 
   // 0x04: STATUS (Operational status flags; interrupt events managed by INTR factory at 0x40)
   val REG_STATUS = busif.newRegAt(address = 0x04, doc = "DMA Status Register")
@@ -237,10 +246,13 @@ class AxiTileDma(
   val LAST_BRESP = REG_STATUS.field(Bits(2 bits), RO, doc = "Last AXI write response status")
   val SOFT_RESET_PENDING =
     REG_STATUS.field(Bool(), RO, doc = "Soft reset requested, waiting for the active transfer to complete")
+  val CLEAR_BUSY = REG_STATUS.field(Bool(), RO, doc = "CLEAR in progress (START is ignored meanwhile)")
 
   BUSY := dmaBusy
   LAST_BRESP := brespVal
   SOFT_RESET_PENDING := softResetPending
+  val clearBusy = RegInit(False)
+  CLEAR_BUSY := clearBusy
 
   // 0x08: BASE_ADDR_LOW (RW)
   val REG_BASE_LOW = busif.newRegAt(address = 0x08, doc = "DRAM Frame Base Address (Lower 32 bits)")
@@ -310,6 +322,15 @@ class AxiTileDma(
   val REG_PERF = busif.newRegAt(address = 0x24, doc = "Performance Cycle Counter")
   val PERF_CYCLES = REG_PERF.field(UInt(32 bits), RO, doc = "Elapsed clock cycles during active tile transfer")
   PERF_CYCLES := cycleCounter
+
+  // 0x28: CLEAR_VALUE (RW)
+  val REG_CLEAR_VALUE = busif.newRegAt(address = 0x28, doc = "Tile RAM Clear Value")
+  val CLEAR_VALUE = REG_CLEAR_VALUE.field(
+    Bits(32 bits),
+    RW,
+    resetValue = 0,
+    doc = "Pixel left in the tile RAMs: written over each word the transfer has read, and by CLEAR"
+  )
 
   // ===========================================================================
   // INTERRUPT FACTORY REGISTERS (0x40 - 0x4C)
@@ -398,6 +419,19 @@ class AxiTileDma(
     clockOut = ramClock
   )
 
+  // Pulse to fill the tile RAMs with CLEAR_VALUE (CLEAR) in the ramClock domain
+  val clearPulseAxi = False
+  val clearPulseRam = PulseCCByToggle(
+    input = clearPulseAxi,
+    clockIn = ClockDomain.current,
+    clockOut = ramClock
+  )
+
+  // CLEAR_VALUE as of the accepted START or CLEAR. It only changes then, and the pulse takes at least
+  // two ramClock cycles to cross, so the RAM domain takes it on the pulse without synchronizers.
+  val clearValueShadow = Reg(Bits(32 bits)) init (0)
+  clearValueShadow.addTag(crossClockDomain)
+
   // ===========================================================================
   // HIGH-FREQUENCY RAM CLOCK DOMAIN LOGIC (ramClock, optimized for 600+ MHz)
   // Fully pipelined credit tracking: registers pushOccupancy to cut the Gray-to-Binary
@@ -460,6 +494,46 @@ class AxiTileDma(
     // Register the interleave mux output before the CDC FIFO write port
     val mergedValid = RegNext(readValid) init (False)
     val mergedData = RegNext(mergedWord)
+
+    // CLEAR_VALUE in every pixel of a word
+    val clearWord = RegNextWhen(Cat(Seq.fill(config.threadPixels)(clearValueShadow)), startPulseRam || clearPulseRam)
+
+    // CLEAR: every word of all four RAMs, one per cycle
+    val clearing = RegInit(False)
+    val clearAddr = Reg(UInt(config.threadWordAddrWidth bits)) init (0)
+    val clearLastWord = clearing && clearAddr === config.threadTotalBeats - 1
+    when(clearPulseRam) {
+      clearing := True
+      clearAddr := 0
+    }.elsewhen(clearing) {
+      clearAddr := clearAddr + 1
+      when(clearLastWord) {
+        clearing := False
+      }
+    }
+    // Done once the last word is in the RAMs: a cycle to the write registers, two in the RAM
+    val clearDone = Delay(clearLastWord, cycleCount = 4, init = False)
+
+    // Writes, straight from registers, a cycle after the read they follow:
+    //  - in a transfer, the word just read, in the two RAMs its line used (threads 0/1 on an even
+    //    line, 2/3 on an odd one, so the odd line's re-read of the quad row still finds threads 2/3).
+    //    In a RAM that registers writes and reads alike (frame_buffer_ram: the write lands two edges
+    //    after its request, the array read two edges after its), the write lands an edge after the
+    //    array read of the word, while the array reads the next word: a word is never read and
+    //    written on the same edge.
+    //  - in CLEAR, every word of all four
+    val wrEnReg = Vec.fill(config.quadThreads)(RegInit(False))
+    val wrAddrReg = Reg(UInt(config.threadWordAddrWidth bits)) init (0)
+    for (t <- 0 until config.quadThreads) {
+      val lineUsesThread = if (t < 2) !ramOddLine else ramOddLine
+      wrEnReg(t) := clearing || (ramEnReg && lineUsesThread)
+    }
+    wrAddrReg := clearing ? clearAddr | ramAddrReg
+    for ((port, t) <- io.tile_ram.zipWithIndex) {
+      port.wr_en := wrEnReg(t)
+      port.wr_addr := (wrAddrReg @@ U(0, config.threadBeatShift bits)).resized
+      port.wr_data := clearWord
+    }
 
     when(startPulseRam) {
       ramReadsLeft := config.totalBeats
@@ -524,6 +598,16 @@ class AxiTileDma(
     // Push interleaved quad data into the dual-clock CDC FIFO
     cdcFifo.io.push.valid := mergedValid
     cdcFifo.io.push.payload := mergedData
+  }
+
+  // CLEAR finished, back in the AXI domain
+  val clearDoneAxi = PulseCCByToggle(
+    input = ramArea.clearDone,
+    clockIn = ramClock,
+    clockOut = ClockDomain.current
+  )
+  when(clearDoneAxi) {
+    clearBusy := False
   }
 
   // ===========================================================================
@@ -682,9 +766,14 @@ class AxiTileDma(
           CUR_TILE_X := 0
           CUR_TILE_Y := 0
         }
-      }.elsewhen(START && !dmaBusy) {
+      }.elsewhen(CLEAR && !clearBusy) {
+        clearBusy := True
+        clearValueShadow := CLEAR_VALUE
+        clearPulseAxi := True
+      }.elsewhen(START && !dmaBusy && !clearBusy) {
         dmaBusy := True
         cycleCounter := 0
+        clearValueShadow := CLEAR_VALUE
 
         shadowStride := STRIDE(31 downto config.strideAlignShift) @@ U(0, config.strideAlignShift bits)
         if (config.useAutoAdvance) {
@@ -840,10 +929,13 @@ class AxiTileDmaWithRam(
     val tiledRams = for (t <- 0 until config.quadThreads) yield {
       val tiledRam = Mem(Bits(config.threadDataWidth bits), wordCount = config.threadTotalBeats)
 
+      // One write port: the DMA's own writes (the write-back's clear, CLEAR) take it over the external
+      // one, which only writes while the DMA is idle
+      val dmaPort = dma.io.tile_ram(t)
       tiledRam.write(
-        enable = io.ram_wr_en(t),
-        address = io.ram_wr_addr(t),
-        data = io.ram_wr_data(t)
+        enable = io.ram_wr_en(t) || dmaPort.wr_en,
+        address = dmaPort.wr_en ? (dmaPort.wr_addr >> config.threadBeatShift).resized | io.ram_wr_addr(t),
+        data = dmaPort.wr_en ? dmaPort.wr_data | io.ram_wr_data(t)
       )
 
       // Convert byte-address back to word address for SpinalHDL simulation Mem

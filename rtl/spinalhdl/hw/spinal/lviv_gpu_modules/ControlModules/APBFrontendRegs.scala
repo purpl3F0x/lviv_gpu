@@ -70,8 +70,9 @@ class APBFrontendRegs(tile_x_width: Int = 5, tile_y_width: Int = 5) extends Comp
     tileYWriteStream.valid := REG_TILE_Y.hitDoWrite
     tileYWriteStream.payload := busif.writeData(tile_y_width - 1 downto 0).asUInt
 
+    // Named by address, as in ApbThreadRegs: under one name the C header defines each twice.
     for (address <- 0x0c until APBFrontendRegs.byteCount by 4) {
-      val reservedReg = busif.newRegAt(address = address, doc = "Reserved")
+      val reservedReg = busif.newRegAt(address = address, doc = "Reserved")(SymbolName(f"REG_RESERVED_$address%02X"))
       reservedReg.reserved(32 bits)
     }
 

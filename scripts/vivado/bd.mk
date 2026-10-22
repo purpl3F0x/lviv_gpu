@@ -11,9 +11,12 @@
 #   xsa         bitstream, then build/bd/<name>/<name>.xsa (with the bitstream) for Vitis or PetaLinux
 #   export_bd   write the block design, as it is now in the project, back to BD_TCL
 #   clean       delete the project and the logs
-# synth, impl, bitstream and xsa skip runs that are complete and up to date.
+# synth, impl, bitstream and xsa skip runs that are complete and up to date. The SpinalHDL Verilog
+# in RTL is made first (scripts/spinal.mk); the project refers to it where it is, so it is not
+# recreated when that changes.
 
 include $(dir $(lastword $(MAKEFILE_LIST)))vivado.mk
+include $(VIVADO_MK_DIR)/../spinal.mk
 
 BD_DIR = $(REPO_ROOT)/build/bd/$(BD_NAME)
 XPR = $(BD_DIR)/$(BD_NAME).xpr
@@ -45,17 +48,20 @@ endef
 
 project: $(XPR)
 
+BD_SPINAL_VERILOG = $(filter $(SPINAL_VERILOG),$(abspath $(RTL)))
+
 $(BD_DIR):
 	$(call MKDIR,$@)
 
 # Only when it is missing, so the design edited in the GUI is never overwritten.
-$(XPR): | $(BD_DIR)
+$(XPR): | $(BD_DIR) $(BD_SPINAL_VERILOG)
 	$(WRITE_BD_ARGS)
 	cd $(BD_DIR) && $(VIVADO) -mode batch -nojournal -log $(LOG_DIR)/create_$(BD_NAME).log -source $(VIVADO_MK_DIR)/bd_create.tcl -tclargs $(BD_ARGS)
 
 gui: $(XPR)
 	cd $(BD_DIR) && $(VIVADO) -mode gui -nojournal -log $(LOG_DIR)/gui_$(BD_NAME).log $(XPR)
 
+synth impl bitstream xsa: $(BD_SPINAL_VERILOG)
 synth impl bitstream xsa export_bd: $(XPR) | $(BD_DIR)
 	$(WRITE_BD_ARGS)
 	cd $(BD_DIR) && $(VIVADO) -mode batch -nojournal -log $(LOG_DIR)/$@_$(BD_NAME).log -source $(VIVADO_MK_DIR)/bd_flow.tcl -tclargs $(BD_ARGS) $@

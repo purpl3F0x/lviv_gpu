@@ -3,6 +3,8 @@ VERILATOR = verilator
 MAGICK    = magick
 OBJ_DIR   = obj_dir
 
+include ../../scripts/spinal.mk
+
 RTL_SRCS = ../../rtl/gpu_types_pkg.sv \
            ../../rtl/int_modules.sv \
            ../../rtl/delay_pipe.sv \
@@ -11,7 +13,7 @@ RTL_SRCS = ../../rtl/gpu_types_pkg.sv \
            ../../rtl/sync_fifo.sv \
            ../../rtl/async_fifo.sv \
            ../../rtl/fp_wrappers.sv \
-           ../../rtl/generated/APBFrontendRegs.v \
+           $(SPINAL_GEN_DIR)/APBFrontendRegs.v \
            ../../rtl/raster_frontend.sv \
            ../../rtl/orchestrator_alu.sv \
            ../../rtl/thread_orchestrator.sv \
@@ -23,15 +25,15 @@ RTL_SRCS = ../../rtl/gpu_types_pkg.sv \
            ../../rtl/z_buffer_ram.sv \
            ../../rtl/texture_address_generator.sv \
            ../../rtl/texture_cache.sv \
-           ../../rtl/generated/ApbThreadRegs.v \
+           $(SPINAL_GEN_DIR)/ApbThreadRegs.v \
            ../../rtl/thread.sv \
            ../../rtl/frame_buffer_ram.sv \
-           ../../rtl/generated/ApbLutRam.v \
+           $(SPINAL_GEN_DIR)/ApbLutRam.v \
            ../../rtl/raster_core.sv \
            ../../rtl/dummy_core.sv \
-           ../../rtl/generated/Axi4ToApbXbar.v \
-           ../../rtl/generated/AxiVisibilityDma.v \
-           ../../rtl/generated/AxiTileDma.v \
+           $(SPINAL_GEN_DIR)/Axi4ToApbXbar.v \
+           $(SPINAL_GEN_DIR)/AxiVisibilityDma.v \
+           $(SPINAL_GEN_DIR)/AxiTileDma.v \
            ../../rtl/generated/triangle_unpack.sv \
            ../../rtl/triangle_stream_adapter.sv \
            ../../rtl/triangle_datamover.sv \
@@ -50,7 +52,7 @@ VERILATOR_FLAGS = --binary --timing -j 0 --top-module tb_gpu_top --Mdir $(OBJ_DI
 
 all: run
 
-compile:
+compile: $(filter $(SPINAL_VERILOG),$(RTL_SRCS))
 	$(VERILATOR) $(VERILATOR_FLAGS) $(INCLUDES) $(RTL_SRCS) $(TB_SRCS) $(DPI_SRCS)
 
 run: compile

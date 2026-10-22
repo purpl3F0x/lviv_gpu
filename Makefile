@@ -14,7 +14,7 @@ PART ?= xczu7ev-ffvc1156-2-e
 SCHEMATIC_DIR = $(REPO_ROOT)/build/schematic
 PKG_SRCS := rtl/gpu_types_pkg.sv
 # The SpinalHDL Verilog is generated before a schematic needs it (scripts/spinal.mk).
-RTL_SRCS := $(PKG_SRCS) $(filter-out $(PKG_SRCS),$(wildcard rtl/*.sv)) $(SPINAL_VERILOG)
+RTL_SRCS := $(PKG_SRCS) $(filter-out $(PKG_SRCS),$(wildcard rtl/*.sv rtl/generated/*.sv)) $(SPINAL_VERILOG)
 
 # Module names: the word after each `module` keyword in the RTL sources, and the SpinalHDL tops
 # (named after their files) even before they are generated.

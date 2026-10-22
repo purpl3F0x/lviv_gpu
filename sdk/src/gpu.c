@@ -1,14 +1,8 @@
 #include "gpu.h"
 
+#include "gpu_map.h"
 #include "xil_cache.h"
 #include "xil_io.h"
-#include "xil_types.h"
-
-// The generated headers use the BSP's u32.
-#include "apb_thread_regmap.h"
-#include "axi_tile_dma_regmap.h"
-#include "axi_visibility_dma_regmap.h"
-#include "gpu_map.h"
 
 // Register polls before a wait is declared hung (each is a round trip over the control port).
 #define GPU_POLL_LIMIT 10000000u

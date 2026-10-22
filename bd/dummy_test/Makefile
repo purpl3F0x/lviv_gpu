@@ -16,7 +16,7 @@ RTL = ../../rtl/gpu_types_pkg.sv \
       ../../rtl/sync_fifo.sv \
       ../../rtl/async_fifo.sv \
       ../../rtl/fp_wrappers.sv \
-      ../../rtl/generated/APBFrontendRegs.v \
+      $(SPINAL_GEN_DIR)/APBFrontendRegs.v \
       ../../rtl/raster_frontend.sv \
       ../../rtl/orchestrator_alu.sv \
       ../../rtl/thread_orchestrator.sv \
@@ -28,15 +28,15 @@ RTL = ../../rtl/gpu_types_pkg.sv \
       ../../rtl/z_buffer_ram.sv \
       ../../rtl/texture_address_generator.sv \
       ../../rtl/texture_cache.sv \
-      ../../rtl/generated/ApbThreadRegs.v \
+      $(SPINAL_GEN_DIR)/ApbThreadRegs.v \
       ../../rtl/thread.sv \
       ../../rtl/frame_buffer_ram.sv \
-      ../../rtl/generated/ApbLutRam.v \
+      $(SPINAL_GEN_DIR)/ApbLutRam.v \
       ../../rtl/raster_core.sv \
       ../../rtl/dummy_core.sv \
-      ../../rtl/generated/Axi4ToApbXbar.v \
-      ../../rtl/generated/AxiVisibilityDma.v \
-      ../../rtl/generated/AxiTileDma.v \
+      $(SPINAL_GEN_DIR)/Axi4ToApbXbar.v \
+      $(SPINAL_GEN_DIR)/AxiVisibilityDma.v \
+      $(SPINAL_GEN_DIR)/AxiTileDma.v \
       ../../rtl/generated/triangle_unpack.sv \
       ../../rtl/triangle_stream_adapter.sv \
       ../../rtl/triangle_datamover.sv \

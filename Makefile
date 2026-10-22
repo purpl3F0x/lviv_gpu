@@ -8,18 +8,22 @@
 #   make clean-schematic
 
 include scripts/vivado/vivado.mk
+include scripts/spinal.mk
 
 PART ?= xczu7ev-ffvc1156-2-e
 SCHEMATIC_DIR = $(REPO_ROOT)/build/schematic
 PKG_SRCS := rtl/gpu_types_pkg.sv
-RTL_SRCS := $(PKG_SRCS) $(filter-out $(PKG_SRCS),$(wildcard rtl/*.sv rtl/generated/*.v))
+# The SpinalHDL Verilog is generated before a schematic needs it (scripts/spinal.mk).
+RTL_SRCS := $(PKG_SRCS) $(filter-out $(PKG_SRCS),$(wildcard rtl/*.sv)) $(SPINAL_VERILOG)
 
-# Module names: the word after each `module` keyword in the RTL sources.
+# Module names: the word after each `module` keyword in the RTL sources, and the SpinalHDL tops
+# (named after their files) even before they are generated.
 hash := \#
 open_paren := (
 src_words := $(foreach src,$(RTL_SRCS),$(file <$(src)))
 word_pairs := $(join $(src_words),$(addprefix @@,$(wordlist 2,$(words $(src_words)),$(src_words))))
-MODULES := $(sort $(foreach name,$(patsubst module@@%,%,$(filter module@@%,$(word_pairs))),\
+MODULES := $(sort $(SPINAL_MODULES) \
+             $(foreach name,$(patsubst module@@%,%,$(filter module@@%,$(word_pairs))),\
              $(firstword $(subst $(open_paren), ,$(subst $(hash), ,$(subst ;, ,$(name)))))))
 
 # Passed to Vivado as a Tcl file so paths never go through cmd.exe argument splitting.

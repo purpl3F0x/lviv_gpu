@@ -3,6 +3,8 @@ IVERILOG  = iverilog
 VVP       = vvp
 VERILATOR = verilator
 
+include ../../scripts/spinal.mk
+
 SNAPSHOT = tb_sim
 OBJ_DIR  = obj_dir
 
@@ -12,7 +14,7 @@ RTL_SRCS = ../../rtl/gpu_types_pkg.sv \
            ../../rtl/delay_pipe_fifo.sv \
            ../../rtl/axis_skid_buffer.sv \
            ../../rtl/fp_wrappers.sv \
-           ../../rtl/generated/APBFrontendRegs.v \
+           $(SPINAL_GEN_DIR)/APBFrontendRegs.v \
            ../../rtl/raster_frontend.sv \
            ../../rtl/async_fifo.sv \
            ../../rtl/sync_fifo.sv \
@@ -26,10 +28,10 @@ RTL_SRCS = ../../rtl/gpu_types_pkg.sv \
            ../../rtl/z_buffer_ram.sv \
            ../../rtl/texture_address_generator.sv \
            ../../rtl/texture_cache.sv \
-           ../../rtl/generated/ApbThreadRegs.v \
+           $(SPINAL_GEN_DIR)/ApbThreadRegs.v \
            ../../rtl/thread.sv \
            ../../rtl/frame_buffer_ram.sv \
-           ../../rtl/generated/ApbLutRam.v \
+           $(SPINAL_GEN_DIR)/ApbLutRam.v \
            ../../rtl/raster_core.sv
 TB_SRCS  = tb_raster_core.sv ../common/axi_ram.v
 INCLUDES = -I../../rtl -I../../rtl/generated
@@ -54,7 +56,7 @@ VERILATOR_FLAGS = --binary --timing -j 0 --top-module tb_raster_core --Mdir $(OB
 all: run
 
 # Verilator
-compile:
+compile: $(filter $(SPINAL_VERILOG),$(RTL_SRCS))
 	$(VERILATOR) $(VERILATOR_FLAGS) $(INCLUDES) $(RTL_SRCS) $(TB_SRCS) $(DPI_SRCS)
 
 run: compile $(TEXTURE)

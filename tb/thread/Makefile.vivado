@@ -5,11 +5,15 @@
 RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/fp_wrappers.sv ../../rtl/fp_cmp_le.sv ../../rtl/axis_skid_buffer.sv \
       ../../rtl/delay_pipe.sv ../../rtl/fx_texture_interpolator.sv ../../rtl/fx_color_interpolator.sv \
       ../../rtl/fragment_shader.sv ../../rtl/blend_unit.sv ../../rtl/z_buffer_ram.sv \
-      ../../rtl/texture_address_generator.sv ../../rtl/texture_cache.sv ../../rtl/generated/ApbThreadRegs.v \
+      ../../rtl/texture_address_generator.sv ../../rtl/texture_cache.sv $(SPINAL_GEN_DIR)/ApbThreadRegs.v \
       ../../rtl/thread.sv
 
 .DEFAULT_GOAL := sim
 include ../../scripts/vivado/xsim.mk
+include ../../scripts/spinal.mk
+
+# xsim compiles the SpinalHDL Verilog too.
+compile: $(filter $(SPINAL_VERILOG),$(RTL))
 
 .PHONY: sim gui_sim
 

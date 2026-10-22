@@ -35,7 +35,7 @@ module tb_raster_core #(
   localparam int ApbFrontend = 4, ApbLut = 5;
   localparam logic [ApbLut:0] SelThreads = {{(ApbLut + 1 - Lanes) {1'b0}}, {Lanes{1'b1}}};
   localparam logic [9:0] RegFrontendStatus = 10'h00, RegTileX = 10'h04, RegTileY = 10'h08;
-  localparam logic [9:0] RegThreadBusy = 10'h00, RegZbufClear = 10'h04, RegCacheFlush = 10'h10;
+  localparam logic [9:0] RegThreadBusy = 10'h00, RegZbufClear = 10'h04, RegCacheFlush = 10'h08;
   localparam logic [9:0] RegLutBase = 10'h000, RegLutSize = 10'h200;  // + 4 * texture id
 
   // Texture memory: byte addresses, 128-bit beats of four texels.

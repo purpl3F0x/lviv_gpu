@@ -172,7 +172,7 @@ class SimApbDriver(apb: Apb3, clockDomain: ClockDomain) {
 // - Synchronous read port connected to dut.io.tile_ram with configurable latency (1, 2... cycles)
 // =============================================================================
 class SimBramMemory(
-    tileRam: TileRamReadPort,
+    tileRam: TileRamPort,
     clockDomain: ClockDomain,
     beatShift: Int,
     totalBeats: Int,

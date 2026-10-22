@@ -388,7 +388,7 @@ module texture_cache #(
       .clk(clk),
       .rst_n(rst_reg),
       // .flush(flush),
-git      .flush(1'b0),  // temp fix // TODO: lot of fixes here (we can break AXI in cache flush)
+      .flush(1'b0),  // temp fix // TODO: lot of fixes here (we can break AXI in cache flush)
       .lookup_en(lookup_fire),
       .lookup_tag(request_stage_tag),
       .lookup_hit_found(tag_lookup_hit_found),

@@ -1,5 +1,6 @@
 VERILATOR = verilator
 RUN_ARGS ?=
+include ../../scripts/spinal.mk
 .RECIPEPREFIX := >
 
 ROOT_DIR = $(abspath ../..)
@@ -26,8 +27,8 @@ SV_SRCS = verilator.vlt \
           ../../rtl/blend_unit.sv \
           ../../rtl/z_buffer_ram.sv \
           ../../rtl/texture_address_generator.sv \
-          ../../rtl/generated/ApbLutRam.v \
-          ../../rtl/generated/ApbThreadRegs.v \
+          $(SPINAL_GEN_DIR)/ApbLutRam.v \
+          $(SPINAL_GEN_DIR)/ApbThreadRegs.v \
           ../../rtl/texture_cache.sv \
           ../../rtl/thread.sv
 
@@ -51,7 +52,7 @@ VERILATOR_INCLUDES = -I../../rtl/generated
 
 all: compile
 
-compile:
+compile: $(filter $(SPINAL_VERILOG),$(SV_SRCS))
 >mkdir -p $(BUILD_DIR) && mkdir -p $(OBJ_DIR) && $(VERILATOR) --cc --exe --build --top-module $(TOP) --Mdir $(OBJ_DIR) -o rasterizer_thread $(VERILATOR_INCLUDES) $(SV_SRCS) $(CPP_SRCS) $(VERILATOR_WARNINGS) $(VERILATOR_CFLAGS)
 
 run: compile

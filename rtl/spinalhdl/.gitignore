@@ -1,0 +1,21 @@
+# sbt
+target/
+project/target/
+project/project/
+.bsp/
+
+# IDEs
+.metals/
+.bloop/
+.idea/
+.vscode/
+project/metals.sbt
+
+# Generator output (SpinalConfig targetDirectory); scripts/spinal.mk copies it out to
+# rtl/generated/ and sdk/include/generated/
+rtl/
+
+# Simulations
+simWorkspace/
+tmp/
+*.vcd

@@ -1,6 +1,6 @@
 // Generator : SpinalHDL v1.12.3    git head : 591e64062329e5e2e2b81f4d52422948053edb97
 // Component : ApbLutRam
-// Git hash  : f921e41a46266c865ee28f084499d68632bd8f7c
+// Git hash  : 0867eb45c9a7627edf7c710aa90817a6ac31f5e6
 
 `timescale 1ns/1ps
 

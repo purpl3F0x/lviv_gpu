@@ -1,6 +1,6 @@
 // Generator : SpinalHDL v1.12.3    git head : 591e64062329e5e2e2b81f4d52422948053edb97
 // Component : APBFrontendRegs
-// Git hash  : d8b2fd7242cf24f2e3e1e9b9a50c54c449ebfc76
+// Git hash  : 0867eb45c9a7627edf7c710aa90817a6ac31f5e6
 
 `timescale 1ns/1ps
 

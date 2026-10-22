@@ -48,7 +48,13 @@ module raster_frontend (
 
     // * Status Signal * //
     input  logic orchestrator_empty,  // We use the APB of the frontend since it's just 1 signal
-    output logic core_empty
+    input  logic input_fifo_idle,  // the raster core's triangle FIFO, also reported here
+    output logic core_empty,
+
+    // * Reset * //
+    // Hardware reset combined with the APB soft reset, for logic outside the frontend that the soft
+    // reset must clear too (the raster core's input FIFO).
+    output logic core_rst_n
 );
   typedef struct packed {
     logic [7:0] tex_id;
@@ -105,6 +111,8 @@ module raster_frontend (
     local_reset_n <= rst_n & ~frontend_sw_reset;
   end
 
+  assign core_rst_n = local_reset_n;
+
   APBFrontendRegs u_apb_frontend_regs (
       .apb_clock(apb_clk),
       .apb_resetn(apb_rst_n),
@@ -120,6 +128,7 @@ module raster_frontend (
       .s_apb_PSLVERROR(s_apb_PSLVERROR),
       .thread_empty(core_empty),
       .orchestrator_empty(orchestrator_empty),
+      .input_fifo_idle(input_fifo_idle),
       .thread_sw_reset(frontend_sw_reset),
       .tile_x_index(tile_x_index),
       .tile_y_index(tile_y_index)

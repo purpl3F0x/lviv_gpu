@@ -1,6 +1,6 @@
 // Generator : SpinalHDL v1.12.3    git head : 591e64062329e5e2e2b81f4d52422948053edb97
 // Component : APBFrontendRegs
-// Git hash  : f921e41a46266c865ee28f084499d68632bd8f7c
+// Git hash  : d8b2fd7242cf24f2e3e1e9b9a50c54c449ebfc76
 
 `timescale 1ns/1ps
 
@@ -19,6 +19,7 @@ module APBFrontendRegs (
   output wire          s_apb_PSLVERROR,
   input  wire          thread_empty,
   input  wire          orchestrator_empty,
+  input  wire          input_fifo_idle,
   output wire          thread_sw_reset,
   output wire [4:0]    tile_x_index,
   output wire [4:0]    tile_y_index
@@ -28,6 +29,7 @@ module APBFrontendRegs (
   wire                streamCCByToggle_1_io_output_ready;
   wire                thread_empty_buffercc_io_dataOut;
   wire                orchestrator_empty_buffercc_io_dataOut;
+  wire                input_fifo_idle_buffercc_io_dataOut;
   wire                apbArea_RESET_pulseCCByToggle_io_pulseOut;
   wire                apbArea_RESET_pulseCCByToggle_toplevel_apb_resetn_synchronized_1;
   wire                streamCCByToggle_io_input_ready;
@@ -47,7 +49,8 @@ module APBFrontendRegs (
   wire                write_hit_0x0000;
   wire                apbArea_EMPTY;
   wire                apbArea_ORCHESTRATOR_EMPTY;
-  wire       [28:0]   reserved;
+  wire                apbArea_INPUT_FIFO_IDLE;
+  wire       [27:0]   reserved;
   reg                 apbArea_RESET;
   wire                when_RegBase_l328;
   wire                read_hit_0x0004;
@@ -88,6 +91,12 @@ module APBFrontendRegs (
     .io_dataOut (orchestrator_empty_buffercc_io_dataOut), //o
     .apb_clock  (apb_clock                             ), //i
     .apb_resetn (apb_resetn                            )  //i
+  );
+  (* keep_hierarchy = "TRUE" *) APBFrontendRegs_BufferCC_6 input_fifo_idle_buffercc (
+    .io_dataIn  (input_fifo_idle                    ), //i
+    .io_dataOut (input_fifo_idle_buffercc_io_dataOut), //o
+    .apb_clock  (apb_clock                          ), //i
+    .apb_resetn (apb_resetn                         )  //i
   );
   APBFrontendRegs_PulseCCByToggle apbArea_RESET_pulseCCByToggle (
     .io_pulseIn                         (apbArea_RESET                                                   ), //i
@@ -130,10 +139,11 @@ module APBFrontendRegs (
   assign s_apb_PSLVERROR = apbArea_busif_reg_rderr;
   assign read_hit_0x0000 = ((s_apb_PADDR == 5'h0) && apbArea_busif_doRead);
   assign write_hit_0x0000 = ((s_apb_PADDR == 5'h0) && apbArea_busif_doWrite);
-  assign reserved = 29'h0;
+  assign reserved = 28'h0;
   assign when_RegBase_l328 = (write_hit_0x0000 && s_apb_PWDATA[31]);
   assign apbArea_EMPTY = thread_empty_buffercc_io_dataOut;
   assign apbArea_ORCHESTRATOR_EMPTY = orchestrator_empty_buffercc_io_dataOut;
+  assign apbArea_INPUT_FIFO_IDLE = input_fifo_idle_buffercc_io_dataOut;
   assign read_hit_0x0004 = ((s_apb_PADDR == 5'h04) && apbArea_busif_doRead);
   assign write_hit_0x0004 = ((s_apb_PADDR == 5'h04) && apbArea_busif_doWrite);
   assign apbArea_tileXWriteStream_valid = write_hit_0x0004;
@@ -184,7 +194,7 @@ module APBFrontendRegs (
       if(apbArea_busif_askRead) begin
         case(s_apb_PADDR)
           5'h0 : begin
-            apbArea_busif_reg_rdata <= {apbArea_RESET,{reserved,{apbArea_ORCHESTRATOR_EMPTY,apbArea_EMPTY}}};
+            apbArea_busif_reg_rdata <= {apbArea_RESET,{reserved,{apbArea_INPUT_FIFO_IDLE,{apbArea_ORCHESTRATOR_EMPTY,apbArea_EMPTY}}}};
             apbArea_busif_reg_rderr <= 1'b0;
           end
           5'h04 : begin
@@ -387,6 +397,8 @@ module APBFrontendRegs_PulseCCByToggle (
 
 
 endmodule
+
+//APBFrontendRegs_BufferCC_8 replaced by APBFrontendRegs_BufferCC_6
 
 //APBFrontendRegs_BufferCC_7 replaced by APBFrontendRegs_BufferCC_6
 

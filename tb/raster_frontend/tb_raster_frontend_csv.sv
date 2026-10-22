@@ -70,7 +70,9 @@ module tb_raster_frontend_csv;
       .ready_in(ready_in),
       .valid_out(valid_out),
       .orchestrator_empty(1'b1),
+      .input_fifo_idle(1'b1),
       .core_empty(core_empty),
+      .core_rst_n(),
       .out_data(out_data)
   );
 

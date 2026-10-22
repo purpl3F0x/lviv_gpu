@@ -376,11 +376,12 @@ module tb_raster_core #(
     if (data[3:0] !== 4'(tex_log2)) $fatal(1, "texture table size readback %h", data);
   endtask
 
-  // True when the frontend (bit 0), the orchestrator (bit 1) and every thread are empty.
+  // True when the frontend (bit 0), the orchestrator (bit 1), the input FIFO (bit 2) and every
+  // thread are empty.
   task automatic core_idle(output bit idle);
     logic [31:0] data;
     apb_read(ApbFrontend, RegFrontendStatus, data);
-    idle = data[0] === 1'b1 && data[1] === 1'b1;
+    idle = data[0] === 1'b1 && data[1] === 1'b1 && data[2] === 1'b1;
     for (int lane = 0; lane < Lanes; lane++) begin
       apb_read(lane, RegThreadBusy, data);
       if (data[0] !== 1'b0) idle = 0;

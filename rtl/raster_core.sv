@@ -6,20 +6,21 @@
 import gpu_types_pkg::*;
 
 /*
- *                          Raster Core Block Diagram
- *   ┌───────────────────────────────────────────────────────────────────────┐
- *   │                                         ┌──────────┐   ┌──────────┐   │
- *   │                                    ┌───►│ Thread 0 │◄─►│ FB RAM 0 │◄──┼─► FB host port 0
- *   │ ┌──────────┐   ┌──────────────┐    │    ├──────────┤   ├──────────┤   │
- * ──┼►│ Frontend ├──►│ Orchestrator ├────┼───►│ Thread 1 │◄─►│ FB RAM 1 │◄──┼─► FB host port 1
- *   │ └────▲─────┘   └──────┬───────┘    │    ├──────────┤   ├──────────┤   │
- *   │      │      empty     │            ├───►│ Thread 2 │◄─►│ FB RAM 2 │◄──┼─► FB host port 2
- *   │      └────────────────┘            │    ├──────────┤   ├──────────┤   │
- *   │                                    └───►│ Thread 3 │◄─►│ FB RAM 3 │◄──┼─► FB host port 3
- *   │                                         └────▲─────┘   └──────────┘   │
- *   │                                     Texture LUT (shared)              │
- *   └───────────────────────────────────────────────────────────────────────┘
+ *                                  Raster Core Block Diagram
+ *   ┌───────────────────────────────────────────────────────────────────────────────────────┐
+ *   │                                                         ┌──────────┐   ┌──────────┐   │
+ *   │                                                    ┌───►│ Thread 0 │◄─►│ FB RAM 0 │◄──┼─► FB host port 0
+ *   │ ┌───────────┐   ┌──────────┐   ┌──────────────┐    │    ├──────────┤   ├──────────┤   │
+ * ──┼►│ URAM FIFO ├──►│ Frontend ├──►│ Orchestrator ├────┼───►│ Thread 1 │◄─►│ FB RAM 1 │◄──┼─► FB host port 1
+ *   │ └───────────┘   └────▲─────┘   └──────┬───────┘    │    ├──────────┤   ├──────────┤   │
+ *   │                      │      empty     │            ├───►│ Thread 2 │◄─►│ FB RAM 2 │◄──┼─► FB host port 2
+ *   │                      └────────────────┘            │    ├──────────┤   ├──────────┤   │
+ *   │                                                    └───►│ Thread 3 │◄─►│ FB RAM 3 │◄──┼─► FB host port 3
+ *   │                                                         └────▲─────┘   └──────────┘   │
+ *   │                                                     Texture LUT (shared)              │
+ *   └───────────────────────────────────────────────────────────────────────────────────────┘
  *     APB: frontend, thread 0..3, texture LUT. Texture AXI: one read master per thread.
+ *
  *
  * Clocks: the frontend runs on frontend_clk; the orchestrator, the threads and the frame buffers
  * run on thread_clk. The orchestrator's input FIFO crosses between the two, so they may be the
@@ -106,6 +107,47 @@ module raster_core (
   end
 
   //
+  // Triangle input FIFO (frontend_clk)
+  //
+
+  // A URAM288 is 4K x 72: the 696-bit triangle takes 10 side by side, and any depth up to 4096
+  // costs the same 10, so the FIFO uses all of it. The first output register is the URAM OREG, the
+  // rest are fabric stages for the route from the URAM column. The frontend's input skid pops the
+  // FIFO with its registered ready, so the URAM read enables come from a flop.
+  localparam int InputFifoDepth = 4096;
+  localparam int InputFifoOutputRegs = 3;
+
+  logic [$bits(frontend_data_in_t)-1:0] input_fifo_data;
+  logic [$clog2(InputFifoDepth):0] input_fifo_fill;
+  logic input_fifo_full, input_fifo_empty, input_fifo_idle, frontend_ready;
+  logic frontend_core_rst_n;  // hardware or frontend soft reset: queued triangles are dropped too
+
+  assign ready_out = !input_fifo_full;
+
+  sync_fifo #(
+      .DATA_WIDTH($bits(frontend_data_in_t)),
+      .FIFO_DEPTH(InputFifoDepth),
+      .RAM_STYLE("ultra"),
+      .OUTPUT_REGS(InputFifoOutputRegs)
+  ) u_input_fifo (
+      .clk(frontend_clk),
+      .rst_n(frontend_core_rst_n),
+      .wr_en(valid_in),
+      .data_i(in_data),
+      .rd_en(frontend_ready),
+      .data_o(input_fifo_data),
+      .fill_cnt(input_fifo_fill),
+      .fifo_full(input_fifo_full),
+      .fifo_almost_full(),
+      .fifo_empty(input_fifo_empty)
+  );
+
+  // Status bit 2 of the frontend. fill_cnt holds a triangle until the frontend takes it, and the
+  // frontend counts it from then on (bit 0). Registered, so the flag crossing into the APB clock
+  // comes from a single flop.
+  always_ff @(posedge frontend_clk) input_fifo_idle <= input_fifo_fill == '0;
+
+  //
   // Frontend
   //
 
@@ -127,14 +169,16 @@ module raster_core (
       .s_apb_PWDATA(s_apb_frontend_PWDATA),
       .s_apb_PRDATA(s_apb_frontend_PRDATA),
       .s_apb_PSLVERROR(s_apb_frontend_PSLVERROR),
-      .valid_in(valid_in),
-      .ready_out(ready_out),
-      .in_data(in_data),
+      .valid_in(!input_fifo_empty),
+      .ready_out(frontend_ready),
+      .in_data(frontend_data_in_t'(input_fifo_data)),
       .ready_in(orchestrator_ready),
       .valid_out(frontend_valid),
       .out_data(frontend_data),
       .orchestrator_empty(orchestrator_empty),
-      .core_empty()  // also readable through the frontend status register
+      .input_fifo_idle(input_fifo_idle),
+      .core_empty(),  // also readable through the frontend status register
+      .core_rst_n(frontend_core_rst_n)
   );
 
   //

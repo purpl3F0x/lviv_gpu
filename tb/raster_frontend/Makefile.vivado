@@ -2,10 +2,14 @@
 #   xsim simulation (scripts/vivado/xsim.mk) and out-of-context synth/impl (below, scripts/vivado/ooc_flow.tcl).
 # Usage: make -f Makefile.vivado [simple|csv|gui_simple|gui_csv|synth|impl|synth_gui|impl_gui|ooc_clean|ip|clean|distclean]
 
-RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/int_modules.sv ../../rtl/delay_pipe.sv ../../rtl/delay_pipe_fifo.sv ../../rtl/axis_skid_buffer.sv ../../rtl/fp_wrappers.sv ../../rtl/generated/APBFrontendRegs.v ../../rtl/raster_frontend.sv
+RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/int_modules.sv ../../rtl/delay_pipe.sv ../../rtl/delay_pipe_fifo.sv ../../rtl/axis_skid_buffer.sv ../../rtl/fp_wrappers.sv $(SPINAL_GEN_DIR)/APBFrontendRegs.v ../../rtl/raster_frontend.sv
 
 .DEFAULT_GOAL := simple
 include ../../scripts/vivado/xsim.mk
+include ../../scripts/spinal.mk
+
+# xsim compiles the SpinalHDL Verilog too.
+compile: $(filter $(SPINAL_VERILOG),$(RTL))
 
 .PHONY: simple csv gui_simple gui_csv
 

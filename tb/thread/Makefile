@@ -1,6 +1,8 @@
 IVERILOG = iverilog
 VVP      = vvp
 
+include ../../scripts/spinal.mk
+
 SNAPSHOT = tb_sim
 
 RTL_SRCS = ../../rtl/gpu_types_pkg.sv \
@@ -15,7 +17,7 @@ RTL_SRCS = ../../rtl/gpu_types_pkg.sv \
            ../../rtl/z_buffer_ram.sv \
            ../../rtl/texture_address_generator.sv \
            ../../rtl/texture_cache.sv \
-           ../../rtl/generated/ApbThreadRegs.v \
+           $(SPINAL_GEN_DIR)/ApbThreadRegs.v \
            ../../rtl/thread.sv
 TB_SRCS  = tb_thread.sv ../common/axi_ram.v
 INCLUDES = -I../../rtl -I../../rtl/generated

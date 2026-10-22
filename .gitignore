@@ -20,3 +20,12 @@ tb_sim*
 *.wdb
 /build/
 tb/**/logs/
+
+# SpinalHDL Verilog, made from rtl/spinalhdl when missing or out of date (scripts/spinal.mk)
+/rtl/generated/*.v
+
+# Scala tooling (Metals) for rtl/spinalhdl
+.metals/
+.bloop/
+.bsp/
+sdk/include/generated/

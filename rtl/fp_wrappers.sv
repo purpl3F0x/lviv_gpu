@@ -8,13 +8,13 @@
 
 `timescale 1ns / 1ns
 `ifdef VERILATOR
-  `define SIM_MODE
+`define SIM_MODE
 `endif
 `ifdef SIMULATION
-  `define SIM_MODE
+`define SIM_MODE
 `endif
 `ifdef __ICARUS__
-  `define SIM_MODE
+`define SIM_MODE
 `endif
 
 `ifdef VERILATOR
@@ -23,53 +23,13 @@ import "DPI-C" function int unsigned dpi_float_to_bits(input shortreal val);
 `define BITSTOSHORTREAL(x) dpi_bits_to_float(x)
 `define SHORTREALTOBITS(x) dpi_float_to_bits(x)
 `else
-  `define BITSTOSHORTREAL(x) $bitstoshortreal(x)
-  `define SHORTREALTOBITS(x) $shortrealtobits(x)
+`define BITSTOSHORTREAL(x) $bitstoshortreal(x)
+`define SHORTREALTOBITS(x) $shortrealtobits(x)
 `endif
 
-
-// ============================================================================
-// Floating-Point Adder
-// ============================================================================
-module fx16_32_to_fp32 #(
-    parameter int LATENCY = 5
-) (
-    input logic aclk,
-    input logic aclken,
-    input logic valid_in,
-    input logic signed [47:0] a,
-    output logic [31:0] result
-);
-`ifdef SIM_MODE
-  logic [31:0] pipeline [LATENCY];
-  logic [31:0] res_bits;
-  shortreal converted;
-
-  assign converted = real'($signed(a)) / 4294967296.0;
-  assign res_bits = `SHORTREALTOBITS(converted);
-
-  always_ff @(posedge aclk) begin
-    if (aclken) begin
-      pipeline[0] <= res_bits;
-      for (int stage = 1; stage < LATENCY; stage++)
-        pipeline[stage] <= pipeline[stage-1];
-    end
-  end
-  assign result = pipeline[LATENCY-1];
-`else
-  xil_fx16_32_to_fp32 u_convert (
-      .aclk(aclk),
-      .aclken(aclken),
-      .s_axis_a_tvalid(valid_in),
-      .s_axis_a_tdata(a),
-      .m_axis_result_tvalid(),
-      .m_axis_result_tdata(result)
-  );
-`endif
-endmodule
 
 module fx28_20_to_fp32 #(
-  parameter int LATENCY = 7
+    parameter int LATENCY = 7
 ) (
     input logic aclk,
     input logic aclken,
@@ -81,29 +41,31 @@ module fx28_20_to_fp32 #(
 `ifdef SIM_MODE
   shortreal converted;
   logic [31:0] res_bits;
-  logic [31:0] pipeline [LATENCY];
-  logic valid_pipe [LATENCY];
+  logic [31:0] pipeline[LATENCY];
+  logic valid_pipe[LATENCY];
 
   assign converted = real'($signed(s_axis_a_tdata)) / 1048576.0;
-  assign res_bits = `SHORTREALTOBITS(converted);
+  assign res_bits  = `SHORTREALTOBITS(converted);
 
   always_ff @(posedge aclk) begin
     if (aclken) begin
-      pipeline[0] <= res_bits;
+      pipeline[0]   <= res_bits;
       valid_pipe[0] <= s_axis_a_tvalid;
       for (int i = 1; i < LATENCY; i++) begin
-        pipeline[i] <= pipeline[i-1];
+        pipeline[i]   <= pipeline[i-1];
         valid_pipe[i] <= valid_pipe[i-1];
       end
     end
   end
 
-  assign m_axis_result_tdata = pipeline[LATENCY-1];
+  assign m_axis_result_tdata  = pipeline[LATENCY-1];
   assign m_axis_result_tvalid = valid_pipe[LATENCY-1];
 `else
   xil_fx28_20_to_fp32 u_convert (
-      .aclk(aclk), .aclken(aclken),
-      .s_axis_a_tvalid(s_axis_a_tvalid), .s_axis_a_tdata(s_axis_a_tdata),
+      .aclk(aclk),
+      .aclken(aclken),
+      .s_axis_a_tvalid(s_axis_a_tvalid),
+      .s_axis_a_tdata(s_axis_a_tdata),
       .m_axis_result_tvalid(m_axis_result_tvalid),
       .m_axis_result_tdata(m_axis_result_tdata)
   );
@@ -278,8 +240,8 @@ module fp_to_fx14_10 #(
   real scaled;
   longint signed converted;
   logic signed [23:0] res_bits;
-  logic signed [23:0] pipeline [LATENCY];
-  logic valid_pipe [LATENCY];
+  logic signed [23:0] pipeline[LATENCY];
+  logic valid_pipe[LATENCY];
 
   function automatic longint signed round_nearest_even(input real value);
     real magnitude;
@@ -287,10 +249,9 @@ module fp_to_fx14_10 #(
     longint signed integral;
     begin
       magnitude = value < 0.0 ? -value : value;
-      integral = longint'($floor(magnitude));
-      fraction = magnitude - real'(integral);
-      if ((fraction > 0.5) || ((fraction == 0.5) && integral[0]))
-        integral++;
+      integral  = longint'($floor(magnitude));
+      fraction  = magnitude - real'(integral);
+      if ((fraction > 0.5) || ((fraction == 0.5) && integral[0])) integral++;
       return value < 0.0 ? -integral : integral;
     end
   endfunction
@@ -303,22 +264,24 @@ module fp_to_fx14_10 #(
 
   always_ff @(posedge aclk) begin
     if (aclken) begin
-      pipeline[0] <= res_bits;
+      pipeline[0]   <= res_bits;
       valid_pipe[0] <= s_axis_a_tvalid;
       for (int i = 1; i < LATENCY; i++) begin
-        pipeline[i] <= pipeline[i-1];
+        pipeline[i]   <= pipeline[i-1];
         valid_pipe[i] <= valid_pipe[i-1];
       end
     end
   end
 
-  assign m_axis_result_tdata = pipeline[LATENCY-1];
+  assign m_axis_result_tdata  = pipeline[LATENCY-1];
   assign m_axis_result_tvalid = valid_pipe[LATENCY-1];
 `else
   logic [31:0] result_padded;
   xil_fp_to_fx14_10 u_convert (
-      .aclk(aclk), .aclken(aclken),
-      .s_axis_a_tvalid(s_axis_a_tvalid), .s_axis_a_tdata(s_axis_a_tdata),
+      .aclk(aclk),
+      .aclken(aclken),
+      .s_axis_a_tvalid(s_axis_a_tvalid),
+      .s_axis_a_tdata(s_axis_a_tdata),
       .m_axis_result_tvalid(m_axis_result_tvalid),
       .m_axis_result_tdata(result_padded)
   );
@@ -347,10 +310,9 @@ module fp_to_fx5_13 #(
     longint signed integral;
     begin
       magnitude = value < 0.0 ? -value : value;
-      integral = longint'($floor(magnitude));
-      fraction = magnitude - real'(integral);
-      if ((fraction > 0.5) || ((fraction == 0.5) && integral[0]))
-        integral++;
+      integral  = longint'($floor(magnitude));
+      fraction  = magnitude - real'(integral);
+      if ((fraction > 0.5) || ((fraction == 0.5) && integral[0])) integral++;
       return value < 0.0 ? -integral : integral;
     end
   endfunction
@@ -358,16 +320,23 @@ module fp_to_fx5_13 #(
   assign scaled = real'(`BITSTOSHORTREAL(s_axis_a_tdata)) * 8192.0;
   assign converted = round_nearest_even(scaled);
   assign res_bits = converted[17:0];
-  delay_pipe #(.WIDTH(19), .STAGES(LATENCY)) u_pipeline (
-      .clk(aclk), .rst_n(1'b1), .clken(aclken),
+  delay_pipe #(
+      .WIDTH (19),
+      .STAGES(LATENCY)
+  ) u_pipeline (
+      .clk(aclk),
+      .rst_n(1'b1),
+      .clken(aclken),
       .data_in({s_axis_a_tvalid, res_bits}),
       .data_out({m_axis_result_tvalid, m_axis_result_tdata})
   );
 `else
   logic [23:0] result_padded;
   xil_fp_to_fx5_13 u_convert (
-      .aclk(aclk), .aclken(aclken),
-      .s_axis_a_tvalid(s_axis_a_tvalid), .s_axis_a_tdata(s_axis_a_tdata),
+      .aclk(aclk),
+      .aclken(aclken),
+      .s_axis_a_tvalid(s_axis_a_tvalid),
+      .s_axis_a_tdata(s_axis_a_tdata),
       .m_axis_result_tvalid(m_axis_result_tvalid),
       .m_axis_result_tdata(result_padded)
   );
@@ -387,11 +356,11 @@ module fp_to_fx2_23 #(
 );
 
 `ifdef SIM_MODE
-  shortreal a_real;
-  logic [24:0] res_bits;
-  logic [24:0] pipeline [LATENCY];
-  logic        valid_pipe [LATENCY];
-  longint signed scaled;
+  shortreal             a_real;
+  logic          [24:0] res_bits;
+  logic          [24:0] pipeline  [LATENCY];
+  logic                 valid_pipe[LATENCY];
+  longint signed        scaled;
 
   function automatic longint signed round_nearest_even(input real value);
     real magnitude;
@@ -399,32 +368,31 @@ module fp_to_fx2_23 #(
     longint signed integral;
     begin
       magnitude = value < 0.0 ? -value : value;
-      integral = longint'($floor(magnitude));
-      fraction = magnitude - real'(integral);
-      if ((fraction > 0.5) || ((fraction == 0.5) && integral[0]))
-        integral++;
+      integral  = longint'($floor(magnitude));
+      fraction  = magnitude - real'(integral);
+      if ((fraction > 0.5) || ((fraction == 0.5) && integral[0])) integral++;
       return value < 0.0 ? -integral : integral;
     end
   endfunction
 
   always_comb begin
-    a_real = `BITSTOSHORTREAL(s_axis_a_tdata);
-    scaled = round_nearest_even(real'(a_real) * 8388608.0);
+    a_real   = `BITSTOSHORTREAL(s_axis_a_tdata);
+    scaled   = round_nearest_even(real'(a_real) * 8388608.0);
     res_bits = scaled[24:0];
   end
 
   always_ff @(posedge aclk) begin
     if (aclken) begin
-      pipeline[0] <= res_bits;
+      pipeline[0]   <= res_bits;
       valid_pipe[0] <= s_axis_a_tvalid;
       for (int i = 1; i < LATENCY; i++) begin
-        pipeline[i] <= pipeline[i-1];
+        pipeline[i]   <= pipeline[i-1];
         valid_pipe[i] <= valid_pipe[i-1];
       end
     end
   end
 
-  assign m_axis_result_tdata = pipeline[LATENCY-1];
+  assign m_axis_result_tdata  = pipeline[LATENCY-1];
   assign m_axis_result_tvalid = valid_pipe[LATENCY-1];
 
 `else

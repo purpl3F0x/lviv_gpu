@@ -89,8 +89,14 @@ switch $stage {
   }
   xsa {
     impl 1
-    write_hw_platform -fixed -include_bit -force -file $xsa
-    print_color 32 "Wrote $xsa"
+    # Not rewritten for the same bitstream: a newer XSA makes bd.mk update the Vitis platform.
+    set bit [lindex [glob -nocomplain [get_property DIRECTORY [get_runs impl_1]]/*.bit] 0]
+    if {[file exists $xsa] && [file mtime $xsa] >= [file mtime $bit]} {
+      puts "$xsa is up to date"
+    } else {
+      write_hw_platform -fixed -include_bit -force -file $xsa
+      print_color 32 "Wrote $xsa"
+    }
   }
   export_bd {
     open_bd_design [get_files *.bd]

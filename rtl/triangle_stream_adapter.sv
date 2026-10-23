@@ -8,13 +8,19 @@
 // 96-byte stride a triangle arrives as a full beat and a half, or a half and a full beat. At a
 // 128-byte stride each record is followed by a 32-byte gap, which is dropped.
 //
-// Commands from the visibility DMA pass through on their way to the DataMover. Each is aligned down
-// to 64 bytes, its BTT lengthened by the half it now starts early, so the DataMover (no DRE) only
-// sees aligned commands. A side FIFO keeps, per command, whether its first half is that extra half
-// and how many halves the command holds; the gearbox drops the first and stops at the second, so it
-// does not depend on TKEEP or TLAST. A command's data always starts on a new beat.
+// The visibility DMA's commands go to the DataMover as they are. Without DRE the DataMover does not
+// realign: a command that starts on the upper half of a beat arrives with TKEEP clear over the lower
+// half of its first beat, and one that ends on a lower half with TKEEP clear over the upper half of
+// its last (its start and end strobes). So TKEEP alone says which halves are data. Every command
+// must hold whole strides, as the visibility DMA's do (BTT = triangles x stride), for the gearbox
+// to stay on record boundaries.
 //
-// Up to one triangle per beat: at a 96-byte stride the stream is 1.5 beats per triangle.
+// Four registered stages, each taking a beat every cycle while the next one can, so the stream runs
+// at a beat per cycle (two thirds of a triangle at a 96-byte stride) while the output is ready:
+//   input skid buffer   the DataMover's TREADY ends here
+//   half filter         the halves TKEEP keeps, packed to the front, and how many (0, 1 or 2)
+//   gearbox             three halves to a 768-bit record, at most one per beat
+//   output skid buffer  after triangle_unpack; the output's ready ends here
 
 `timescale 1ns / 1ps
 
@@ -27,16 +33,9 @@ module triangle_stream_adapter #(
     input logic aclk,
     input logic aresetn,
 
-    // Commands from the visibility DMA, and the same commands aligned for the DataMover
-    input  logic        s_cmd_tvalid,
-    output logic        s_cmd_tready,
-    input  logic [71:0] s_cmd_tdata,
-    output logic        m_cmd_tvalid,
-    input  logic        m_cmd_tready,
-    output logic [71:0] m_cmd_tdata,
-
     // DataMover stream
     input  logic [511:0] s_axis_tdata,
+    input  logic [ 63:0] s_axis_tkeep,
     input  logic         s_axis_tvalid,
     output logic         s_axis_tready,
 
@@ -46,10 +45,9 @@ module triangle_stream_adapter #(
     output frontend_data_in_t m_tri_data
 );
   localparam int HalfBits = 256;
+  localparam int HalfBytes = HalfBits / 8;
   localparam int RecordHalves = 3;  // 96 bytes
   localparam int StrideHalves = TRIANGLE_STRIDE / 32;
-  localparam int HalvesW = 19;  // a 23-bit BTT in 32-byte halves
-  localparam int SideFifoDepth = 16;  // commands the DataMover can hold, with margin
 
   initial begin
     if (TRIANGLE_STRIDE % 32 != 0 || StrideHalves < RecordHalves || StrideHalves > 4)
@@ -57,132 +55,154 @@ module triangle_stream_adapter #(
   end
 
   //
-  // Command alignment
+  // Input skid buffer: the beat, and per half whether TKEEP keeps it
   //
 
-  logic lead_half;
-  logic [22:0] aligned_btt;
-  logic side_full, side_empty, side_pop;
-  logic [HalvesW:0] side_in, side_out;
-  logic side_lead;
-  logic [HalvesW-1:0] side_halves;
+  logic [511:0] beat_data;
+  logic [1:0] beat_keep;
+  logic beat_valid, beat_ready;
 
-  assign lead_half = s_cmd_tdata[37];  // the command starts on the upper half of a beat
-  assign aligned_btt = s_cmd_tdata[22:0] + (lead_half ? 23'd32 : 23'd0);
-
-  always_comb begin
-    m_cmd_tdata = s_cmd_tdata;
-    m_cmd_tdata[63:32] = {s_cmd_tdata[63:38], 6'b0};
-    m_cmd_tdata[22:0] = aligned_btt;
-  end
-
-  assign m_cmd_tvalid = s_cmd_tvalid && !side_full;
-  assign s_cmd_tready = m_cmd_tready && !side_full;
-  assign side_in = {lead_half, HalvesW'(aligned_btt >> 5)};
-
-  sync_fifo #(
-      .DATA_WIDTH(HalvesW + 1),
-      .FIFO_DEPTH(SideFifoDepth)
-  ) u_side_fifo (
-      .clk(aclk),
-      .rst_n(aresetn),
-      .wr_en(s_cmd_tvalid && s_cmd_tready),
-      .data_i(side_in),
-      .rd_en(side_pop),
-      .data_o(side_out),
-      .fill_cnt(),
-      .fifo_full(side_full),
-      .fifo_almost_full(),
-      .fifo_empty(side_empty)
+  axis_skid_buffer #(
+      .WIDTH(512 + 2)
+  ) u_in_skid (
+      .aclk(aclk),
+      .aresetn(aresetn),
+      .s_axis_tdata({s_axis_tkeep[HalfBytes], s_axis_tkeep[0], s_axis_tdata}),
+      .s_axis_tvalid(s_axis_tvalid),
+      .s_axis_tready(s_axis_tready),
+      .m_axis_tdata({beat_keep, beat_data}),
+      .m_axis_tvalid(beat_valid),
+      .m_axis_tready(beat_ready)
   );
 
-  assign {side_lead, side_halves} = side_out;
+`ifndef SYNTHESIS
+  // 32-byte aligned addresses and lengths: TKEEP keeps each half whole or not at all.
+  function automatic bit partial(input logic [HalfBytes-1:0] keep);
+    return keep != '0 && keep != '1;
+  endfunction
+
+  always_ff @(posedge aclk) begin
+    if (aresetn && s_axis_tvalid && s_axis_tready &&
+        (partial(s_axis_tkeep[0+:HalfBytes]) || partial(s_axis_tkeep[HalfBytes+:HalfBytes])))
+      $error("triangle_stream_adapter: TKEEP %h keeps part of a half", s_axis_tkeep);
+  end
+`endif
+
+  //
+  // Half filter
+  //
+
+  logic filt_valid, filt_ready;
+  logic [1:0] filt_count;  // halves kept, in filt_half[0] then filt_half[1]
+  logic [HalfBits-1:0] filt_half[2];
+
+  assign beat_ready = !filt_valid || filt_ready;
+
+  always_ff @(posedge aclk) begin
+    if (!aresetn) filt_valid <= 1'b0;
+    else if (beat_ready) filt_valid <= beat_valid && beat_keep != 2'b00;
+  end
+
+  // The data loads on every free cycle; filt_valid qualifies it.
+  always_ff @(posedge aclk) begin
+    if (beat_ready) begin
+      filt_count <= 2'(beat_keep[0]) + 2'(beat_keep[1]);
+      filt_half[0] <= beat_keep[0] ? beat_data[0+:HalfBits] : beat_data[HalfBits+:HalfBits];
+      filt_half[1] <= beat_data[HalfBits+:HalfBits];
+    end
+  end
 
   //
   // Gearbox
   //
 
-  logic [HalvesW-1:0] halves_seen;  // of the current command, including its lead half
-  logic [1:0] rec_pos;  // half of the current record the next data half is
-  logic [HalfBits-1:0] rec_half[2];  // the record's first two halves
-  logic out_valid;
-  logic [RecordHalves*HalfBits-1:0] out_record;
+  logic [1:0] held;  // halves of the current record kept
+  logic [HalfBits-1:0] held_half[2];
+  logic [1:0] stride_pos;  // of the next half in its stride; RecordHalves and up are the gap
+  logic rec_valid, rec_ready;
+  logic [RecordHalves*HalfBits-1:0] rec_data;
 
-  logic beat_fire;
-  logic [HalvesW-1:0] halves_seen_next;
-  logic [1:0] rec_pos_next;
-  logic [HalfBits-1:0] rec_half_next[2];
+  logic filt_fire;
+  logic [1:0] held_next, stride_pos_next;
+  logic [HalfBits-1:0] held_half_next[2];
   logic emit;
   logic [RecordHalves*HalfBits-1:0] emit_record;
-  logic command_done;
 
-  // The output register is free next cycle, and the command the beat belongs to is known.
-  assign s_axis_tready = !side_empty && (!out_valid || m_tri_ready);
-  assign beat_fire = s_axis_tvalid && s_axis_tready;
+  assign filt_ready = !rec_valid || rec_ready;
+  assign filt_fire  = filt_valid && filt_ready;
 
-  // Walks the beat's two halves in address order. Record halves 0 and 1 are kept, half 2 completes
-  // the triangle, and half 3 (a 128-byte stride) is the gap.
+  // The kept halves in address order: two of a record are held, the third completes it. At most
+  // four halves (two held, two in), so at most one record per beat.
   always_comb begin
-    logic [HalvesW-1:0] position;
-    logic [HalfBits-1:0] half;
-    rec_pos_next = rec_pos;
-    rec_half_next = rec_half;
+    held_next = held;
+    held_half_next = held_half;
+    stride_pos_next = stride_pos;
     emit = 1'b0;
     emit_record = '0;
     for (int slot = 0; slot < 2; slot++) begin
-      position = halves_seen + HalvesW'(slot);
-      half = s_axis_tdata[slot*HalfBits+:HalfBits];
-      // Inside the command, and not the extra half its alignment added in front.
-      if (position < side_halves && !(position == '0 && side_lead)) begin
-        if (rec_pos_next < 2'(RecordHalves - 1)) begin
-          rec_half_next[rec_pos_next[0]] = half;
-        end else if (rec_pos_next == 2'(RecordHalves - 1)) begin
-          emit = 1'b1;
-          emit_record = {half, rec_half_next[1], rec_half_next[0]};
+      if (2'(slot) < filt_count) begin
+        if (stride_pos_next < 2'(RecordHalves)) begin
+          if (held_next == 2'(RecordHalves - 1)) begin
+            emit = 1'b1;
+            emit_record = {filt_half[slot], held_half_next[1], held_half_next[0]};
+            held_next = '0;
+          end else begin
+            held_half_next[held_next[0]] = filt_half[slot];
+            held_next = held_next + 2'd1;
+          end
         end
-        rec_pos_next = rec_pos_next == 2'(StrideHalves - 1) ? 2'd0 : rec_pos_next + 2'd1;
+        stride_pos_next = stride_pos_next == 2'(StrideHalves - 1) ? '0 : stride_pos_next + 2'd1;
       end
     end
-    halves_seen_next = halves_seen + HalvesW'(2);
-    command_done = halves_seen_next >= side_halves;
   end
-
-  assign side_pop = beat_fire && command_done;
 
   always_ff @(posedge aclk) begin
     if (!aresetn) begin
-      halves_seen <= '0;
-      rec_pos <= '0;
-      out_valid <= 1'b0;
+      held <= '0;
+      stride_pos <= '0;
+      rec_valid <= 1'b0;
     end else begin
-      if (m_tri_ready) out_valid <= 1'b0;
-      if (beat_fire) begin
-        rec_half <= rec_half_next;
-        if (emit) begin
-          out_valid  <= 1'b1;
-          out_record <= emit_record;
-        end
-        if (command_done) begin
-          halves_seen <= '0;
-          rec_pos <= '0;
-`ifndef SYNTHESIS
-          if (rec_pos_next != '0)
-            $error("triangle_stream_adapter: command of %0d halves ends inside a triangle",
-                   side_halves);
-`endif
-        end else begin
-          halves_seen <= halves_seen_next;
-          rec_pos <= rec_pos_next;
-        end
+      if (rec_ready) rec_valid <= 1'b0;
+      if (filt_fire) begin
+        held <= held_next;
+        stride_pos <= stride_pos_next;
+        if (emit) rec_valid <= 1'b1;
       end
     end
   end
 
-  assign m_tri_valid = out_valid;
+  always_ff @(posedge aclk) begin
+    if (filt_fire) begin
+      held_half <= held_half_next;
+      if (emit) rec_data <= emit_record;
+    end
+  end
+
+  //
+  // Output skid buffer
+  //
+
+  frontend_data_in_t rec_tri;
+  logic [$bits(frontend_data_in_t)-1:0] out_bits;
 
   triangle_unpack u_unpack (
-      .packed_triangle(out_record),
-      .triangle(m_tri_data)
+      .packed_triangle(rec_data),
+      .triangle(rec_tri)
   );
+
+  axis_skid_buffer #(
+      .WIDTH($bits(frontend_data_in_t))
+  ) u_out_skid (
+      .aclk(aclk),
+      .aresetn(aresetn),
+      .s_axis_tdata(rec_tri),
+      .s_axis_tvalid(rec_valid),
+      .s_axis_tready(rec_ready),
+      .m_axis_tdata(out_bits),
+      .m_axis_tvalid(m_tri_valid),
+      .m_axis_tready(m_tri_ready)
+  );
+
+  assign m_tri_data = frontend_data_in_t'(out_bits);
 
 endmodule

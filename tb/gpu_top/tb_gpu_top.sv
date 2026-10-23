@@ -2,28 +2,42 @@
 
 import gpu_types_pkg::*;
 
-// gpu_top with dummy_core, driven through its CPU port as software would:
+// gpu_top driven through its CPU port as software would:
 //
 //   1. register access through the crossbar to every slave
-//   2. per tile of a 2 x 2 tile image: set the frontend tile, run the visibility DMA over the
-//      visibility buffer, wait for the core to go idle, run the tile DMA
-//   3. check every pixel the tile DMA wrote (dummy_core's pattern, B = the triangles the tile got)
+//   2. per tile: set the frontend tile, run the visibility DMA over the visibility buffer, wait for
+//      the core to go idle, run the tile DMA
+//   3. with dummy_core, check every pixel the tile DMA wrote (its pattern, B = the triangles the
+//      tile got)
 //
 // Every triangle that reaches the core is checked against the next one the tile should get, so the
 // visibility DMA, the DataMover (its simulation model), triangle_stream_adapter and the clock
 // crossing are checked end to end. The image is also written to +OUT (default gpu_top.tga).
-module tb_gpu_top;
+//
+// DUMMY_CORE = 1: 40 random records over a 2 x 2 tile image.
+// DUMMY_CORE = 0 (make DUMMY=0): raster_core, rendering raster_sw's scene (+SCENE, made by
+// `make gpu_top_scene` in dv/raster_sw: its visibility words and gpu_triangle_t records) at
+// 1280 x 720 in 10 x 6 tiles. The tile DMA's CLEAR first fills the frame buffers with raster_sw's
+// clear colour, each write-back leaves it behind, and the z-buffers are cleared before each tile.
+// The image is written, and make compares it with raster_sw's. Then a second write-back of the
+// first tile must read the clear colour everywhere.
+module tb_gpu_top #(
+    parameter bit DUMMY_CORE = 1'b1
+);
   localparam int TriangleStride = 96;  // as AxiVisibilityDma addresses them
-  localparam int Triangles = 40;
-  localparam int TilesX = 2, TilesY = 2;
-  localparam int Width = TilesX * TILE_SIZE_X, Height = TilesY * TILE_SIZE_Y;
+  localparam int RandomTriangles = 40;
+  localparam int TilesX = DUMMY_CORE ? 2 : 10, TilesY = DUMMY_CORE ? 2 : 6;
+  localparam int Width = TilesX * TILE_SIZE_X;
+  localparam int Height = DUMMY_CORE ? TilesY * TILE_SIZE_Y : 720;  // the rows written out
   localparam int RowBytes = Width * 4;
+  localparam logic [31:0] ClearColor = 32'hFF636363;  // raster_sw's clear colour (ARGB)
 
   // Memory map of the three behavioural memories (byte addresses, inside each RAM).
   localparam logic [31:0] VbBase = 32'h0000_1000;
   localparam logic [31:0] TriBase = 32'h0000_8000;
   localparam logic [31:0] ImgBase = 32'h0001_0000;
-  localparam int VbAddrW = 16, TriAddrW = 18, ImgAddrW = 20;
+  localparam int VbAddrW = 16, TriAddrW = 18, ImgAddrW = DUMMY_CORE ? 20 : 22;
+  localparam int MaxTriangles = ((1 << TriAddrW) - int'(TriBase)) / TriangleStride;
 
   // Control map
   localparam logic [11:0] FrontendStatus = 12'h800, FrontendTileX = 12'h804;
@@ -33,6 +47,7 @@ module tb_gpu_top;
   localparam logic [11:0] TileCtrl = 12'hF00, TileStatus = 12'hF04, TileBase = 12'hF08;
   localparam logic [11:0] TileStride = 12'hF10, TileTilesX = 12'hF14, TileTilesY = 12'hF18;
   localparam logic [11:0] TileCur = 12'hF1C, TileIrqRaw = 12'hF44, TileIrqClear = 12'hF40;
+  localparam logic [11:0] TileClearValue = 12'hF28;
 
   function automatic logic [11:0] thread_reg(input int lane, input int offset);
     return 12'(12'h820 + 32 * lane + offset);
@@ -70,7 +85,7 @@ module tb_gpu_top;
   logic vis_irq, tile_irq, tri_err;
 
   gpu_top #(
-      .DUMMY_CORE(1'b1),
+      .DUMMY_CORE(DUMMY_CORE),
       .TRIANGLE_STRIDE(TriangleStride)
   ) dut (
       .aclk(aclk),
@@ -310,11 +325,13 @@ module tb_gpu_top;
   // Scene: triangles, their tile masks, and what each tile must receive
   // -------------------------------------------------------------------------
 
-  logic [767:0] records[Triangles];
-  logic [63:0] tile_mask[Triangles];
-  frontend_data_in_t expected[Triangles];
+  int triangles;
+  logic [767:0] records[];
+  logic [63:0] tile_mask[];  // the triangle's visibility word: bit t set if tile t gets it
+  frontend_data_in_t expected[];
 
-  // Runs and gaps that differ per tile: some tiles get every triangle, some none in a stretch.
+  // Random records: runs and gaps that differ per tile, some tiles get every triangle, some none
+  // in a stretch.
   function automatic bit visible(input int tri_idx, input int tile);
     case (tile)
       0: return 1'b1;
@@ -327,9 +344,47 @@ module tb_gpu_top;
   function automatic int tile_triangles(input int tile);
     int n;
     n = 0;
-    for (int t = 0; t < Triangles; t++) if (visible(t, tile)) n++;
+    for (int t = 0; t < triangles; t++) if (tile_mask[t][tile]) n++;
     return n;
   endfunction
+
+  task automatic random_scene();
+    triangles = RandomTriangles;
+    records = new[triangles];
+    tile_mask = new[triangles];
+    for (int t = 0; t < triangles; t++) begin
+      for (int w = 0; w < 24; w++) records[t][32*w+:32] = $urandom();
+      tile_mask[t] = '0;
+      for (int k = 0; k < TilesX * TilesY; k++) tile_mask[t][k] = visible(t, k);
+    end
+  endtask
+
+  // raster_sw's scene: per line, the visibility word, then the record as 24 words in memory order.
+  task automatic load_scene(input string path);
+    int fd;
+    logic [63:0] mask;
+    logic [31:0] word;
+    fd = $fopen(path, "r");
+    if (fd == 0) $fatal(1, "cannot open scene %s (make gpu_top_scene in dv/raster_sw)", path);
+    records = new[MaxTriangles];
+    tile_mask = new[MaxTriangles];
+    triangles = 0;
+    while ($fscanf(fd, "%h", mask) == 1) begin
+      if (triangles == MaxTriangles)
+        $fatal(1, "scene %s: more than %0d triangles", path, MaxTriangles);
+      tile_mask[triangles] = mask;
+      for (int w = 0; w < 24; w++) begin
+        if ($fscanf(fd, "%h", word) != 1)
+          $fatal(1, "scene %s: triangle %0d is short", path, triangles);
+        records[triangles][32*w+:32] = word;
+      end
+      triangles++;
+    end
+    $fclose(fd);
+    records = new[triangles] (records);
+    tile_mask = new[triangles] (tile_mask);
+    $display("scene %s: %0d triangles", path, triangles);
+  endtask
 
   // The record as the core must receive it, through the RTL's own unpack.
   logic [767:0] unpack_in;
@@ -339,19 +394,19 @@ module tb_gpu_top;
       .triangle(unpack_out)
   );
 
-  task automatic build_scene();
+  task automatic build_scene(input string scene_path);
     logic [31:0] addr;
     logic [7:0] value;
-    for (int t = 0; t < Triangles; t++) begin
-      for (int w = 0; w < 24; w++) records[t][32*w+:32] = $urandom();
-      tile_mask[t] = '0;
-      for (int k = 0; k < TilesX * TilesY; k++) tile_mask[t][k] = visible(t, k);
+    if (DUMMY_CORE) random_scene();
+    else load_scene(scene_path);
+    expected = new[triangles];
+    for (int t = 0; t < triangles; t++) begin
       unpack_in = records[t];
       #1;
       expected[t] = unpack_out;
     end
     // Triangles every TriangleStride bytes; the gap after each record is filled with noise.
-    for (int t = 0; t < Triangles; t++) begin
+    for (int t = 0; t < triangles; t++) begin
       for (int b = 0; b < TriangleStride; b++) begin
         addr = TriBase + 32'(t * TriangleStride + b);
         value = b < 96 ? records[t][8*b+:8] : 8'($urandom());
@@ -359,10 +414,31 @@ module tb_gpu_top;
       end
     end
     // One 64-bit tile mask per triangle, two per 128-bit word.
-    for (int t = 0; t < Triangles; t += 2) begin
+    for (int t = 0; t < triangles; t += 2) begin
       addr = VbBase + 32'(8 * t);
-      u_vb_ram.mem[addr[VbAddrW-1:4]] = {t + 1 < Triangles ? tile_mask[t+1] : 64'd0, tile_mask[t]};
+      u_vb_ram.mem[addr[VbAddrW-1:4]] = {t + 1 < triangles ? tile_mask[t+1] : 64'd0, tile_mask[t]};
     end
+  endtask
+
+  // -------------------------------------------------------------------------
+  // Frame buffers and z-buffers
+  // -------------------------------------------------------------------------
+
+  // The tile DMA's CLEAR: color into every frame buffer word, STATUS.CLEAR_BUSY until done. The
+  // write-backs then leave CLEAR_VALUE behind them.
+  task automatic clear_frame_buffers(input logic [31:0] color);
+    axi_write(TileClearValue, color);
+    axi_write(TileCtrl, 32'h8);  // CLEAR
+    expect_read(TileStatus, 32'h10, 32'h10, "tile DMA CLEAR_BUSY after CLEAR");
+    wait_bits(TileStatus, 32'h10, 32'h0, "tile DMA CLEAR_BUSY");
+  endtask
+
+  // Through the thread registers: ZBUF_CLEAR reads 1 until the clear is done.
+  task automatic clear_zbuffers();
+    for (int lane = 0; lane < NUM_OF_THREADS; lane++) axi_write(thread_reg(lane, 4), 32'h1);
+    repeat (8) @(posedge aclk);  // the clear pulse crosses into the thread clock
+    for (int lane = 0; lane < NUM_OF_THREADS; lane++)
+      wait_bits(thread_reg(lane, 4), 32'h1, 32'h0, $sformatf("thread %0d z-buffer clear", lane));
   endtask
 
   // -------------------------------------------------------------------------
@@ -484,6 +560,7 @@ module tb_gpu_top;
     expect_read(VisTriCount, 32'hFFFF_FFFF, 32'd1234, "visibility DMA TRI_COUNT");
     axi_write(TileStride, 32'h0000_0400);
     expect_read(TileStride, 32'hFFFF_FFFF, 32'h0000_0400, "tile DMA STRIDE");
+    expect_read(TileClearValue, 32'hFFFF_FFFF, 32'h0, "tile DMA CLEAR_VALUE after reset");
     $display("[%0t] register access through the crossbar: %0d errors", $time, errors);
   endtask
 
@@ -510,16 +587,18 @@ module tb_gpu_top;
     int tile;
     tile = ty * TilesX + tx;
     tile_order.delete();
-    for (int t = 0; t < Triangles; t++) if (visible(t, tile)) tile_order.push_back(t);
+    for (int t = 0; t < triangles; t++) if (tile_mask[t][tile]) tile_order.push_back(t);
     received = 0;
     current_tile = tile;
+
+    if (!DUMMY_CORE) clear_zbuffers();
 
     axi_write(FrontendTileX, tx);
     axi_write(FrontendTileY, ty);
 
     axi_write(VisVbBase, VbBase);
     axi_write(VisTriBase, TriBase);
-    axi_write(VisTriCount, Triangles);
+    axi_write(VisTriCount, triangles);
     axi_write(VisTileIndex, tile);
     axi_write(VisCtrl, 32'h1);  // START
     wait_bits(VisStatus, 32'h2, 32'h2, "visibility DMA DONE");
@@ -531,6 +610,12 @@ module tb_gpu_top;
       error($sformatf("tile %0d: the core received %0d triangles, expected %0d", tile, received,
                       tile_order.size()));
 
+    write_back_tile(tx, ty);
+    $display("[%0t] tile (%0d, %0d): %0d triangles", $time, tx, ty, received);
+  endtask
+
+  // The tile DMA: the frame buffers to tile (tx, ty) of the image.
+  task automatic write_back_tile(input int tx, input int ty);
     axi_write(TileBase, ImgBase);
     axi_write(TileStride, RowBytes);
     axi_write(TileTilesX, TilesX);
@@ -540,8 +625,24 @@ module tb_gpu_top;
     wait_bits(TileIrqRaw, 32'h1, 32'h1, "tile DMA done");
     axi_write(TileIrqClear, 32'h1);
     expect_read(TileStatus, 32'h1, 32'h0, "tile DMA BUSY after done");
+  endtask
 
-    $display("[%0t] tile (%0d, %0d): %0d triangles", $time, tx, ty, received);
+  // Each write-back left CLEAR_VALUE behind it: a second write-back of the first tile, with nothing
+  // rendered in between, reads only that.
+  task automatic check_cleared();
+    int bad;
+    write_back_tile(0, 0);
+    bad = 0;
+    for (int y = 0; y < TILE_SIZE_Y; y++)
+      for (int x = 0; x < TILE_SIZE_X; x++)
+        if (image_pixel(x, y) !== ClearColor) begin
+          if (bad < 8)
+            error($sformatf("after the write-back, pixel (%0d, %0d): %08h, expected %08h", x, y,
+                            image_pixel(x, y), ClearColor));
+          bad++;
+        end
+    $display("[%0t] frame buffers after a write-back: %0d of %0d pixels not the clear value",
+             $time, bad, TILE_SIZE_X * TILE_SIZE_Y);
   endtask
 
   function automatic logic [31:0] image_pixel(input int x, input int y);
@@ -587,13 +688,15 @@ module tb_gpu_top;
   endtask
 
   initial begin : run
-    string out_path;
+    string out_path, scene_path;
     out_path = "gpu_top.tga";
+    scene_path = "gpu_top_scene.hex";
     void'($value$plusargs("OUT=%s", out_path));
+    void'($value$plusargs("SCENE=%s", scene_path));
     errors = 0;
 
     #20;  // after axi_ram's own initial blocks
-    build_scene();
+    build_scene(scene_path);
     repeat (10) @(posedge aclk);
     aresetn = 1;
     frontend_rst_n = 1;
@@ -601,14 +704,17 @@ module tb_gpu_top;
     repeat (10) @(posedge aclk);
 
     register_access();
+    clear_frame_buffers(ClearColor);  // dummy_core ignores the writes, but not CLEAR_BUSY
     for (int ty = 0; ty < TilesY; ty++)
       for (int tx = 0; tx < TilesX; tx++) render_tile(tx, ty);
-    check_image();
+    if (DUMMY_CORE) check_image();
+    else $display("[%0t] image not checked here (make compares it with raster_sw's)", $time);
     write_tga(out_path);
+    if (!DUMMY_CORE) check_cleared();
     if (tri_err) error("triangle DMA reported an error");
 
     if (errors == 0) $display("PASS: %0d tiles, %0d triangles, wrote %s", TilesX * TilesY,
-                              Triangles, out_path);
+                              triangles, out_path);
     else $display("FAIL: %0d errors", errors);
     $finish;
   end

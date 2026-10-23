@@ -103,11 +103,29 @@ class Rasterizer
     void dumpFrontendInputCsv(const std::string &path) const;
     void dumpFrontendExpectedCsv(const std::string &path) const;
     void dumpRasterCoreCsv(const std::string &path) const;
+    // gpu_top's input, for tb/gpu_top: one line per triangle a bin got, in submission order, with
+    // its 64-bit visibility word (bit by * num_bins_x + bx) and its gpu_triangle_t record.
+    void dumpGpuTopScene(const std::string &path) const;
 
     // Execute the binned pipeline
     void flush(bool dump_bins);
 
   private:
+    // A triangle as gpu_top gets it: the bins it goes to, as the visibility DMA reads them.
+    struct SceneTriangle
+    {
+        std::array<Vertex_ScreenSpace, 3> vertices;
+        uint64_t visibility;
+    };
+    std::vector<SceneTriangle> scene_triangles; // filled by rasterizeBins
+
+    // The render state of every triangle, in gpu_types_pkg.sv's encodings.
+    struct RasterCoreState
+    {
+        int texId, modeU, modeV, textureFunction, sfactor, dfactor, depthFunc;
+    };
+    RasterCoreState rasterCoreState() const;
+
     void binningPass();
     void rasterizeBins(bool dump_bins);
     void recordFrontendVector(const Vertex_ScreenSpace &v0, const Vertex_ScreenSpace &v1, const Vertex_ScreenSpace &v2,

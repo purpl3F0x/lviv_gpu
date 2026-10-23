@@ -1,6 +1,7 @@
 #include "rasterizer.h"
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -9,6 +10,8 @@
 
 #include <ap_fixed.h>
 #include <ap_int.h>
+
+#include "gpu_triangle.h" // sdk/include: the record layout gpu_top unpacks
 
 struct ColorU8
 {
@@ -84,7 +87,7 @@ void Rasterizer::dumpFrontendExpectedCsv(const std::string &path) const
 // One row per (triangle, bin), in bin order: everything raster_core's frontend_data_in_t takes. The
 // render state is the rasterizer's global state, written per row because the hardware takes it per
 // triangle. Enum columns use the RTL encodings (gpu_types_pkg.sv); colours are ARGB hex.
-void Rasterizer::dumpRasterCoreCsv(const std::string &path) const
+Rasterizer::RasterCoreState Rasterizer::rasterCoreState() const
 {
     // gpu_types_pkg.sv encodings
     constexpr int TexIdNone = 0x80, TexIdBound = 0;
@@ -94,12 +97,20 @@ void Rasterizer::dumpRasterCoreCsv(const std::string &path) const
     constexpr int DepthLess = 1; // rasterizeTriangle passes z < stored
 
     const Texture *texture = textureUnit.enabled ? textureUnit.boundTexture : nullptr;
-    const int texId = texture ? TexIdBound : TexIdNone;
-    const int textureFunction = texture ? static_cast<int>(textureUnit.envMode) : FragmentColor;
-    const int modeU = texture && texture->wrapModeS == TexWrapMode::CLAMP ? TextureClamp : TextureTile;
-    const int modeV = texture && texture->wrapModeT == TexWrapMode::CLAMP ? TextureClamp : TextureTile;
-    const int sfactor = alphaBlendingEnabled ? BlendSrcAlpha : BlendOne;
-    const int dfactor = alphaBlendingEnabled ? BlendOneMinusSrcAlpha : BlendZero;
+    return {
+        texture ? TexIdBound : TexIdNone,
+        texture && texture->wrapModeS == TexWrapMode::CLAMP ? TextureClamp : TextureTile,
+        texture && texture->wrapModeT == TexWrapMode::CLAMP ? TextureClamp : TextureTile,
+        texture ? static_cast<int>(textureUnit.envMode) : FragmentColor,
+        alphaBlendingEnabled ? BlendSrcAlpha : BlendOne,
+        alphaBlendingEnabled ? BlendOneMinusSrcAlpha : BlendZero,
+        DepthLess,
+    };
+}
+
+void Rasterizer::dumpRasterCoreCsv(const std::string &path) const
+{
+    const RasterCoreState state = rasterCoreState();
 
     std::ofstream csv(path);
     if (!csv)
@@ -122,8 +133,45 @@ void Rasterizer::dumpRasterCoreCsv(const std::string &path) const
                 << vertex.position.w << ',' << vertex.texcoord_over_w.x << ',' << vertex.texcoord_over_w.y << ','
                 << std::hex << std::setw(8) << std::setfill('0') << vertex.color << std::dec << std::setfill(' ');
         }
-        csv << ',' << texId << ',' << modeU << ',' << modeV << ',' << textureFunction << ',' << sfactor << ','
-            << dfactor << ',' << DepthLess << '\n';
+        csv << ',' << state.texId << ',' << state.modeU << ',' << state.modeV << ',' << state.textureFunction << ','
+            << state.sfactor << ',' << state.dfactor << ',' << state.depthFunc << '\n';
+    }
+}
+
+void Rasterizer::dumpGpuTopScene(const std::string &path) const
+{
+    if (num_bins_x * num_bins_y > 64)
+        throw std::runtime_error("gpu_top scene: more than 64 bins for a 64-bit visibility word");
+    const RasterCoreState state = rasterCoreState();
+
+    std::ofstream out(path);
+    if (!out)
+        throw std::runtime_error("Could not open gpu_top scene: " + path);
+
+    // The record as words in memory (little-endian), as tb/gpu_top loads them with $fscanf.
+    out << std::hex << std::setfill('0');
+    for (const SceneTriangle &triangle : scene_triangles)
+    {
+        gpu_triangle_t record{};
+        for (int v = 0; v < 3; ++v)
+        {
+            const Vertex_ScreenSpace &vertex = triangle.vertices[v];
+            record.v[v] = {vertex.position.x, vertex.position.y,       vertex.position.z,      vertex.position.w,
+                           vertex.color,      vertex.texcoord_over_w.x, vertex.texcoord_over_w.y};
+        }
+        record.tex_id = static_cast<uint8_t>(state.texId);
+        record.texture_mode =
+            static_cast<uint8_t>(state.modeU << GPU_TEXTURE_MODE_U_SHIFT | state.modeV << GPU_TEXTURE_MODE_V_SHIFT);
+        record.texture_function = static_cast<uint8_t>(state.textureFunction);
+        record.blend = static_cast<uint8_t>(state.sfactor << GPU_SFACTOR_OP_SHIFT | state.dfactor << GPU_DFACTOR_OP_SHIFT);
+        record.depth_func = static_cast<uint8_t>(state.depthFunc);
+
+        uint32_t words[GPU_TRIANGLE_BYTES / 4];
+        std::memcpy(words, &record, sizeof record);
+        out << std::setw(16) << triangle.visibility;
+        for (uint32_t word : words)
+            out << ' ' << std::setw(8) << word;
+        out << '\n';
     }
 }
 
@@ -263,6 +311,9 @@ extern void savePNG(const Framebuffer &fb, const char *filename);
 
 void Rasterizer::rasterizeBins(bool dump_bins)
 {
+    // Which bins each triangle goes to, for the gpu_top scene (only up to 64 bins).
+    std::vector<uint64_t> visibility(triangle_list.size(), 0);
+
     for (int y = 0; y < num_bins_y; ++y)
     {
         for (int x = 0; x < num_bins_x; ++x)
@@ -298,6 +349,8 @@ void Rasterizer::rasterizeBins(bool dump_bins)
                 if (bin.triangle_bits[i])
                 {
                     bin_empty = false;
+                    if (const int bit = y * num_bins_x + x; bit < 64)
+                        visibility[i] |= uint64_t{1} << bit;
                     const auto &tri = triangle_list[i];
                     rasterizeTriangle(tri[0], tri[1], tri[2], binMinX, binMinY, binMaxX, binMaxY, tileColor.data(),
                                       tileDepth.data());
@@ -329,6 +382,10 @@ void Rasterizer::rasterizeBins(bool dump_bins)
             // }
         }
     }
+
+    for (size_t i = 0; i < triangle_list.size(); ++i)
+        if (visibility[i])
+            scene_triangles.push_back({triangle_list[i], visibility[i]});
 }
 
 // -----------------------------------------------------------------------------

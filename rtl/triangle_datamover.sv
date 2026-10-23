@@ -5,9 +5,10 @@
 // DRE), or a behavioural model of it under Verilator, Icarus or SIMULATION, which cannot run the IP.
 //
 // The model behaves as gpu_top uses the IP: one command at a time; INCR bursts of up to 16 beats
-// that do not cross 4 KiB; the stream beat by beat, TKEEP marking the bytes of a partial last beat,
-// TLAST on the last beat of a command whose EOF bit is set; then one status byte (OKAY, SLVERR,
-// INTERR, TAG). Commands must start 64-byte aligned (triangle_stream_adapter aligns them).
+// that do not cross 4 KiB, from the beat the command starts in; the stream beat by beat, not
+// realigned (no DRE), TKEEP marking the command's bytes in its first and last beats (the IP's start
+// and end strobes); TLAST on the last beat of a command whose EOF bit is set; then one status byte
+// (OKAY, SLVERR, INTERR, TAG).
 
 `timescale 1ns / 1ps
 
@@ -114,7 +115,8 @@ module triangle_datamover (
   } state_t;
 
   state_t state;
-  logic [31:0] addr;  // next burst
+  logic [31:0] addr;  // next burst, beat aligned
+  logic [5:0] lead;  // bytes of the next beat before the command's (its start offset, then 0)
   logic [22:0] bytes_left;  // of the command
   logic eof, error, interr;
   logic [3:0] tag;
@@ -123,8 +125,15 @@ module triangle_datamover (
   // Beats left in the command, and beats to the next 4 KiB boundary (a burst must not cross it).
   logic [17:0] beats_left;
   logic [6:0] beats_to_4k;
-  assign beats_left  = 18'((bytes_left + BeatBytes - 1) / BeatBytes);
+  assign beats_left  = 18'((24'(lead) + 24'(bytes_left) + 24'(BeatBytes - 1)) / BeatBytes);
   assign beats_to_4k = 7'((4096 - addr[11:0]) / BeatBytes);
+
+  // The command's bytes in the next beat, and their byte lanes.
+  logic [6:0] beat_room, beat_bytes;
+  logic [64:0] beat_keep;
+  assign beat_room  = 7'(BeatBytes) - 7'(lead);
+  assign beat_bytes = bytes_left > 23'(beat_room) ? beat_room : 7'(bytes_left);
+  assign beat_keep  = ((65'd1 << beat_bytes) - 65'd1) << lead;
 
   always_comb begin
     burst_beats = MaxBurstBeats;
@@ -147,8 +156,8 @@ module triangle_datamover (
   assign m_axis_tdata  = m_axi_rdata;
   assign m_axis_tvalid = state == Data && m_axi_rvalid;
   assign m_axi_rready  = state == Data && m_axis_tready;
-  assign m_axis_tkeep  = bytes_left >= BeatBytes ? '1 : (64'd1 << bytes_left) - 64'd1;
-  assign m_axis_tlast  = eof && bytes_left <= BeatBytes;
+  assign m_axis_tkeep  = beat_keep[63:0];
+  assign m_axis_tlast  = eof && bytes_left == 23'(beat_bytes);
 
   // OKAY, SLVERR, DECERR, INTERR, TAG
   assign m_sts_tvalid  = state == Status;
@@ -162,7 +171,8 @@ module triangle_datamover (
       case (state)
         Idle:
         if (s_cmd_tvalid) begin
-          addr <= s_cmd_tdata[63:32];
+          addr <= {s_cmd_tdata[63:38], 6'b0};
+          lead <= s_cmd_tdata[37:32];
           bytes_left <= s_cmd_tdata[22:0];
           eof <= s_cmd_tdata[30];
           tag <= s_cmd_tdata[67:64];
@@ -170,17 +180,15 @@ module triangle_datamover (
           // The IP reports a zero BTT as an internal error.
           interr <= s_cmd_tdata[22:0] == '0;
           state <= s_cmd_tdata[22:0] == '0 ? Status : Address;
-          if (s_cmd_tdata[37:32] != '0)
-            $error("triangle_datamover model: command address %h is not 64-byte aligned",
-                   s_cmd_tdata[63:32]);
         end
         Address: if (m_axi_arready) state <= Data;
         Data:
         if (m_axi_rvalid && m_axis_tready) begin
           addr <= addr + BeatBytes;
-          bytes_left <= bytes_left > BeatBytes ? bytes_left - BeatBytes : '0;
+          lead <= '0;
+          bytes_left <= bytes_left - 23'(beat_bytes);
           if (m_axi_rresp != 2'b00) error <= 1'b1;
-          if (m_axi_rlast) state <= bytes_left > BeatBytes ? Address : Status;
+          if (m_axi_rlast) state <= bytes_left > 23'(beat_bytes) ? Address : Status;
         end
         Status:
         if (m_sts_tready) begin

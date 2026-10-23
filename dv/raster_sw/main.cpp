@@ -134,13 +134,22 @@ void savePNG(const Framebuffer &fb, const char *filename)
 int main(int argc, char **argv)
 {
     bool alphaBlend = false;
+    bool noTexture = false;
     std::string frontendInputsCsv;
     std::string frontendExpectedCsv;
     std::string rasterCoreCsv;
+    std::string gpuTopScene;
+    std::string referencePng = "output_ref.png";
     for (int argument = 1; argument < argc; ++argument)
     {
         if (std::string(argv[argument]) == "--alpha-blend")
             alphaBlend = true;
+        else if (std::string(argv[argument]) == "--no-texture")
+            noTexture = true;
+        else if (std::string(argv[argument]) == "--gpu-top-scene" && argument + 1 < argc)
+            gpuTopScene = argv[++argument];
+        else if (std::string(argv[argument]) == "--ref-png" && argument + 1 < argc)
+            referencePng = argv[++argument];
         else if (std::string(argv[argument]) == "--frontend-inputs-csv" && argument + 1 < argc)
             frontendInputsCsv = argv[++argument];
         else if (std::string(argv[argument]) == "--frontend-expected-csv" && argument + 1 < argc)
@@ -150,8 +159,8 @@ int main(int argc, char **argv)
         else
         {
             std::cerr << "Usage: " << argv[0]
-                      << " [--alpha-blend] [--frontend-inputs-csv PATH --frontend-expected-csv PATH]"
-                         " [--raster-core-csv PATH]\n";
+                      << " [--alpha-blend] [--no-texture] [--frontend-inputs-csv PATH --frontend-expected-csv PATH]"
+                         " [--raster-core-csv PATH] [--gpu-top-scene PATH] [--ref-png PATH]\n";
             return 1;
         }
     }
@@ -223,8 +232,12 @@ int main(int argc, char **argv)
     Texture myTex;
     int tw, th, tcomp;
     const char *texture_path = "texture_64x64.jpg";
-    unsigned char *data = stbi_load(texture_path, &tw, &th, &tcomp, 4);
-    if (data)
+    unsigned char *data = noTexture ? nullptr : stbi_load(texture_path, &tw, &th, &tcomp, 4);
+    if (noTexture)
+    {
+        std::cout << "Texture disabled (--no-texture)" << std::endl;
+    }
+    else if (data)
     {
         myTex.width = tw;
         myTex.height = th;
@@ -282,6 +295,11 @@ int main(int argc, char **argv)
         rasterizer.dumpRasterCoreCsv(rasterCoreCsv);
         std::cout << "Wrote " << rasterCoreCsv << std::endl;
     }
+    if (!gpuTopScene.empty())
+    {
+        rasterizer.dumpGpuTopScene(gpuTopScene);
+        std::cout << "Wrote " << gpuTopScene << std::endl;
+    }
 
     auto end_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> render_ms = end_time - start_time;
@@ -292,10 +310,10 @@ int main(int argc, char **argv)
     // Verilator compare mode: save the DUT image and the software reference
     // image side by side for visual diffing.
     savePNG(fb, "output_dut.png");
-    threadCmpSaveReferenceImage("output_ref.png");
+    threadCmpSaveReferenceImage(referencePng.c_str());
 #else
     // Standalone software mode: framebuffer itself is the software reference.
-    savePNG(fb, "output_ref.png");
+    savePNG(fb, referencePng.c_str());
 #endif
 
     std::cout << "Pixel draw count: " << rasterizer.pixel_draw_count << "\n";

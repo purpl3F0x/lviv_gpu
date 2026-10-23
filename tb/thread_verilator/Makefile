@@ -43,6 +43,7 @@ VERILATOR_CFLAGS = --CFLAGS -std=c++20 \
                    --CFLAGS -DRASTERIZER_EXTERNAL_RASTERIZE_TRIANGLE \
                    --CFLAGS -I$(RASTER_SW_DIR) \
                    --CFLAGS -I$(HLS_INCLUDE_DIR) \
+                   --CFLAGS -I$(ROOT_DIR)/sdk/include \
                    --CFLAGS -Wno-deprecated-enum-enum-conversion
 
 VERILATOR_WARNINGS = -Wno-SHORTREAL

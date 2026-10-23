@@ -25,6 +25,10 @@ XVHDL = $(VIVADO_BIN)/xvhdl$(TOOL_EXT)
 XELAB = $(VIVADO_BIN)/xelab$(TOOL_EXT)
 XSIM = $(VIVADO_BIN)/xsim$(TOOL_EXT)
 
+# Vitis of the same release, next to Vivado in the install (override with VITIS_BIN=<vitis>/bin).
+VITIS_BIN ?= $(abspath $(VIVADO_BIN)/../../Vitis/bin)
+VITIS = $(VITIS_BIN)/vitis$(TOOL_EXT)
+
 # Xilinx IP configuration (FP units, DSP macro), used by both the simulation and synthesis flows.
 XILINX_IPS_TCL = $(VIVADO_MK_DIR)/xilinx_ips.tcl
 

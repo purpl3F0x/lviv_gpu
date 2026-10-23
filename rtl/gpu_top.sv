@@ -7,13 +7,14 @@
 //   CPU ── s_axi_ctrl ──► Axi4ToApbXbar ──► APB: frontend, threads 0..3, texture LUT,
 //                                              tile DMA, visibility DMA
 //   visibility DMA ◄── m_axi_vb (PS DDR): one 64-bit tile mask per triangle
-//        │ DataMover commands (aligned by the adapter)
+//        │ DataMover commands
 //        ▼
 //   triangle DMA (DataMover) ◄── m_axi_tri (PL DDR, 512-bit)
-//        │ 512-bit stream
+//        │ 512-bit stream, TKEEP marking the halves that are data
 //        ▼
 //   triangle_stream_adapter ──► async FIFO (aclk → frontend_clk) ──► core
-//   core frame buffers ──► tile DMA ── m_axi_tile (PS DDR): the finished tile
+//   core frame buffers ──► tile DMA ── m_axi_tile (PS DDR): the finished tile; the tile DMA writes
+//                          CLEAR_VALUE back over what it read, and fills them with it on CLEAR
 //
 // Control map (4 KiB, from Axi4ToApbXbar): 0x000 texture LUT, 0x800 frontend, 0x820 + 0x20 * n
 // thread n, 0xF00 tile DMA, 0xF80 visibility DMA.
@@ -292,11 +293,12 @@ module gpu_top #(
   // Visibility DMA, triangle DMA and the triangle stream
   //
 
-  logic        vis_cmd_tvalid, vis_cmd_tready, dm_cmd_tvalid, dm_cmd_tready;
-  logic [71:0] vis_cmd_tdata, dm_cmd_tdata;
+  logic        vis_cmd_tvalid, vis_cmd_tready;
+  logic [71:0] vis_cmd_tdata;
   logic dm_sts_tvalid, dm_sts_tready;
   logic [7:0] dm_sts_tdata;
   logic [511:0] tri_stream_tdata;
+  logic [63:0] tri_stream_tkeep;
   logic tri_stream_tvalid, tri_stream_tready;
 
   AxiVisibilityDma u_vis_dma (
@@ -349,13 +351,8 @@ module gpu_top #(
   ) u_tri_adapter (
       .aclk(aclk),
       .aresetn(aresetn),
-      .s_cmd_tvalid(vis_cmd_tvalid),
-      .s_cmd_tready(vis_cmd_tready),
-      .s_cmd_tdata(vis_cmd_tdata),
-      .m_cmd_tvalid(dm_cmd_tvalid),
-      .m_cmd_tready(dm_cmd_tready),
-      .m_cmd_tdata(dm_cmd_tdata),
       .s_axis_tdata(tri_stream_tdata),
+      .s_axis_tkeep(tri_stream_tkeep),
       .s_axis_tvalid(tri_stream_tvalid),
       .s_axis_tready(tri_stream_tready),
       .m_tri_valid(adapted_tri_valid),
@@ -366,9 +363,9 @@ module gpu_top #(
   triangle_datamover u_tri_dma (
       .aclk(aclk),
       .aresetn(aresetn),
-      .s_cmd_tvalid(dm_cmd_tvalid),
-      .s_cmd_tready(dm_cmd_tready),
-      .s_cmd_tdata(dm_cmd_tdata),
+      .s_cmd_tvalid(vis_cmd_tvalid),
+      .s_cmd_tready(vis_cmd_tready),
+      .s_cmd_tdata(vis_cmd_tdata),
       .m_sts_tvalid(dm_sts_tvalid),
       .m_sts_tready(dm_sts_tready),
       .m_sts_tdata(dm_sts_tdata),
@@ -388,7 +385,7 @@ module gpu_top #(
       .m_axi_rvalid(m_axi_tri_rvalid),
       .m_axi_rready(m_axi_tri_rready),
       .m_axis_tdata(tri_stream_tdata),
-      .m_axis_tkeep(),
+      .m_axis_tkeep(tri_stream_tkeep),
       .m_axis_tlast(),
       .m_axis_tvalid(tri_stream_tvalid),
       .m_axis_tready(tri_stream_tready),
@@ -423,9 +420,10 @@ module gpu_top #(
   // Core
   //
 
-  logic [NUM_OF_THREADS-1:0] fb_rd_en;
-  logic [NUM_OF_THREADS-1:0][PIXEL_ADDR_W_THREAD-2:0] fb_rd_addr;
-  logic [NUM_OF_THREADS-1:0][63:0] fb_rd_data;
+  // The frame buffers' host ports, the tile DMA's: it reads a tile out and writes CLEAR_VALUE back.
+  logic [NUM_OF_THREADS-1:0] fb_rd_en, fb_wr_en;
+  logic [NUM_OF_THREADS-1:0][PIXEL_ADDR_W_THREAD-2:0] fb_rd_addr, fb_wr_addr;
+  logic [NUM_OF_THREADS-1:0][63:0] fb_rd_data, fb_wr_data;
   logic [NUM_OF_THREADS-1:0][7:0] core_thread_PADDR;
 
   for (genvar lane = 0; lane < NUM_OF_THREADS; lane++) begin : g_thread_paddr
@@ -467,9 +465,9 @@ module gpu_top #(
       .s_apb_lut_PWDATA(lut_PWDATA), \
       .s_apb_lut_PRDATA(lut_PRDATA), \
       .s_apb_lut_PSLVERROR(lut_PSLVERROR), \
-      .fb_wr_en('0), \
-      .fb_wr_addr('0), \
-      .fb_wr_data('0), \
+      .fb_wr_en(fb_wr_en), \
+      .fb_wr_addr(fb_wr_addr), \
+      .fb_wr_data(fb_wr_data), \
       .fb_rd_en(fb_rd_en), \
       .fb_rd_addr(fb_rd_addr), \
       .fb_rd_data(fb_rd_data), \
@@ -494,10 +492,11 @@ module gpu_top #(
 `undef GPU_TOP_CORE_PORTS
 
   //
-  // Tile DMA: frame buffers (thread_clk) to PS DDR
+  // Tile DMA: frame buffers (thread_clk) to PS DDR, and CLEAR_VALUE back into them
   //
 
-  logic [NUM_OF_THREADS-1:0][13:0] tile_ram_addr;  // byte address of a 64-bit host word
+  // Byte addresses of 64-bit host words
+  logic [NUM_OF_THREADS-1:0][13:0] tile_ram_addr, tile_ram_wr_addr;
 
   AxiTileDma u_tile_dma (
       .aclk(aclk),
@@ -538,21 +537,33 @@ module gpu_top #(
       .tile_ram_0_en(fb_rd_en[0]),
       .tile_ram_0_addr(tile_ram_addr[0]),
       .tile_ram_0_dout(fb_rd_data[0]),
+      .tile_ram_0_wr_en(fb_wr_en[0]),
+      .tile_ram_0_wr_addr(tile_ram_wr_addr[0]),
+      .tile_ram_0_wr_data(fb_wr_data[0]),
       .tile_ram_1_clk(),
       .tile_ram_1_rst(),
       .tile_ram_1_en(fb_rd_en[1]),
       .tile_ram_1_addr(tile_ram_addr[1]),
       .tile_ram_1_dout(fb_rd_data[1]),
+      .tile_ram_1_wr_en(fb_wr_en[1]),
+      .tile_ram_1_wr_addr(tile_ram_wr_addr[1]),
+      .tile_ram_1_wr_data(fb_wr_data[1]),
       .tile_ram_2_clk(),
       .tile_ram_2_rst(),
       .tile_ram_2_en(fb_rd_en[2]),
       .tile_ram_2_addr(tile_ram_addr[2]),
       .tile_ram_2_dout(fb_rd_data[2]),
+      .tile_ram_2_wr_en(fb_wr_en[2]),
+      .tile_ram_2_wr_addr(tile_ram_wr_addr[2]),
+      .tile_ram_2_wr_data(fb_wr_data[2]),
       .tile_ram_3_clk(),
       .tile_ram_3_rst(),
       .tile_ram_3_en(fb_rd_en[3]),
       .tile_ram_3_addr(tile_ram_addr[3]),
       .tile_ram_3_dout(fb_rd_data[3]),
+      .tile_ram_3_wr_en(fb_wr_en[3]),
+      .tile_ram_3_wr_addr(tile_ram_wr_addr[3]),
+      .tile_ram_3_wr_data(fb_wr_data[3]),
       .irq(tile_dma_irq),
       .irq_done(),
       .irq_error(),
@@ -561,6 +572,7 @@ module gpu_top #(
 
   for (genvar lane = 0; lane < NUM_OF_THREADS; lane++) begin : g_tile_ram_addr
     assign fb_rd_addr[lane] = tile_ram_addr[lane][13:3];
+    assign fb_wr_addr[lane] = tile_ram_wr_addr[lane][13:3];
   end
 
 endmodule

@@ -3,7 +3,7 @@
 // include/generated/<Name>/ (`make spinal` at the top of the repo).
 #pragma once
 
-#include "xil_types.h"  // the generated headers use the BSP's u32
+#include "xil_types.h" // the generated headers use the BSP's u32
 
 #include "generated/APBFrontendRegs/apb_front_end_regmap.h"
 #include "generated/ApbThreadRegs/apb_thread_regmap.h"
@@ -14,10 +14,27 @@
 #define GPU_TILE_SIZE 128
 
 // Block offsets from the control port's base address
-#define GPU_LUT_OFFSET 0x000  // texture table: 128 base words, then 128 size codes
+#define GPU_LUT_OFFSET 0x000 // texture table: 128 base words, then 128 size codes
 #define GPU_LUT_BASE(id) (GPU_LUT_OFFSET + 0x000 + 4 * (id))
 #define GPU_LUT_SIZE(id) (GPU_LUT_OFFSET + 0x200 + 4 * (id))
 #define GPU_FRONTEND_OFFSET 0x800
 #define GPU_THREAD_OFFSET(n) (0x820 + 0x20 * (n))
 #define GPU_TILE_DMA_OFFSET 0xF00
 #define GPU_VIS_DMA_OFFSET 0xF80
+
+// Both DMAs' interrupt blocks (SpinalHDL RFMS4), at the same offsets in each: INT_RAW holds the
+// events (write 1 to clear), INT_FORCE raises them (write 1), INT_MASK holds them back (1 = masked),
+// and INT_STATUS, INT_RAW and not INT_MASK, drives the DMA's interrupt line (level, active high).
+#define GPU_INT_RAW AXI_TILE_DMA_INTR_INT_RAW
+#define GPU_INT_FORCE AXI_TILE_DMA_INTR_INT_FORCE
+#define GPU_INT_MASK AXI_TILE_DMA_INTR_INT_MASK
+#define GPU_INT_STATUS AXI_TILE_DMA_INTR_INT_STATUS
+#define GPU_INT_DONE (1u << AXI_TILE_DMA_INTR_INT_RAW_DONE_RAW_SHIFT)
+#define GPU_INT_ERROR (1u << AXI_TILE_DMA_INTR_INT_RAW_ERROR_RAW_SHIFT)
+#define GPU_INT_ALL (GPU_INT_DONE | GPU_INT_ERROR | (1u << AXI_TILE_DMA_INTR_INT_RAW_FRAME_DONE_RAW_SHIFT))
+_Static_assert(GPU_INT_RAW == AXI_VISIBILITY_DMA_INTR_INT_RAW && GPU_INT_FORCE == AXI_VISIBILITY_DMA_INTR_INT_FORCE &&
+                   GPU_INT_MASK == AXI_VISIBILITY_DMA_INTR_INT_MASK &&
+                   GPU_INT_STATUS == AXI_VISIBILITY_DMA_INTR_INT_STATUS &&
+                   AXI_TILE_DMA_INTR_INT_RAW_DONE_RAW_SHIFT == AXI_VISIBILITY_DMA_INTR_INT_RAW_DONE_RAW_SHIFT &&
+                   AXI_TILE_DMA_INTR_INT_RAW_ERROR_RAW_SHIFT == AXI_VISIBILITY_DMA_INTR_INT_RAW_ERROR_RAW_SHIFT,
+               "the DMAs' interrupt blocks differ");

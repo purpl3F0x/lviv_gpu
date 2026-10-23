@@ -1,5 +1,6 @@
 # Block design to bring up gpu_top with dummy_core on the ZCU104 from the CPU (dummy_test_bd.tcl).
-# Usage: make [project|gui|synth|impl|bitstream|xsa|export_bd|clean]; see scripts/vivado/bd.mk.
+# Usage: make [project|gui|synth|impl|bitstream|xsa|export_bd|clean]
+#        make [vitis|vitis_gui|vitis_build|vitis_clean]; see scripts/vivado/bd.mk.
 
 BD_NAME = dummy_test
 PART = xczu7ev-ffvc1156-2-e
@@ -42,6 +43,11 @@ RTL = ../../rtl/gpu_types_pkg.sv \
       ../../rtl/triangle_datamover.sv \
       ../../rtl/gpu_top.sv \
       gpu_top_bd.v
+
+# The Vitis application: the bring-up demo in sdk/.
+VITIS_APP = gpu_demo
+VITIS_APP_SRC = ../../sdk/src
+VITIS_APP_INCLUDES = ../../sdk/include
 
 .DEFAULT_GOAL := project
 include ../../scripts/vivado/bd.mk

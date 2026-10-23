@@ -42,13 +42,19 @@ TB_SRCS  = tb_gpu_top.sv ../common/axi_ram.v
 DPI_SRCS = ../../dv/common/dpi_functions.cpp
 INCLUDES = -I../../rtl -I../../rtl/generated
 
-OUT ?= gpu_top.tga
+# DUMMY=0: raster_core instead of dummy_core, rendering raster_sw's untextured scene (made by
+# `make gpu_top_scene` in dv/raster_sw); the image is compared with raster_sw's (PSNR).
+DUMMY ?= 1
+OUT ?= $(if $(filter 0,$(DUMMY)),gpu_top_raster_core.tga,gpu_top.tga)
 PNG  = $(OUT:.tga=.png)
+SCENE ?= ../../dv/raster_sw/gpu_top_scene.hex
+REF   ?= ../../dv/raster_sw/gpu_top_ref.png
+SIM_ARGS = +OUT=$(OUT) +SCENE=$(SCENE)
 
 VERILATOR_FLAGS = --binary --timing -j 0 --top-module tb_gpu_top --Mdir $(OBJ_DIR) \
-                  -Wno-SHORTREAL -Wno-WIDTH
+                  -Wno-SHORTREAL -Wno-WIDTH -GDUMMY_CORE=$(DUMMY)
 
-.PHONY: all compile run png clean
+.PHONY: all compile run png compare clean
 
 all: run
 
@@ -56,11 +62,17 @@ compile: $(filter $(SPINAL_VERILOG),$(RTL_SRCS))
 	$(VERILATOR) $(VERILATOR_FLAGS) $(INCLUDES) $(RTL_SRCS) $(TB_SRCS) $(DPI_SRCS)
 
 run: compile
-	$(OBJ_DIR)/Vtb_gpu_top +OUT=$(OUT)
+	$(OBJ_DIR)/Vtb_gpu_top $(SIM_ARGS)
 	$(MAKE) png
+	$(if $(filter 0,$(DUMMY)),$(MAKE) compare)
 
 png:
 	$(MAGICK) $(OUT) $(PNG)
+
+# PSNR in dB against raster_sw's image (magick exits 1 when they differ at all).
+compare:
+	@echo "PSNR of $(PNG) against $(REF):"
+	-@$(MAGICK) compare -metric PSNR $(PNG) $(REF) null:; echo
 
 clean:
 	rm -rf $(OBJ_DIR) $(OUT) $(PNG)

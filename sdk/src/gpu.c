@@ -1,6 +1,7 @@
 #include "gpu.h"
 
 #include "gpu_map.h"
+#include "sleep.h"
 #include "xil_cache.h"
 #include "xil_io.h"
 
@@ -113,6 +114,46 @@ gpu_status_t gpu_wait_idle(const gpu_t *gpu)
     return GPU_TIMEOUT;
 }
 
+uint32_t gpu_texel_index(uint32_t x, uint32_t y)
+{
+    uint32_t index = 0;
+    for (int bit = 0; bit < GPU_TEXTURE_MAX_LOG2; bit++)
+        index |= (x >> bit & 1u) << (2 * bit) | (y >> bit & 1u) << (2 * bit + 1);
+    return index;
+}
+
+int gpu_set_texture(const gpu_t *gpu, uint32_t id, const uint32_t *texels, uint32_t log2_size)
+{
+    // Below the window, the offset wraps around to beyond it.
+    const uint64_t offset = (uint64_t)(uintptr_t)texels - GPU_TEXTURE_WINDOW;
+    const uint64_t bytes = 4ull << (2 * log2_size);
+    if (id >= GPU_TEXTURES || log2_size > GPU_TEXTURE_MAX_LOG2 || offset % bytes != 0 ||
+        offset + bytes > GPU_TEXTURE_WINDOW_BYTES)
+        return -1;
+    // The texture caches read it behind the CPU's caches.
+    Xil_DCacheFlushRange((UINTPTR)texels, (INTPTR)bytes);
+    gpu_write(gpu, GPU_LUT_BASE(id), (uint32_t)(offset / 4));
+    gpu_write(gpu, GPU_LUT_SIZE(id), log2_size);
+    return 0;
+}
+
+gpu_status_t gpu_clear_zbuffers(const gpu_t *gpu)
+{
+    for (int n = 0; n < GPU_THREADS; n++)
+        gpu_write(gpu, GPU_THREAD_OFFSET(n) + THREAD_REG_ZBUF, THREAD_REG_ZBUF_ZBUF_CLEAR_MASK);
+    // ZBUF_CLEAR reads 1 only once the clear has crossed into the thread clock and its busy back,
+    // tens of nanoseconds; the clear itself takes a thread clock per entry (41 us at 100 MHz).
+    usleep(1);
+    for (int n = 0; n < GPU_THREADS; n++)
+    {
+        uint32_t polls = 0;
+        while (gpu_read(gpu, GPU_THREAD_OFFSET(n) + THREAD_REG_ZBUF) & THREAD_REG_ZBUF_ZBUF_CLEAR_MASK)
+            if (++polls == GPU_POLL_LIMIT)
+                return GPU_TIMEOUT;
+    }
+    return GPU_OK;
+}
+
 void gpu_set_tile(const gpu_t *gpu, uint32_t tile_x, uint32_t tile_y)
 {
     gpu_write(gpu, GPU_FRONTEND_OFFSET + APB_FRONT_END_FRONTEND_REG_TILE_X,
@@ -202,6 +243,8 @@ gpu_status_t gpu_frame(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t *fai
     {
         gpu_status_t status;
         *failed_tile = tile;
+        if ((status = gpu_clear_zbuffers(gpu)) != GPU_OK)
+            return status;
         gpu_set_tile(gpu, tile % frame->tiles_x, tile / frame->tiles_x);
         if ((status = gpu_stream_tile(gpu, frame, tile)) != GPU_OK)
             return status;

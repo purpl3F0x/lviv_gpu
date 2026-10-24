@@ -1,19 +1,20 @@
-# Block design: gpu_top with dummy_core on the ZCU104, to bring up the GPU's control path and DMAs
-# from the CPU before the rasteriser goes in.
+# Block design: gpu_top with its raster core on the ZCU104, the CPU driving it.
 #
 #   PS M_AXI_HPM0_FPD ──► sc_ctrl ──► gpu_0 s_axi_ctrl     (4 KiB at 0xA000_0000)
 #   gpu_0 m_axi_vb, m_axi_tri, m_axi_tile ──► sc_mem ──► PS S_AXI_HP0_FPD (PS DDR)
+#   gpu_0 m_axi_tex0..3 (the threads' texture caches) ──► sc_tex ──► PS S_AXI_HP1_FPD (PS DDR)
 #   pl_clk0 100 MHz: everything, gpu_0's aclk, frontend_clk and thread_clk included (its clock
 #                    crossings work with equal clocks too)
 #   gpu_0 vis_dma_irq, tile_dma_irq ──► pl_ps_irq0[1:0]
 #
 # The triangles live in PS DDR for now: the GPU's triangle master (PL DDR in the full design) is
-# just a third master on the memory SmartConnect.
+# just a third master on the memory SmartConnect. The texture caches reach the first 128 MiB of PS
+# DDR (gpu_0's TEXTURE_WINDOW, 0); SmartConnect passes addresses on as they are.
 #
 # Sourced by scripts/vivado/bd_create.tcl into a project that already holds the RTL and the IP.
 # `make export_bd` replaces this file with Vivado's own Tcl of the design as edited in the GUI.
 
-set design_name dummy_test
+set design_name gpu_test
 
 # Latest version of a Xilinx catalog IP.
 proc ip_vlnv {name} {
@@ -37,6 +38,8 @@ set_property -dict [list \
     CONFIG.PSU__USE__M_AXI_GP2 {0} \
     CONFIG.PSU__USE__S_AXI_GP2 {1} \
     CONFIG.PSU__SAXIGP2__DATA_WIDTH {128} \
+    CONFIG.PSU__USE__S_AXI_GP3 {1} \
+    CONFIG.PSU__SAXIGP3__DATA_WIDTH {128} \
     CONFIG.PSU__FPGA_PL0_ENABLE {1} \
     CONFIG.PSU__CRL_APB__PL0_REF_CTRL__FREQMHZ {100} \
     CONFIG.PSU__FPGA_PL1_ENABLE {0} \
@@ -48,8 +51,7 @@ set_property -dict [list \
 # GPU
 #
 
-set gpu [create_bd_cell -type module -reference gpu_top_bd gpu_0]
-set_property CONFIG.DUMMY_CORE {1} $gpu
+create_bd_cell -type module -reference gpu_top_bd gpu_0
 
 #
 # Reset
@@ -74,6 +76,13 @@ connect_bd_intf_net [get_bd_intf_pins gpu_0/m_axi_tri] [get_bd_intf_pins sc_mem/
 connect_bd_intf_net [get_bd_intf_pins gpu_0/m_axi_tile] [get_bd_intf_pins sc_mem/S02_AXI]
 connect_bd_intf_net [get_bd_intf_pins sc_mem/M00_AXI] [get_bd_intf_pins $ps/S_AXI_HP0_FPD]
 
+set sc_tex [create_bd_cell -type ip -vlnv [ip_vlnv smartconnect] sc_tex]
+set_property -dict [list CONFIG.NUM_SI {4} CONFIG.NUM_MI {1}] $sc_tex
+for {set n 0} {$n < 4} {incr n} {
+  connect_bd_intf_net [get_bd_intf_pins gpu_0/m_axi_tex$n] [get_bd_intf_pins sc_tex/S0${n}_AXI]
+}
+connect_bd_intf_net [get_bd_intf_pins sc_tex/M00_AXI] [get_bd_intf_pins $ps/S_AXI_HP1_FPD]
+
 #
 # Clocks and resets
 #
@@ -81,11 +90,12 @@ connect_bd_intf_net [get_bd_intf_pins sc_mem/M00_AXI] [get_bd_intf_pins $ps/S_AX
 connect_bd_net [get_bd_pins $ps/pl_clk0] [get_bd_pins gpu_0/aclk] \
     [get_bd_pins gpu_0/frontend_clk] [get_bd_pins gpu_0/thread_clk] \
     [get_bd_pins $ps/maxihpm0_fpd_aclk] [get_bd_pins $ps/saxihp0_fpd_aclk] \
-    [get_bd_pins sc_ctrl/aclk] [get_bd_pins sc_mem/aclk] [get_bd_pins rst_pl_clk0/slowest_sync_clk]
+    [get_bd_pins $ps/saxihp1_fpd_aclk] [get_bd_pins sc_ctrl/aclk] [get_bd_pins sc_mem/aclk] \
+    [get_bd_pins sc_tex/aclk] [get_bd_pins rst_pl_clk0/slowest_sync_clk]
 
 connect_bd_net [get_bd_pins rst_pl_clk0/peripheral_aresetn] [get_bd_pins gpu_0/aresetn] \
     [get_bd_pins gpu_0/frontend_rst_n] [get_bd_pins gpu_0/thread_rst_n] \
-    [get_bd_pins sc_ctrl/aresetn] [get_bd_pins sc_mem/aresetn]
+    [get_bd_pins sc_ctrl/aresetn] [get_bd_pins sc_mem/aresetn] [get_bd_pins sc_tex/aresetn]
 
 #
 # Interrupts

@@ -13,6 +13,14 @@
 #define GPU_THREADS 4
 #define GPU_TILE_SIZE 128
 
+// Textures: up to 128 (a triangle's tex_id), square, up to 2048 x 2048 (size code: log2 of the
+// width). The texture caches reach the 128 MiB from GPU_TEXTURE_WINDOW, gpu_top's TEXTURE_WINDOW
+// parameter (0 in bd/gpu_test); the table holds word addresses inside it.
+#define GPU_TEXTURES 128
+#define GPU_TEXTURE_MAX_LOG2 11
+#define GPU_TEXTURE_WINDOW 0x00000000u
+#define GPU_TEXTURE_WINDOW_BYTES (128u << 20)
+
 // Block offsets from the control port's base address
 #define GPU_LUT_OFFSET 0x000 // texture table: 128 base words, then 128 size codes
 #define GPU_LUT_BASE(id) (GPU_LUT_OFFSET + 0x000 + 4 * (id))

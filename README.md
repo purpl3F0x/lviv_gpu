@@ -18,6 +18,8 @@ A work-in-progress FPGA GPU in SystemVerilog, with a C++ reference rasterizer.
 | `rtl/` | Hardware and generated pipelines |
 | `rtl/spinalhdl/` | SpinalHDL sources of the register blocks, crossbar and DMAs |
 | `scripts/` | Pipeline generators and Vivado scripts |
+| `bd/` | ZCU104 block design `gpu_test`: the GPU with the raster core, driven by the PS |
+| `sdk/` | Bare-metal software for the ZCU104 |
 | `tb/` | Testbenches |
 | `dv/raster_sw/` | C++ reference and CSV vectors |
 | `docs/` | Design notes and diagrams |

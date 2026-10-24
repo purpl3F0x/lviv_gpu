@@ -5,7 +5,7 @@
 `timescale 1ns / 1ps
 
 module gpu_top_bd #(
-    parameter DUMMY_CORE = 1
+    parameter TEXTURE_WINDOW = 32'h00000000
 ) (
     (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 aclk CLK", X_INTERFACE_PARAMETER = "ASSOCIATED_BUSIF s_axi_ctrl:m_axi_vb:m_axi_tri:m_axi_tile, ASSOCIATED_RESET aresetn" *)
     input  wire         aclk,
@@ -15,7 +15,7 @@ module gpu_top_bd #(
     input  wire         frontend_clk,
     (* X_INTERFACE_INFO = "xilinx.com:signal:reset:1.0 frontend_rst_n RST", X_INTERFACE_PARAMETER = "POLARITY ACTIVE_LOW" *)
     input  wire         frontend_rst_n,
-    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 thread_clk CLK", X_INTERFACE_PARAMETER = "ASSOCIATED_RESET thread_rst_n" *)
+    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 thread_clk CLK", X_INTERFACE_PARAMETER = "ASSOCIATED_BUSIF m_axi_tex0:m_axi_tex1:m_axi_tex2:m_axi_tex3, ASSOCIATED_RESET thread_rst_n" *)
     input  wire         thread_clk,
     (* X_INTERFACE_INFO = "xilinx.com:signal:reset:1.0 thread_rst_n RST", X_INTERFACE_PARAMETER = "POLARITY ACTIVE_LOW" *)
     input  wire         thread_rst_n,
@@ -111,6 +111,58 @@ module gpu_top_bd #(
     input  wire         m_axi_tile_bvalid,
     output wire         m_axi_tile_bready,
 
+    // Texture reads, thread 0's L1 cache
+    output wire [ 31:0] m_axi_tex0_araddr,
+    output wire [  7:0] m_axi_tex0_arlen,
+    output wire [  2:0] m_axi_tex0_arsize,
+    output wire [  1:0] m_axi_tex0_arburst,
+    output wire         m_axi_tex0_arvalid,
+    input  wire         m_axi_tex0_arready,
+    input  wire [127:0] m_axi_tex0_rdata,
+    input  wire [  1:0] m_axi_tex0_rresp,
+    input  wire         m_axi_tex0_rlast,
+    input  wire         m_axi_tex0_rvalid,
+    output wire         m_axi_tex0_rready,
+
+    // Texture reads, thread 1's L1 cache
+    output wire [ 31:0] m_axi_tex1_araddr,
+    output wire [  7:0] m_axi_tex1_arlen,
+    output wire [  2:0] m_axi_tex1_arsize,
+    output wire [  1:0] m_axi_tex1_arburst,
+    output wire         m_axi_tex1_arvalid,
+    input  wire         m_axi_tex1_arready,
+    input  wire [127:0] m_axi_tex1_rdata,
+    input  wire [  1:0] m_axi_tex1_rresp,
+    input  wire         m_axi_tex1_rlast,
+    input  wire         m_axi_tex1_rvalid,
+    output wire         m_axi_tex1_rready,
+
+    // Texture reads, thread 2's L1 cache
+    output wire [ 31:0] m_axi_tex2_araddr,
+    output wire [  7:0] m_axi_tex2_arlen,
+    output wire [  2:0] m_axi_tex2_arsize,
+    output wire [  1:0] m_axi_tex2_arburst,
+    output wire         m_axi_tex2_arvalid,
+    input  wire         m_axi_tex2_arready,
+    input  wire [127:0] m_axi_tex2_rdata,
+    input  wire [  1:0] m_axi_tex2_rresp,
+    input  wire         m_axi_tex2_rlast,
+    input  wire         m_axi_tex2_rvalid,
+    output wire         m_axi_tex2_rready,
+
+    // Texture reads, thread 3's L1 cache
+    output wire [ 31:0] m_axi_tex3_araddr,
+    output wire [  7:0] m_axi_tex3_arlen,
+    output wire [  2:0] m_axi_tex3_arsize,
+    output wire [  1:0] m_axi_tex3_arburst,
+    output wire         m_axi_tex3_arvalid,
+    input  wire         m_axi_tex3_arready,
+    input  wire [127:0] m_axi_tex3_rdata,
+    input  wire [  1:0] m_axi_tex3_rresp,
+    input  wire         m_axi_tex3_rlast,
+    input  wire         m_axi_tex3_rvalid,
+    output wire         m_axi_tex3_rready,
+
     (* X_INTERFACE_INFO = "xilinx.com:signal:interrupt:1.0 vis_dma_irq INTERRUPT", X_INTERFACE_PARAMETER = "SENSITIVITY LEVEL_HIGH" *)
     output wire         vis_dma_irq,
     (* X_INTERFACE_INFO = "xilinx.com:signal:interrupt:1.0 tile_dma_irq INTERRUPT", X_INTERFACE_PARAMETER = "SENSITIVITY LEVEL_HIGH" *)
@@ -119,7 +171,7 @@ module gpu_top_bd #(
 );
 
   gpu_top #(
-      .DUMMY_CORE(DUMMY_CORE)
+      .TEXTURE_WINDOW(TEXTURE_WINDOW)
   ) u_gpu_top (
       .aclk(aclk),
       .aresetn(aresetn),
@@ -210,6 +262,17 @@ module gpu_top_bd #(
       .m_axi_tile_bresp(m_axi_tile_bresp),
       .m_axi_tile_bvalid(m_axi_tile_bvalid),
       .m_axi_tile_bready(m_axi_tile_bready),
+      .m_axi_tex_araddr({m_axi_tex3_araddr, m_axi_tex2_araddr, m_axi_tex1_araddr, m_axi_tex0_araddr}),
+      .m_axi_tex_arlen({m_axi_tex3_arlen, m_axi_tex2_arlen, m_axi_tex1_arlen, m_axi_tex0_arlen}),
+      .m_axi_tex_arsize({m_axi_tex3_arsize, m_axi_tex2_arsize, m_axi_tex1_arsize, m_axi_tex0_arsize}),
+      .m_axi_tex_arburst({m_axi_tex3_arburst, m_axi_tex2_arburst, m_axi_tex1_arburst, m_axi_tex0_arburst}),
+      .m_axi_tex_arvalid({m_axi_tex3_arvalid, m_axi_tex2_arvalid, m_axi_tex1_arvalid, m_axi_tex0_arvalid}),
+      .m_axi_tex_arready({m_axi_tex3_arready, m_axi_tex2_arready, m_axi_tex1_arready, m_axi_tex0_arready}),
+      .m_axi_tex_rdata({m_axi_tex3_rdata, m_axi_tex2_rdata, m_axi_tex1_rdata, m_axi_tex0_rdata}),
+      .m_axi_tex_rresp({m_axi_tex3_rresp, m_axi_tex2_rresp, m_axi_tex1_rresp, m_axi_tex0_rresp}),
+      .m_axi_tex_rlast({m_axi_tex3_rlast, m_axi_tex2_rlast, m_axi_tex1_rlast, m_axi_tex0_rlast}),
+      .m_axi_tex_rvalid({m_axi_tex3_rvalid, m_axi_tex2_rvalid, m_axi_tex1_rvalid, m_axi_tex0_rvalid}),
+      .m_axi_tex_rready({m_axi_tex3_rready, m_axi_tex2_rready, m_axi_tex1_rready, m_axi_tex0_rready}),
       .vis_dma_irq(vis_dma_irq),
       .tile_dma_irq(tile_dma_irq),
       .tri_dma_err(tri_dma_err)

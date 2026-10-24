@@ -25,6 +25,6 @@ clean:
 run: $(TARGET)
 	$(subst /,\,$(TARGET))
 
-# tb/gpu_top's scene (make run DUMMY=0 there): untextured, with its reference image.
+# tb/gpu_top's scene (make run there): untextured, with its reference image.
 gpu_top_scene: $(TARGET)
 	$(subst /,\,$(TARGET)) --no-texture --gpu-top-scene gpu_top_scene.hex --ref-png gpu_top_ref.png

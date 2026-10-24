@@ -4,9 +4,11 @@ so what is edited in the IDE is edited in git. Used by bd.mk.
 
 Usage: vitis -s vitis_workspace.py <args.json> <stage>
   workspace  create the platform and the application if they are missing, otherwise give the
-             platform the XSA again (bd.mk runs it when the XSA is newer); build the platform
-  sources    list in the application every .c and .h of app_src and every .h of app_includes, so
-             the IDE shows them all (bd.mk runs it when a file is added or removed there)
+             platform the XSA again (bd.mk runs it when the XSA is newer); build the platform, and
+             give the application's launch configurations its bitstream and psu_init.tcl
+  sources    list in the application every .c and .h of the app_src directories and every .h of
+             app_includes, so the IDE shows them all, and make both its include path (bd.mk runs it
+             when a file is added or removed there)
   build      build the application
 args.json (written by bd.mk): workspace, xsa, platform, cpu, domain, app, app_src, app_includes,
 and the files that say a stage succeeded: stamp (workspace), sources_stamp (sources), built (build)
@@ -15,6 +17,7 @@ and the files that say a stage succeeded: stamp (workspace), sources_stamp (sour
 import glob
 import json
 import os
+import shutil
 import sys
 import time
 
@@ -67,8 +70,21 @@ def make_workspace(client):
         raise RuntimeError(f"{args['platform']} did not build")
 
     if not exists(args["app"]):
-        app = client.create_app_component(name=args["app"], platform=xpfm, domain=domain)
-        app.set_app_config(key="USER_INCLUDE_DIRECTORIES", values=args["app_includes"])
+        client.create_app_component(name=args["app"], platform=xpfm, domain=domain)
+    refresh_launch_files()
+
+
+def refresh_launch_files():
+    # The IDE's launch configurations program copies of the platform's bitstream and psu_init.tcl,
+    # made in <app>/_ide/ with them, and do not refresh them when the platform takes a new XSA: the
+    # board would run the new software on the old hardware.
+    hw = os.path.join(export, "hw")
+    ide = os.path.join(workspace, args["app"], "_ide")
+    for directory, pattern in (("bitstream", "*.bit"), ("psinit", "psu_init.tcl")):
+        if os.path.isdir(os.path.join(ide, directory)):
+            for f in glob.glob(os.path.join(hw, pattern)):
+                shutil.copy2(f, os.path.join(ide, directory))
+                print(f"Launch file: {os.path.join(args['app'], '_ide', directory, os.path.basename(f))}")
 
 
 def files(directory, patterns):
@@ -78,13 +94,23 @@ def files(directory, patterns):
 def sources(client):
     # Relative to the application's src/, as the IDE writes them. The headers are listed only to be
     # shown: the build compiles the .c files.
-    listed = files(args["app_src"], ["*.c", "*.h"])
+    src = os.path.join(workspace, args["app"], "src")
+
+    def relative(paths):
+        return [os.path.relpath(f, src).replace("\\", "/") for f in paths]
+
+    listed = []
+    for directory in args["app_src"]:
+        listed += files(directory, ["*.c", "*.h"])
     for directory in args["app_includes"]:
         listed += files(directory, ["*.h"])
-    src = os.path.join(workspace, args["app"], "src")
-    listed = sorted({os.path.relpath(f, src).replace("\\", "/") for f in listed})
-    client.get_component(name=args["app"]).set_app_config(key="USER_COMPILE_SOURCES", values=listed)
+    listed = sorted(set(relative(listed)))
+    includes = relative(args["app_src"] + args["app_includes"])
+    app = client.get_component(name=args["app"])
+    app.set_app_config(key="USER_COMPILE_SOURCES", values=listed)
+    app.set_app_config(key="USER_INCLUDE_DIRECTORIES", values=includes)
     print("Sources: " + " ".join(listed))
+    print("Include directories: " + " ".join(includes))
 
 
 def build(client):

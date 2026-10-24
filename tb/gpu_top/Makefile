@@ -1,4 +1,4 @@
-# gpu_top with dummy_core, on Verilator (run in WSL). The DataMover is its simulation model.
+# gpu_top with its raster core, on Verilator (run in WSL). The DataMover is its simulation model.
 VERILATOR = verilator
 MAGICK    = magick
 OBJ_DIR   = obj_dir
@@ -30,7 +30,6 @@ RTL_SRCS = ../../rtl/gpu_types_pkg.sv \
            ../../rtl/frame_buffer_ram.sv \
            $(SPINAL_GEN_DIR)/ApbLutRam.v \
            ../../rtl/raster_core.sv \
-           ../../rtl/dummy_core.sv \
            $(SPINAL_GEN_DIR)/Axi4ToApbXbar.v \
            $(SPINAL_GEN_DIR)/AxiVisibilityDma.v \
            $(SPINAL_GEN_DIR)/AxiTileDma.v \
@@ -42,17 +41,18 @@ TB_SRCS  = tb_gpu_top.sv ../common/axi_ram.v
 DPI_SRCS = ../../dv/common/dpi_functions.cpp
 INCLUDES = -I../../rtl -I../../rtl/generated
 
-# DUMMY=0: raster_core instead of dummy_core, rendering raster_sw's untextured scene (made by
-# `make gpu_top_scene` in dv/raster_sw); the image is compared with raster_sw's (PSNR).
-DUMMY ?= 1
-OUT ?= $(if $(filter 0,$(DUMMY)),gpu_top_raster_core.tga,gpu_top.tga)
+# The scene: raster_sw's untextured one (made by `make gpu_top_scene` in dv/raster_sw) unless SCENE
+# says otherwise; the image is compared with raster_sw's (PSNR).
+OUT ?= gpu_top.tga
 PNG  = $(OUT:.tga=.png)
 SCENE ?= ../../dv/raster_sw/gpu_top_scene.hex
 REF   ?= ../../dv/raster_sw/gpu_top_ref.png
-SIM_ARGS = +OUT=$(OUT) +SCENE=$(SCENE)
+# TEXTURE=<file>: a texture for LUT entry 0 (format in tb_gpu_top.sv)
+TEXTURE ?=
+SIM_ARGS = +OUT=$(OUT) +SCENE=$(SCENE)$(if $(TEXTURE), +TEXTURE=$(TEXTURE))
 
 VERILATOR_FLAGS = --binary --timing -j 0 --top-module tb_gpu_top --Mdir $(OBJ_DIR) \
-                  -Wno-SHORTREAL -Wno-WIDTH -GDUMMY_CORE=$(DUMMY)
+                  -Wno-SHORTREAL -Wno-WIDTH
 
 .PHONY: all compile run png compare clean
 
@@ -64,7 +64,7 @@ compile: $(filter $(SPINAL_VERILOG),$(RTL_SRCS))
 run: compile
 	$(OBJ_DIR)/Vtb_gpu_top $(SIM_ARGS)
 	$(MAKE) png
-	$(if $(filter 0,$(DUMMY)),$(MAKE) compare)
+	$(MAKE) compare
 
 png:
 	$(MAGICK) $(OUT) $(PNG)

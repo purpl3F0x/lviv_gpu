@@ -85,4 +85,9 @@ endef
 
 $(foreach m,$(SPINAL_MODULES),$(eval $(call SPINAL_MODULE_RULE,$(m))))
 
+# What the modules whose Verilog is in $(1) are made from: their Scala and the sbt build. Files
+# without a rule, for comparing against without regenerating anything.
+spinal_sources = $(sort $(if $(1),$(SPINAL_BUILD)) $(foreach m,$(SPINAL_MODULES),\
+                   $(if $(filter $(SPINAL_GEN_DIR)/$(m).v,$(1)),$(addprefix $(SPINAL_SRC_DIR)/,$(SPINAL_SRCS_$(m))))))
+
 .DEFAULT_GOAL := $(SPINAL_SAVED_GOAL)

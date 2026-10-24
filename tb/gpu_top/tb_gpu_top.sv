@@ -2,33 +2,31 @@
 
 import gpu_types_pkg::*;
 
-// gpu_top driven through its CPU port as software would:
+// gpu_top driven through its CPU port as software would, rendering a scene (+SCENE, made by
+// `make gpu_top_scene` in dv/raster_sw: its visibility words and gpu_triangle_t records) at
+// 1280 x 720 in 10 x 6 tiles:
 //
 //   1. register access through the crossbar to every slave
-//   2. per tile: set the frontend tile, run the visibility DMA over the visibility buffer, wait for
-//      the core to go idle, run the tile DMA
-//   3. with dummy_core, check every pixel the tile DMA wrote (its pattern, B = the triangles the
-//      tile got)
+//   2. the tile DMA's CLEAR fills the frame buffers with raster_sw's clear colour; each write-back
+//      leaves it behind
+//   3. per tile: clear the z-buffers, set the frontend tile, run the visibility DMA over the
+//      visibility buffer, wait for the core to go idle, run the tile DMA
+//   4. a second write-back of the first tile must read the clear colour everywhere
 //
 // Every triangle that reaches the core is checked against the next one the tile should get, so the
 // visibility DMA, the DataMover (its simulation model), triangle_stream_adapter and the clock
-// crossing are checked end to end. The image is also written to +OUT (default gpu_top.tga).
+// crossing are checked end to end. The image is written to +OUT (default gpu_top.tga), and make
+// compares it with raster_sw's.
 //
-// DUMMY_CORE = 1: 40 random records over a 2 x 2 tile image.
-// DUMMY_CORE = 0 (make DUMMY=0): raster_core, rendering raster_sw's scene (+SCENE, made by
-// `make gpu_top_scene` in dv/raster_sw: its visibility words and gpu_triangle_t records) at
-// 1280 x 720 in 10 x 6 tiles. The tile DMA's CLEAR first fills the frame buffers with raster_sw's
-// clear colour, each write-back leaves it behind, and the z-buffers are cleared before each tile.
-// The image is written, and make compares it with raster_sw's. Then a second write-back of the
-// first tile must read the clear colour everywhere.
-module tb_gpu_top #(
-    parameter bit DUMMY_CORE = 1'b1
-);
+// +TEXTURE: a texture for LUT entry 0, in the texture memory that every thread's texture cache
+// reads through its own port. gpu_top's TEXTURE_WINDOW is not 0 here, and every texture read must
+// carry it. The memory answers like PS DDR behind an interconnect: +TEX_LATENCY thread clocks
+// (default 64) from a read's address to its first beat, then beats with random gaps.
+module tb_gpu_top;
   localparam int TriangleStride = 96;  // as AxiVisibilityDma addresses them
-  localparam int RandomTriangles = 40;
-  localparam int TilesX = DUMMY_CORE ? 2 : 10, TilesY = DUMMY_CORE ? 2 : 6;
+  localparam int TilesX = 10, TilesY = 6;
   localparam int Width = TilesX * TILE_SIZE_X;
-  localparam int Height = DUMMY_CORE ? TilesY * TILE_SIZE_Y : 720;  // the rows written out
+  localparam int Height = 720;  // the rows written out
   localparam int RowBytes = Width * 4;
   localparam logic [31:0] ClearColor = 32'hFF636363;  // raster_sw's clear colour (ARGB)
 
@@ -36,12 +34,13 @@ module tb_gpu_top #(
   localparam logic [31:0] VbBase = 32'h0000_1000;
   localparam logic [31:0] TriBase = 32'h0000_8000;
   localparam logic [31:0] ImgBase = 32'h0001_0000;
-  localparam int VbAddrW = 16, TriAddrW = 18, ImgAddrW = DUMMY_CORE ? 20 : 22;
+  localparam int VbAddrW = 16, TriAddrW = 18, ImgAddrW = 22, TexAddrW = 16;
+  localparam logic [31:0] TextureWindow = 32'h3800_0000;  // gpu_top's TEXTURE_WINDOW
   localparam int MaxTriangles = ((1 << TriAddrW) - int'(TriBase)) / TriangleStride;
 
   // Control map
   localparam logic [11:0] FrontendStatus = 12'h800, FrontendTileX = 12'h804;
-  localparam logic [11:0] FrontendTileY = 12'h808, LutBase = 12'h000;
+  localparam logic [11:0] FrontendTileY = 12'h808, LutBase = 12'h000, LutSize = 12'h200;
   localparam logic [11:0] VisCtrl = 12'hF80, VisStatus = 12'hF84, VisVbBase = 12'hF88;
   localparam logic [11:0] VisTriBase = 12'hF90, VisTriCount = 12'hF98, VisTileIndex = 12'hF9C;
   localparam logic [11:0] TileCtrl = 12'hF00, TileStatus = 12'hF04, TileBase = 12'hF08;
@@ -83,10 +82,16 @@ module tb_gpu_top #(
   logic [15:0] tile_wstrb;
   logic [511:0] tri_rdata;
   logic vis_irq, tile_irq, tri_err;
+  logic [NUM_OF_THREADS-1:0][31:0] tex_araddr;
+  logic [NUM_OF_THREADS-1:0][7:0] tex_arlen;
+  logic [NUM_OF_THREADS-1:0][2:0] tex_arsize;
+  logic [NUM_OF_THREADS-1:0][1:0] tex_arburst, tex_rresp;
+  logic [NUM_OF_THREADS-1:0] tex_arvalid, tex_arready, tex_rlast, tex_rvalid, tex_rready;
+  logic [NUM_OF_THREADS-1:0][127:0] tex_rdata;
 
   gpu_top #(
-      .DUMMY_CORE(DUMMY_CORE),
-      .TRIANGLE_STRIDE(TriangleStride)
+      .TRIANGLE_STRIDE(TriangleStride),
+      .TEXTURE_WINDOW(TextureWindow)
   ) dut (
       .aclk(aclk),
       .aresetn(aresetn),
@@ -177,6 +182,17 @@ module tb_gpu_top #(
       .m_axi_tile_bresp(tile_bresp),
       .m_axi_tile_bvalid(tile_bvalid),
       .m_axi_tile_bready(tile_bready),
+      .m_axi_tex_araddr(tex_araddr),
+      .m_axi_tex_arlen(tex_arlen),
+      .m_axi_tex_arsize(tex_arsize),
+      .m_axi_tex_arburst(tex_arburst),
+      .m_axi_tex_arvalid(tex_arvalid),
+      .m_axi_tex_arready(tex_arready),
+      .m_axi_tex_rdata(tex_rdata),
+      .m_axi_tex_rresp(tex_rresp),
+      .m_axi_tex_rlast(tex_rlast),
+      .m_axi_tex_rvalid(tex_rvalid),
+      .m_axi_tex_rready(tex_rready),
       .vis_dma_irq(vis_irq),
       .tile_dma_irq(tile_irq),
       .tri_dma_err(tri_err)
@@ -321,6 +337,75 @@ module tb_gpu_top #(
       .s_axi_rready(1'b1)
   );
 
+  // Textures (PS DDR): one memory, read through a port per thread's texture cache, one INCR burst
+  // of 128-bit beats at a time per port. The low TexAddrW bits of the address select the byte.
+  logic [31:0] tex_mem[1 << (TexAddrW - 2)];
+  logic [31:0] tex_base;  // +TEXTURE's LUT entry: word address and size code
+  logic [3:0] tex_size;
+  bit tex_loaded = 1'b0;
+  int tex_latency = 64;
+  initial void'($value$plusargs("TEX_LATENCY=%d", tex_latency));
+
+  for (genvar lane = 0; lane < NUM_OF_THREADS; lane++) begin : g_tex_port
+    logic busy = 1'b0;
+    logic [TexAddrW-1:0] addr;
+    logic [7:0] beats_left;
+    int wait_cycles = 0;  // before the next beat
+    logic beat;
+
+    assign beat = busy && wait_cycles == 0;
+    assign tex_arready[lane] = !busy;
+    assign tex_rvalid[lane] = beat;
+    assign tex_rlast[lane] = beat && beats_left == 0;
+    assign tex_rresp[lane] = 2'b00;
+    for (genvar w = 0; w < 4; w++) begin : g_word
+      assign tex_rdata[lane][32*w+:32] = tex_mem[{addr[TexAddrW-1:4], 2'(w)}];
+    end
+
+    always @(posedge thread_clk) begin
+      if (tex_arvalid[lane] && tex_arready[lane]) begin
+        if (tex_araddr[lane][31:27] != TextureWindow[31:27])
+          error($sformatf("thread %0d texture read at %08h, outside TEXTURE_WINDOW %08h", lane,
+                          tex_araddr[lane], TextureWindow));
+        if (tex_arsize[lane] != 3'd4 || tex_arburst[lane] != 2'b01)
+          error($sformatf("thread %0d texture read: size %0d, burst %0d, expected 16-byte INCR",
+                          lane, tex_arsize[lane], tex_arburst[lane]));
+        busy <= 1'b1;
+        addr <= tex_araddr[lane][TexAddrW-1:0];
+        beats_left <= tex_arlen[lane];
+        wait_cycles <= tex_latency;
+      end else if (busy && wait_cycles != 0) begin
+        wait_cycles <= wait_cycles - 1;
+      end else if (beat && tex_rready[lane]) begin
+        addr <= addr + TexAddrW'(16);
+        beats_left <= beats_left - 8'd1;
+        busy <= beats_left != 0;
+        wait_cycles <= $urandom_range(3) == 0 ? int'($urandom_range(4, 1)) : 0;
+      end
+    end
+  end
+
+  // The texture: its word address and size code (log2 of its width) in hex on the first line, then
+  // its words, in memory order.
+  task automatic load_texture(input string path);
+    int fd, n;
+    logic [31:0] word;
+    fd = $fopen(path, "r");
+    if (fd == 0) $fatal(1, "cannot open texture %s", path);
+    if ($fscanf(fd, "%h %h", tex_base, tex_size) != 2)
+      $fatal(1, "texture %s: no word address and size code", path);
+    n = 0;
+    while ($fscanf(fd, "%h", word) == 1) begin
+      if (tex_base + 32'(n) >= 32'(1 << (TexAddrW - 2)))
+        $fatal(1, "texture %s: beyond the %0d-byte texture memory", path, 1 << TexAddrW);
+      tex_mem[tex_base+32'(n)] = word;
+      n++;
+    end
+    $fclose(fd);
+    tex_loaded = 1'b1;
+    $display("texture %s: %0d words at word %08h, size code %0d", path, n, tex_base, tex_size);
+  endtask
+
   // -------------------------------------------------------------------------
   // Scene: triangles, their tile masks, and what each tile must receive
   // -------------------------------------------------------------------------
@@ -330,36 +415,7 @@ module tb_gpu_top #(
   logic [63:0] tile_mask[];  // the triangle's visibility word: bit t set if tile t gets it
   frontend_data_in_t expected[];
 
-  // Random records: runs and gaps that differ per tile, some tiles get every triangle, some none
-  // in a stretch.
-  function automatic bit visible(input int tri_idx, input int tile);
-    case (tile)
-      0: return 1'b1;
-      1: return (tri_idx % 5) != 2 && (tri_idx % 7) != 0;
-      2: return tri_idx >= 10 && tri_idx < 23;
-      default: return (tri_idx % 3) == 1;
-    endcase
-  endfunction
-
-  function automatic int tile_triangles(input int tile);
-    int n;
-    n = 0;
-    for (int t = 0; t < triangles; t++) if (tile_mask[t][tile]) n++;
-    return n;
-  endfunction
-
-  task automatic random_scene();
-    triangles = RandomTriangles;
-    records = new[triangles];
-    tile_mask = new[triangles];
-    for (int t = 0; t < triangles; t++) begin
-      for (int w = 0; w < 24; w++) records[t][32*w+:32] = $urandom();
-      tile_mask[t] = '0;
-      for (int k = 0; k < TilesX * TilesY; k++) tile_mask[t][k] = visible(t, k);
-    end
-  endtask
-
-  // raster_sw's scene: per line, the visibility word, then the record as 24 words in memory order.
+  // The scene: per line, the visibility word, then the record as 24 words in memory order.
   task automatic load_scene(input string path);
     int fd;
     logic [63:0] mask;
@@ -397,8 +453,7 @@ module tb_gpu_top #(
   task automatic build_scene(input string scene_path);
     logic [31:0] addr;
     logic [7:0] value;
-    if (DUMMY_CORE) random_scene();
-    else load_scene(scene_path);
+    load_scene(scene_path);
     expected = new[triangles];
     for (int t = 0; t < triangles; t++) begin
       unpack_in = records[t];
@@ -591,7 +646,7 @@ module tb_gpu_top #(
     received = 0;
     current_tile = tile;
 
-    if (!DUMMY_CORE) clear_zbuffers();
+    clear_zbuffers();
 
     axi_write(FrontendTileX, tx);
     axi_write(FrontendTileY, ty);
@@ -651,25 +706,6 @@ module tb_gpu_top #(
     return u_img_ram.mem[addr[ImgAddrW-1:4]][32*addr[3:2]+:32];
   endfunction
 
-  task automatic check_image();
-    logic [31:0] got, want;
-    int tile, bad;
-    bad = 0;
-    for (int y = 0; y < Height; y++) begin
-      for (int x = 0; x < Width; x++) begin
-        tile = (y / TILE_SIZE_Y) * TilesX + x / TILE_SIZE_X;
-        want = {8'hFF, 8'(2 * (x % TILE_SIZE_X)), 8'(2 * (y % TILE_SIZE_Y)),
-                8'(tile_triangles(tile) > 255 ? 255 : tile_triangles(tile))};
-        got = image_pixel(x, y);
-        if (got !== want) begin
-          if (bad < 8) error($sformatf("pixel (%0d, %0d): %08h, expected %08h", x, y, got, want));
-          bad++;
-        end
-      end
-    end
-    $display("[%0t] image: %0d of %0d pixels wrong", $time, bad, Width * Height);
-  endtask
-
   task automatic write_tga(input string path);
     int fd;
     logic [31:0] p;
@@ -688,7 +724,7 @@ module tb_gpu_top #(
   endtask
 
   initial begin : run
-    string out_path, scene_path;
+    string out_path, scene_path, texture_path;
     out_path = "gpu_top.tga";
     scene_path = "gpu_top_scene.hex";
     void'($value$plusargs("OUT=%s", out_path));
@@ -697,6 +733,7 @@ module tb_gpu_top #(
 
     #20;  // after axi_ram's own initial blocks
     build_scene(scene_path);
+    if ($value$plusargs("TEXTURE=%s", texture_path)) load_texture(texture_path);
     repeat (10) @(posedge aclk);
     aresetn = 1;
     frontend_rst_n = 1;
@@ -704,13 +741,16 @@ module tb_gpu_top #(
     repeat (10) @(posedge aclk);
 
     register_access();
-    clear_frame_buffers(ClearColor);  // dummy_core ignores the writes, but not CLEAR_BUSY
+    if (tex_loaded) begin
+      axi_write(LutBase, tex_base);
+      axi_write(LutSize, 32'(tex_size));
+    end
+    clear_frame_buffers(ClearColor);
     for (int ty = 0; ty < TilesY; ty++)
       for (int tx = 0; tx < TilesX; tx++) render_tile(tx, ty);
-    if (DUMMY_CORE) check_image();
-    else $display("[%0t] image not checked here (make compares it with raster_sw's)", $time);
+    $display("[%0t] image not checked here (make compares it with raster_sw's)", $time);
     write_tga(out_path);
-    if (!DUMMY_CORE) check_cleared();
+    check_cleared();
     if (tri_err) error("triangle DMA reported an error");
 
     if (errors == 0) $display("PASS: %0d tiles, %0d triangles, wrote %s", TilesX * TilesY,

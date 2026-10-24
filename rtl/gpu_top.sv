@@ -1,8 +1,7 @@
 // GPU Top
 // Copyright (c) 2026 Stavros Avramidis
 //
-// The GPU as the CPU sees it: one AXI control port and the memory masters, around the raster core
-// (or dummy_core, to bring up everything else on hardware first).
+// The GPU as the CPU sees it: one AXI control port and the memory masters, around the raster core.
 //
 //   CPU ── s_axi_ctrl ──► Axi4ToApbXbar ──► APB: frontend, threads 0..3, texture LUT,
 //                                              tile DMA, visibility DMA
@@ -15,26 +14,31 @@
 //   triangle_stream_adapter ──► async FIFO (aclk → frontend_clk) ──► core
 //   core frame buffers ──► tile DMA ── m_axi_tile (PS DDR): the finished tile; the tile DMA writes
 //                          CLEAR_VALUE back over what it read, and fills them with it on CLEAR
+//   thread n's L1 texture cache ◄── m_axi_tex[n] (PS DDR, thread_clk): 256-byte lines
 //
 // Control map (4 KiB, from Axi4ToApbXbar): 0x000 texture LUT, 0x800 frontend, 0x820 + 0x20 * n
 // thread n, 0xF00 tile DMA, 0xF80 visibility DMA.
 //
 // Clocks: aclk runs the crossbar, every APB slave, both DMAs and the DataMover; the core runs on
-// frontend_clk and thread_clk, and the tile DMA reads the frame buffers on thread_clk.
+// frontend_clk and thread_clk. The tile DMA reads the frame buffers on thread_clk, and the
+// texture masters run on it.
 //
-// Not connected yet: the Control Unit's crossbar port (tied off) and the texture masters (no L2
-// cache; their reads are never answered, so only untextured triangles complete on the real core).
+// Texture addresses: a texture cache makes 27-bit byte addresses (the texture LUT holds word
+// addresses), so 128 MiB; TEXTURE_WINDOW supplies the bits above, picking which 128 MiB.
+//
+// Not connected yet: the Control Unit's crossbar port (tied off).
 
 `timescale 1ns / 1ps
 
 import gpu_types_pkg::*;
 
 module gpu_top #(
-    // dummy_core instead of raster_core
-    parameter bit DUMMY_CORE = 1'b1,
     // Bytes between triangles in memory: the packed 96-byte gpu_triangle_t, as AxiVisibilityDma
     // addresses them
-    parameter int TRIANGLE_STRIDE = 96
+    parameter int TRIANGLE_STRIDE = 96,
+    // OR'd into the texture masters' addresses: where the 128 MiB they reach starts (a multiple
+    // of 128 MiB)
+    parameter logic [31:0] TEXTURE_WINDOW = 32'h0000_0000
 ) (
     // * Clocks and resets * //
     input logic aclk,
@@ -134,6 +138,19 @@ module gpu_top #(
     input  logic [  1:0] m_axi_tile_bresp,
     input  logic         m_axi_tile_bvalid,
     output logic         m_axi_tile_bready,
+
+    // * Texture reads (PS DDR), 128-bit, one master per thread's L1 cache (thread_clk) * //
+    output logic [NUM_OF_THREADS-1:0][ 31:0] m_axi_tex_araddr,
+    output logic [NUM_OF_THREADS-1:0][  7:0] m_axi_tex_arlen,
+    output logic [NUM_OF_THREADS-1:0][  2:0] m_axi_tex_arsize,
+    output logic [NUM_OF_THREADS-1:0][  1:0] m_axi_tex_arburst,
+    output logic [NUM_OF_THREADS-1:0]        m_axi_tex_arvalid,
+    input  logic [NUM_OF_THREADS-1:0]        m_axi_tex_arready,
+    input  logic [NUM_OF_THREADS-1:0][127:0] m_axi_tex_rdata,
+    input  logic [NUM_OF_THREADS-1:0][  1:0] m_axi_tex_rresp,
+    input  logic [NUM_OF_THREADS-1:0]        m_axi_tex_rlast,
+    input  logic [NUM_OF_THREADS-1:0]        m_axi_tex_rvalid,
+    output logic [NUM_OF_THREADS-1:0]        m_axi_tex_rready,
 
     // * Interrupts (aclk) * //
     output logic vis_dma_irq,
@@ -430,66 +447,69 @@ module gpu_top #(
     assign core_thread_PADDR[lane] = 8'(thread_PADDR[lane]);
   end
 
-  // The core's port list, shared by both cores.
-`define GPU_TOP_CORE_PORTS \
-      .frontend_clk(frontend_clk), \
-      .frontend_rst_n(frontend_rst_n), \
-      .thread_clk(thread_clk), \
-      .thread_rst_n(thread_rst_n), \
-      .apb_clk(aclk), \
-      .apb_rst_n(aresetn), \
-      .valid_in(!tri_cdc_empty), \
-      .ready_out(core_tri_ready), \
-      .in_data(core_tri), \
-      .s_apb_frontend_PADDR(5'(frontend_PADDR)), \
-      .s_apb_frontend_PSEL(frontend_PSEL), \
-      .s_apb_frontend_PENABLE(frontend_PENABLE), \
-      .s_apb_frontend_PREADY(frontend_PREADY), \
-      .s_apb_frontend_PWRITE(frontend_PWRITE), \
-      .s_apb_frontend_PWDATA(frontend_PWDATA), \
-      .s_apb_frontend_PRDATA(frontend_PRDATA), \
-      .s_apb_frontend_PSLVERROR(frontend_PSLVERROR), \
-      .s_apb_thread_PADDR(core_thread_PADDR), \
-      .s_apb_thread_PSEL(thread_PSEL), \
-      .s_apb_thread_PENABLE(thread_PENABLE), \
-      .s_apb_thread_PREADY(thread_PREADY), \
-      .s_apb_thread_PWRITE(thread_PWRITE), \
-      .s_apb_thread_PWDATA(thread_PWDATA), \
-      .s_apb_thread_PRDATA(thread_PRDATA), \
-      .s_apb_thread_PSLVERROR(thread_PSLVERROR), \
-      .s_apb_lut_PADDR(10'(lut_PADDR)), \
-      .s_apb_lut_PSEL(lut_PSEL), \
-      .s_apb_lut_PENABLE(lut_PENABLE), \
-      .s_apb_lut_PREADY(lut_PREADY), \
-      .s_apb_lut_PWRITE(lut_PWRITE), \
-      .s_apb_lut_PWDATA(lut_PWDATA), \
-      .s_apb_lut_PRDATA(lut_PRDATA), \
-      .s_apb_lut_PSLVERROR(lut_PSLVERROR), \
-      .fb_wr_en(fb_wr_en), \
-      .fb_wr_addr(fb_wr_addr), \
-      .fb_wr_data(fb_wr_data), \
-      .fb_rd_en(fb_rd_en), \
-      .fb_rd_addr(fb_rd_addr), \
-      .fb_rd_data(fb_rd_data), \
-      .tex_m_axi_araddr(), \
-      .tex_m_axi_arlen(), \
-      .tex_m_axi_arsize(), \
-      .tex_m_axi_arburst(), \
-      .tex_m_axi_arvalid(), \
-      .tex_m_axi_arready('0), \
-      .tex_m_axi_rdata('0), \
-      .tex_m_axi_rresp('0), \
-      .tex_m_axi_rvalid('0), \
-      .tex_m_axi_rready(), \
-      .tex_m_axi_rlast('0)
+  // The texture caches' addresses, moved into the window.
+  logic [NUM_OF_THREADS-1:0][31:0] tex_araddr;
 
-  if (DUMMY_CORE) begin : g_core
-    dummy_core u_core (`GPU_TOP_CORE_PORTS);
-  end else begin : g_core
-    raster_core u_core (`GPU_TOP_CORE_PORTS);
+  initial begin
+    if (TEXTURE_WINDOW[26:0] != '0) $fatal(1, "TEXTURE_WINDOW must be a multiple of 128 MiB");
   end
 
-`undef GPU_TOP_CORE_PORTS
+  for (genvar lane = 0; lane < NUM_OF_THREADS; lane++) begin : g_tex_window
+    assign m_axi_tex_araddr[lane] = TEXTURE_WINDOW | tex_araddr[lane];
+  end
+
+  raster_core u_core (
+      .frontend_clk(frontend_clk),
+      .frontend_rst_n(frontend_rst_n),
+      .thread_clk(thread_clk),
+      .thread_rst_n(thread_rst_n),
+      .apb_clk(aclk),
+      .apb_rst_n(aresetn),
+      .valid_in(!tri_cdc_empty),
+      .ready_out(core_tri_ready),
+      .in_data(core_tri),
+      .s_apb_frontend_PADDR(5'(frontend_PADDR)),
+      .s_apb_frontend_PSEL(frontend_PSEL),
+      .s_apb_frontend_PENABLE(frontend_PENABLE),
+      .s_apb_frontend_PREADY(frontend_PREADY),
+      .s_apb_frontend_PWRITE(frontend_PWRITE),
+      .s_apb_frontend_PWDATA(frontend_PWDATA),
+      .s_apb_frontend_PRDATA(frontend_PRDATA),
+      .s_apb_frontend_PSLVERROR(frontend_PSLVERROR),
+      .s_apb_thread_PADDR(core_thread_PADDR),
+      .s_apb_thread_PSEL(thread_PSEL),
+      .s_apb_thread_PENABLE(thread_PENABLE),
+      .s_apb_thread_PREADY(thread_PREADY),
+      .s_apb_thread_PWRITE(thread_PWRITE),
+      .s_apb_thread_PWDATA(thread_PWDATA),
+      .s_apb_thread_PRDATA(thread_PRDATA),
+      .s_apb_thread_PSLVERROR(thread_PSLVERROR),
+      .s_apb_lut_PADDR(10'(lut_PADDR)),
+      .s_apb_lut_PSEL(lut_PSEL),
+      .s_apb_lut_PENABLE(lut_PENABLE),
+      .s_apb_lut_PREADY(lut_PREADY),
+      .s_apb_lut_PWRITE(lut_PWRITE),
+      .s_apb_lut_PWDATA(lut_PWDATA),
+      .s_apb_lut_PRDATA(lut_PRDATA),
+      .s_apb_lut_PSLVERROR(lut_PSLVERROR),
+      .fb_wr_en(fb_wr_en),
+      .fb_wr_addr(fb_wr_addr),
+      .fb_wr_data(fb_wr_data),
+      .fb_rd_en(fb_rd_en),
+      .fb_rd_addr(fb_rd_addr),
+      .fb_rd_data(fb_rd_data),
+      .tex_m_axi_araddr(tex_araddr),
+      .tex_m_axi_arlen(m_axi_tex_arlen),
+      .tex_m_axi_arsize(m_axi_tex_arsize),
+      .tex_m_axi_arburst(m_axi_tex_arburst),
+      .tex_m_axi_arvalid(m_axi_tex_arvalid),
+      .tex_m_axi_arready(m_axi_tex_arready),
+      .tex_m_axi_rdata(m_axi_tex_rdata),
+      .tex_m_axi_rresp(m_axi_tex_rresp),
+      .tex_m_axi_rvalid(m_axi_tex_rvalid),
+      .tex_m_axi_rready(m_axi_tex_rready),
+      .tex_m_axi_rlast(m_axi_tex_rlast)
+  );
 
   //
   // Tile DMA: frame buffers (thread_clk) to PS DDR, and CLEAR_VALUE back into them

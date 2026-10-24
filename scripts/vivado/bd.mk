@@ -1,7 +1,7 @@
 # Vivado project flow for a block design under bd/<name>/, and the Vitis workspace of its software.
 #
 # Include from its Makefile after setting BD_NAME, PART, BOARD_PART, RTL, BD_TCL and XDC, and for
-# the Vitis targets VITIS_APP (name), VITIS_APP_SRC (its source directory) and VITIS_APP_INCLUDES.
+# the Vitis targets VITIS_APP (name), VITIS_APP_SRC (its source directories) and VITIS_APP_INCLUDES.
 #
 #   project     create the project in build/bd/<name>/ (once: edits made in the GUI stay in it;
 #               `make clean project` rebuilds it from BD_TCL)
@@ -14,14 +14,16 @@
 #   clean       delete the project and the logs
 #   vitis       the Vitis workspace build/vitis/<name>/: a platform from the XSA (made first when
 #               missing, a red warning when out of date; given the new one after `make xsa`) and
-#               the application, which builds VITIS_APP_SRC where it is and lists its .c and .h
-#               files and the headers of VITIS_APP_INCLUDES (again when one is added or removed)
+#               the application, which builds VITIS_APP_SRC where they are and lists their .c and
+#               .h files and the headers of VITIS_APP_INCLUDES (again when one is added or
+#               removed); its include path is both
 #   vitis_gui   vitis, then open the workspace in the Vitis IDE
 #   vitis_build vitis, then build the application (<workspace>/<app>/build/<app>.elf)
 #   vitis_clean delete the workspace
 # synth, impl, bitstream and xsa skip runs that are complete and up to date. The SpinalHDL Verilog
 # in RTL is made first (scripts/spinal.mk); the project refers to it where it is, so it is not
-# recreated when that changes. The Vitis targets make the generated register map headers.
+# recreated when that changes. The Vitis targets never run SpinalHDL, except to make the generated
+# register map headers when they are missing.
 
 include $(dir $(lastword $(MAKEFILE_LIST)))vivado.mk
 include $(VIVADO_MK_DIR)/../spinal.mk
@@ -98,7 +100,10 @@ VITIS_BUILT = $(VITIS_WS)/.$(VITIS_APP)_built
 VITIS_SOURCE_DIRS = $(foreach d,$(abspath $(VITIS_APP_SRC) $(VITIS_APP_INCLUDES)),\
                       $(d) $(patsubst %/,%,$(wildcard $(d)/*/ $(d)/*/*/)))
 VITIS_ARGS = $(REPO_ROOT)/build/vitis/$(BD_NAME)_args.json
+# The generated register map headers the application includes: made when missing (a fresh clone),
+# otherwise left as `make xsa` last made them, matching the XSA.
 VITIS_HEADERS = $(filter %.h,$(SPINAL_DOCS))
+VITIS_MISSING_HEADERS = $(filter-out $(wildcard $(VITIS_HEADERS)),$(VITIS_HEADERS))
 
 # vitis -s loses the script's exit code on Windows: fail when the stage's file is not there.
 ifeq ($(OS),Windows_NT)
@@ -109,6 +114,7 @@ endif
 
 BD_COMMA := ,
 BD_SPACE := $(subst ,, )
+VITIS_JSON_PATHS = [$(subst $(BD_SPACE),$(BD_COMMA) ,$(patsubst %,"%",$(abspath $(1))))]
 define VITIS_ARGS_JSON
 {
   "workspace": "$(VITIS_WS)",
@@ -117,8 +123,8 @@ define VITIS_ARGS_JSON
   "cpu": "$(VITIS_CPU)",
   "domain": "$(VITIS_DOMAIN)",
   "app": "$(VITIS_APP)",
-  "app_src": "$(abspath $(VITIS_APP_SRC))",
-  "app_includes": [$(subst $(BD_SPACE),$(BD_COMMA) ,$(patsubst %,"%",$(abspath $(VITIS_APP_INCLUDES))))],
+  "app_src": $(call VITIS_JSON_PATHS,$(VITIS_APP_SRC)),
+  "app_includes": $(call VITIS_JSON_PATHS,$(VITIS_APP_INCLUDES)),
   "stamp": "$(VITIS_STAMP)",
   "sources_stamp": "$(VITIS_SOURCES_STAMP)",
   "built": "$(VITIS_BUILT)"
@@ -134,8 +140,10 @@ unexport ELECTRON_RUN_AS_NODE
 
 # Made only when it is missing; `make xsa` keeps it up to date. When it is older than what it is
 # built from (the RTL, the constraints, the project's block design with the edits made in the GUI),
-# the Vitis targets say so in red and go on with it.
-XSA_INPUTS = $(abspath $(RTL) $(XDC)) $(wildcard $(BD_DIR)/$(BD_NAME).srcs/sources_1/bd/*/*.bd)
+# the Vitis targets say so in red and go on with it. The SpinalHDL modules count by their Scala
+# sources, so the Vitis targets never regenerate their Verilog: only the XSA needs it.
+XSA_INPUTS = $(filter-out $(SPINAL_VERILOG),$(abspath $(RTL) $(XDC))) $(call spinal_sources,$(BD_SPINAL_VERILOG)) \
+             $(wildcard $(BD_DIR)/$(BD_NAME).srcs/sources_1/bd/*/*.bd)
 # $? is the inputs newer than the XSA.
 XSA_OLD_BAR = ================================================================================
 XSA_OLD_1 = WARNING: $(notdir $(XSA)) is out of date, older than:
@@ -161,15 +169,15 @@ $(VITIS_STAMP): $(XSA) | $(VITIS_WS)
 	$(call VITIS_CHECK,$@)
 
 # The generated headers first, so they are listed too.
-$(VITIS_SOURCES_STAMP): $(VITIS_STAMP) $(VITIS_SOURCE_DIRS) | $(VITIS_HEADERS)
+$(VITIS_SOURCES_STAMP): $(VITIS_STAMP) $(VITIS_SOURCE_DIRS) | $(VITIS_MISSING_HEADERS)
 	$(VITIS_RUN) sources
 	$(call VITIS_CHECK,$@)
 
-vitis_build: $(VITIS_SOURCES_STAMP) $(VITIS_HEADERS)
+vitis_build: $(VITIS_SOURCES_STAMP)
 	$(VITIS_RUN) build
 	$(call VITIS_CHECK,$(VITIS_BUILT))
 
-vitis_gui: $(VITIS_SOURCES_STAMP) $(VITIS_HEADERS)
+vitis_gui: $(VITIS_SOURCES_STAMP)
 	cd $(VITIS_WS) && $(VITIS) -w $(VITIS_WS)
 
 vitis_clean:

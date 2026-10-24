@@ -1,12 +1,12 @@
 // Bare-metal driver for the GPU's control port (Zynq UltraScale+, standalone BSP).
 //
-// A frame is rendered one 128 x 128 tile at a time: point the frontend at the tile, let the
-// visibility DMA stream the tile's triangles into the core, wait until the core is idle, then let
-// the tile DMA write the tile's frame buffer to memory. The tile DMA leaves the clear colour behind
-// in the frame buffer as it reads it, so only the first tile needs a clear (its CLEAR, at the start
-// of the frame). The DMAs are polled, or with use_interrupts
-// their interrupts are waited for (gpu_vis_dma_isr and gpu_tile_dma_isr, connected by the
-// application). The core's idle state is always polled.
+// A frame is rendered one 128 x 128 tile at a time: clear the z-buffers, point the frontend at the
+// tile, let the visibility DMA stream the tile's triangles into the core, wait until the core is
+// idle, then let the tile DMA write the tile's frame buffer to memory. The tile DMA leaves the
+// clear colour behind in the frame buffer as it reads it, so only the first tile needs a clear (its
+// CLEAR, at the start of the frame). The DMAs are polled, or with use_interrupts their interrupts
+// are waited for (gpu_vis_dma_isr and gpu_tile_dma_isr, connected by the application). The core's
+// idle state is always polled.
 #pragma once
 
 #include <stdint.h>
@@ -68,7 +68,15 @@ gpu_status_t gpu_wait_idle(const gpu_t *gpu);
 // write-back from then on. The core must be idle.
 gpu_status_t gpu_clear_frame_buffers(const gpu_t *gpu, uint32_t color);
 
+// Texture id (a triangle's tex_id): 1 << log2_size texels square, ARGB, in Morton order (bit 2i of
+// a texel's index is bit i of its x, bit 2i + 1 bit i of its y: gpu_texel_index), at a multiple of
+// their own size in bytes, inside the texture window (gpu_map.h). Flushes them from the data
+// cache. Returns 0, or -1 if the GPU cannot use them where they are.
+int gpu_set_texture(const gpu_t *gpu, uint32_t id, const uint32_t *texels, uint32_t log2_size);
+uint32_t gpu_texel_index(uint32_t x, uint32_t y);
+
 // One tile, each step on its own.
+gpu_status_t gpu_clear_zbuffers(const gpu_t *gpu); // every thread's back to 1.0, the far plane
 void gpu_set_tile(const gpu_t *gpu, uint32_t tile_x, uint32_t tile_y);
 gpu_status_t gpu_stream_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t tile);
 gpu_status_t gpu_write_back_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t tile);

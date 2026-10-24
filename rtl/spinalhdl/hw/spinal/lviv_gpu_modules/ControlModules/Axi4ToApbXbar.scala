@@ -218,10 +218,11 @@ case class Axi4ToApbXbar(
 
   // JSON address map: every decoded window, LUT tables as subregions, and the reserved gaps,
   // so tools can parse and plot the full APB space. "regmap" points at the slave's regif JSON.
+  // Addresses are numbers, as in the regif JSON; only the reserved gaps' names carry them in hex.
   def addressMapJson: String = {
     def hex(v: BigInt): String = f"0x${v.toLong}%03X"
     def span(base: BigInt, size: BigInt): String =
-      s""""base": "${hex(base)}", "end": "${hex(base + size - 1)}", "size": $size"""
+      s""""base": $base, "end": ${base + size - 1}, "size": $size"""
 
     val total = BigInt(1) << addressWidth
 

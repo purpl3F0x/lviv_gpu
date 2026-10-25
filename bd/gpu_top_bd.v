@@ -7,7 +7,11 @@
 module gpu_top_bd #(
     parameter TEXTURE_WINDOW = 32'h00000000
 ) (
-    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 aclk CLK", X_INTERFACE_PARAMETER = "ASSOCIATED_BUSIF s_axi_ctrl:m_axi_vb:m_axi_tri:m_axi_tile, ASSOCIATED_RESET aresetn" *)
+    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 ctrl_clk CLK", X_INTERFACE_PARAMETER = "ASSOCIATED_BUSIF s_axi_ctrl, ASSOCIATED_RESET ctrl_rst_n" *)
+    input  wire         ctrl_clk,
+    (* X_INTERFACE_INFO = "xilinx.com:signal:reset:1.0 ctrl_rst_n RST", X_INTERFACE_PARAMETER = "POLARITY ACTIVE_LOW" *)
+    input  wire         ctrl_rst_n,
+    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 aclk CLK", X_INTERFACE_PARAMETER = "ASSOCIATED_BUSIF m_axi_vb:m_axi_tri:m_axi_tile, ASSOCIATED_RESET aresetn" *)
     input  wire         aclk,
     (* X_INTERFACE_INFO = "xilinx.com:signal:reset:1.0 aresetn RST", X_INTERFACE_PARAMETER = "POLARITY ACTIVE_LOW" *)
     input  wire         aresetn,
@@ -173,6 +177,8 @@ module gpu_top_bd #(
   gpu_top #(
       .TEXTURE_WINDOW(TEXTURE_WINDOW)
   ) u_gpu_top (
+      .ctrl_clk(ctrl_clk),
+      .ctrl_rst_n(ctrl_rst_n),
       .aclk(aclk),
       .aresetn(aresetn),
       .frontend_clk(frontend_clk),

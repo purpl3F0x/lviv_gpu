@@ -1,16 +1,17 @@
 // Tests of gpu_top's raster core on the ZCU104 (bd/gpu_test), on the A53 (standalone).
 //
 // One triangle, made here (no scene data): blue at the top, red at the bottom left, green at the
-// bottom right, over a black clear colour. It is drawn twice:
-//  1. Colour: untextured, so each pixel gets the corners' colours by its barycentric weights.
+// bottom right, over a black clear color. It is drawn in two ways, each by the CPU tile by tile and
+// by the command processor in one START (gpu_set_mode), the same frame expected from both:
+//  1. Color: untextured, so each pixel gets the corners' colors by its barycentric weights.
 //  2. Texture: a 64 x 64 black and white checkerboard made here (8 x 8 squares of 8 texels),
-//     repeated twice across the triangle and modulating its colours: the colours show in the
+//     repeated twice across the triangle and modulating its colors: the colors show in the
 //     white squares, the black ones stay black. Every thread's texture cache reads it from PS DDR.
 // Each is a frame of 1280 x 720 in 10 x 6 tiles of 128 x 128 (each with its z-buffers cleared, the
 // triangle streamed into the core when its bounding box touches the tile, then written back),
 // checked pixel by pixel against the triangle worked out here in floating point. A pixel whose
-// centre is inside every edge by a pixel or more must be the expected colour, within
-// COLOR_TOLERANCE in each channel; one outside an edge by a pixel or more the clear colour. Those in
+// centre is inside every edge by a pixel or more must be the expected color, within
+// COLOR_TOLERANCE in each channel; one outside an edge by a pixel or more the clear color. Those in
 // between are not checked, nor those on the border of a checkerboard square.
 // Then the DisplayPort output shows the last frame, the link brought up and down as a monitor is
 // plugged in and pulled, for as long as the board runs.
@@ -45,7 +46,7 @@
 #define FRAME_ROWS (TILES_Y * GPU_TILE_SIZE) // the tile DMA writes whole tiles
 #define STRIDE (WIDTH * 4)
 #define CLEAR_COLOR 0xFF000000u // opaque black
-// The largest difference from the colour worked out here, per channel: the core interpolates in
+// The largest difference from the color worked out here, per channel: the core interpolates in
 // fixed point (8 fractional bits on the weights) and truncates.
 #define COLOR_TOLERANCE 3
 
@@ -176,8 +177,8 @@ static int build_triangle(int textured)
 }
 
 // What the core should draw at (x, y), sampled at the pixel's centre as the core does: 1 inside
-// every edge by a pixel or more, *want the corners' colours by the barycentric weights (modulated
-// by the checkerboard when textured); 0 outside one by a pixel or more, *want the clear colour;
+// every edge by a pixel or more, *want the corners' colors by the barycentric weights (modulated
+// by the checkerboard when textured); 0 outside one by a pixel or more, *want the clear color;
 // -1 in between, or on the border of a square.
 static int expected(int x, int y, int textured, uint32_t *want)
 {
@@ -203,7 +204,7 @@ static int expected(int x, int y, int textured, uint32_t *want)
     if (textured)
     {
         // The square the texture coordinates fall in. Repeating the texture keeps a square's
-        // colour: an even number of squares across.
+        // color: an even number of squares across.
         double u = 0, v = 0;
         for (int i = 0; i < 3; i++)
         {
@@ -274,29 +275,31 @@ static int check_frame(const char *name, int textured)
     }
     xil_printf("%s: inside %d pixels, %d wrong (largest channel error %d, up to %d allowed)\r\n", name, pixels[1],
                wrong[1], worst, COLOR_TOLERANCE);
-    xil_printf("%s: outside %d pixels, %d not the clear colour\r\n", name, pixels[0], wrong[0]);
+    xil_printf("%s: outside %d pixels, %d not the clear color\r\n", name, pixels[0], wrong[0]);
     xil_printf("%s: %d pixels near an edge%s, not checked\r\n", name, unchecked,
                textured ? " or a square's border" : "");
     return wrong[0] + wrong[1];
 }
 
-// The triangle drawn into frame and checked; returns the errors.
-static int run(const char *name, int textured)
+// The triangle drawn into frame by the CPU or the command processor, and checked; returns the
+// errors.
+static int render(const char *name, int textured, gpu_mode_t mode)
 {
     build_triangle(textured);
+    gpu_set_mode(&gpu, mode);
     gpu_frame_t f = {
         .triangles = &triangle,
         .visibility = &visibility,
         .triangle_count = 1,
         .frame = frame,
         .stride = STRIDE,
-        .tiles_x = TILES_X,
-        .tiles_y = TILES_Y,
+        .width = WIDTH,
+        .height = HEIGHT,
         .clear_color = CLEAR_COLOR,
     };
     XTime start, end;
     uint32_t failed_tile = 0;
-    memset(frame, 0, sizeof frame); // not the clear colour: a tile not written back shows
+    memset(frame, 0, sizeof frame); // not the clear color: a tile not written back shows
     XTime_GetTime(&start);
     gpu_status_t status = gpu_frame(&gpu, &f, &failed_tile);
     XTime_GetTime(&end);
@@ -307,6 +310,11 @@ static int run(const char *name, int textured)
     }
     xil_printf("%s: frame %d us\r\n", name, (int)((end - start) / (COUNTS_PER_SECOND / 1000000)));
     return check_frame(name, textured);
+}
+
+static int run(const char *cpu_name, const char *cp_name, int textured)
+{
+    return render(cpu_name, textured, GPU_MODE_CPU) + render(cp_name, textured, GPU_MODE_CP);
 }
 
 int main(void)
@@ -331,13 +339,13 @@ int main(void)
         return 1;
     }
 
-    errors += run("colour", 0);
+    errors += run("color, CPU", "color, CP", 0);
 
     fill_checkerboard();
     if (gpu_set_texture(&gpu, TEX_ID, texture, TEX_LOG2) == 0)
     {
         xil_printf("texture: %d x %d checkerboard at 0x%x\r\n", TEX_SIZE, TEX_SIZE, (int)(uintptr_t)texture);
-        errors += run("texture", 1);
+        errors += run("texture, CPU", "texture, CP", 1);
     }
     else
     {

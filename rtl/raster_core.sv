@@ -98,7 +98,13 @@ module raster_core (
     input  logic [NUM_OF_THREADS-1:0][  1:0] tex_m_axi_rresp,
     input  logic [NUM_OF_THREADS-1:0]        tex_m_axi_rvalid,
     output logic [NUM_OF_THREADS-1:0]        tex_m_axi_rready,
-    input  logic [NUM_OF_THREADS-1:0]        tex_m_axi_rlast
+    input  logic [NUM_OF_THREADS-1:0]        tex_m_axi_rlast,
+
+    // * Status, raw, each in its own clock: the command processor captures and syncs it * //
+    output logic                      frontend_empty,      // frontend_clk
+    output logic                      orchestrator_empty,  // thread_clk
+    output logic [NUM_OF_THREADS-1:0] thread_empty,        // thread_clk
+    output logic [NUM_OF_THREADS-1:0] zbuf_ready           // thread_clk: low while clearing
 );
 
   // The orchestrator and the texture table are built for exactly four threads.
@@ -125,9 +131,9 @@ module raster_core (
   assign ready_out = !input_fifo_full;
 
   sync_fifo #(
-      .DATA_WIDTH($bits(frontend_data_in_t)),
-      .FIFO_DEPTH(InputFifoDepth),
-      .RAM_STYLE("ultra"),
+      .DATA_WIDTH ($bits(frontend_data_in_t)),
+      .FIFO_DEPTH (InputFifoDepth),
+      .RAM_STYLE  ("ultra"),
       .OUTPUT_REGS(InputFifoOutputRegs)
   ) u_input_fifo (
       .clk(frontend_clk),
@@ -154,7 +160,6 @@ module raster_core (
   logic                  frontend_valid;
   logic                  orchestrator_ready;
   orchestrator_data_in_t frontend_data;
-  logic                  orchestrator_empty;
 
   raster_frontend u_frontend (
       .clk(frontend_clk),
@@ -177,7 +182,7 @@ module raster_core (
       .out_data(frontend_data),
       .orchestrator_empty(orchestrator_empty),
       .input_fifo_idle(input_fifo_idle),
-      .core_empty(),  // also readable through the frontend status register
+      .core_empty(frontend_empty),  // also readable through the frontend status register
       .core_rst_n(frontend_core_rst_n)
   );
 
@@ -254,7 +259,7 @@ module raster_core (
         .valid_in(thread_valid[lane]),
         .ready_out(thread_ready[lane]),
         .in_data(thread_data[lane]),
-        .empty(),  // also readable through the thread's busy register
+        .empty(thread_empty[lane]),  // also readable through the thread's busy register
         .out_fb_color(thread_fb_color),
         .out_fb_addr(thread_fb_addr),
         .out_fb_valid(),  // out_fb_we already excludes fragments that fail the depth test
@@ -272,7 +277,7 @@ module raster_core (
         .s_apb_PWDATA(s_apb_thread_PWDATA[lane]),
         .s_apb_PRDATA(s_apb_thread_PRDATA[lane]),
         .s_apb_PSLVERROR(s_apb_thread_PSLVERROR[lane]),
-        .zbuf_ready(),  // also readable through the thread's z-buffer clear register
+        .zbuf_ready(zbuf_ready[lane]),  // also readable through its z-buffer clear register
         .tex_m_axi_araddr(tex_m_axi_araddr[lane]),
         .tex_m_axi_arlen(tex_m_axi_arlen[lane]),
         .tex_m_axi_arsize(tex_m_axi_arsize[lane]),

@@ -5,7 +5,7 @@ import gpu_types_pkg::*;
 // Self-checking testbench for one thread with the real Xilinx FP IP (run with Makefile.vivado).
 //
 //   1. clear the depth buffer over APB and wait for the scrub to finish
-//   2. colour: covered and uncovered pixels on fresh addresses, untextured, blended with random
+//   2. color: covered and uncovered pixels on fresh addresses, untextured, blended with random
 //      factors against a pre-filled tile buffer
 //   3. depth: revisit the covered addresses with nearer or farther depth
 //   4. texture: REPLACE and MODULATE through the L1 cache from an AXI RAM, wrap and clamp modes;
@@ -22,9 +22,9 @@ module tb_thread;
   localparam real ClkHalf = 0.75;  // 1.5 ns thread clock
   localparam real ApbHalf = 5.0;  // 100 MHz APB clock
 
-  localparam int ColourTokens = 300;
+  localparam int ColorTokens = 300;
   localparam int TextureTokens = 400;
-  localparam int ColourTol = 3;  // LSBs allowed where the result depends on interpolated colour
+  localparam int ColorTol = 3;  // LSBs allowed where the result depends on interpolated color
 
   // Texture 0: 64 x 64 texels at word address 4096, aligned to its 4^6-word footprint.
   localparam logic [6:0] TexId = 7'd0;
@@ -175,7 +175,7 @@ module tb_thread;
     logic [AddrW-1:0] addr;
     logic pass;          // depth test result
     fragment_op_t op;    // texture function the shader applies
-    color_argb_t cf;     // interpolated vertex colour
+    color_argb_t cf;     // interpolated vertex color
     color_argb_t texel;
     blend_op_t sf;
     blend_op_t df;
@@ -190,8 +190,8 @@ module tb_thread;
   bit line_touched[(TexBaseWord + TexSize * TexSize) / 64];
 
   int errors, accepted, fragments, fb_writes, depth_writes, depth_fails, lines_touched;
-  int l1_expected, l1_requests, ar_bursts, max_colour_err;
-  logic [AddrW-1:0] colour_addrs[$];
+  int l1_expected, l1_requests, ar_bursts, max_color_err;
+  logic [AddrW-1:0] color_addrs[$];
 
   function automatic void error(input string msg);
     errors++;
@@ -526,10 +526,10 @@ module tb_thread;
   // Phases
   // -------------------------------------------------------------------------
 
-  task automatic phase_colour();
+  task automatic phase_color();
     thread_data_in_t tok;
     bit covered;
-    for (int i = 0; i < ColourTokens; i++) begin
+    for (int i = 0; i < ColorTokens; i++) begin
       covered = $urandom_range(0, 99) >= 15;
       tok = random_pixel(addr_of(i), covered, $urandom_range(100, 900) / 1000.0);
       // Untextured either way: no texture id, or a texture with the COLOR function.
@@ -537,26 +537,26 @@ module tb_thread;
       else tok.tex_id = {1'b0, TexId};
       random_blend(tok);
       if (covered) begin
-        expect_fragment(tok, 1'b0, 32'h0, ColourTol);
-        colour_addrs.push_back(tok.addr);
+        expect_fragment(tok, 1'b0, 32'h0, ColorTol);
+        color_addrs.push_back(tok.addr);
       end
       send(tok);
     end
-    drain("colour");
+    drain("color");
   endtask
 
   task automatic phase_depth();
     thread_data_in_t tok;
     logic [AddrW-1:0] addr;
     real z;
-    for (int i = colour_addrs.size() - 1; i >= 0; i--) begin
-      addr = colour_addrs[i];
+    for (int i = color_addrs.size() - 1; i >= 0; i--) begin
+      addr = color_addrs[i];
       z = z_model[addr] + ($urandom_range(0, 1) ? 0.05 : -0.05);
       tok = random_pixel(addr, 1'b1, z);
       random_blend(tok);
       // Every depth function; z differs from the stored value by +-0.05, so lt / gt decide it.
       tok.depth_func = depth_func_t'($urandom_range(0, 7));
-      expect_fragment(tok, 1'b0, 32'h0, ColourTol);
+      expect_fragment(tok, 1'b0, 32'h0, ColorTol);
       send(tok);
     end
     drain("depth");
@@ -567,7 +567,7 @@ module tb_thread;
     logic [17:0] u, v;
     int x, y, word;
     for (int i = 0; i < TextureTokens; i++) begin
-      tok = random_pixel(addr_of(ColourTokens + i), 1'b1, $urandom_range(100, 900) / 1000.0);
+      tok = random_pixel(addr_of(ColorTokens + i), 1'b1, $urandom_range(100, 900) / 1000.0);
       tok.tex_id = {1'b0, TexId};
       if ($urandom_range(0, 1)) tok.texture_function = REPLACE;
       else tok.texture_function = MODULATE;
@@ -587,7 +587,7 @@ module tb_thread;
       if (!line_touched[word>>6]) lines_touched++;
       line_touched[word>>6] = 1'b1;
       expect_fragment(tok, 1'b1, texel_value(word),
-                      tok.texture_function == REPLACE ? 0 : ColourTol);
+                      tok.texture_function == REPLACE ? 0 : ColorTol);
       send(tok);
     end
     drain("texture");
@@ -597,7 +597,7 @@ module tb_thread;
   // Monitors
   // -------------------------------------------------------------------------
 
-  // Interpolated colour of each fragment as it leaves the arithmetic pipeline, for error reports.
+  // Interpolated color of each fragment as it leaves the arithmetic pipeline, for error reports.
   logic [31:0] hw_cf_q[$];
   always @(posedge clk) begin
     if (rst_n && dut.output_bundle_buf_tvalid && dut.output_bundle_buf_tready)
@@ -643,9 +643,9 @@ module tb_thread;
             if (diff < 0) diff = -diff;
             if (diff > worst) worst = diff;
           end
-          if (f.tol != 0 && worst > max_colour_err) max_colour_err = worst;
+          if (f.tol != 0 && worst > max_color_err) max_color_err = worst;
           if (worst > f.tol || $isunknown(got))
-            error($sformatf({"colour 0x%08h at address %0d, expected 0x%08h (op %s, blend %s/%s, ",
+            error($sformatf({"color 0x%08h at address %0d, expected 0x%08h (op %s, blend %s/%s, ",
                              "interpolated 0x%08h, model 0x%08h, dst 0x%08h)"},
                             got, f.addr, expected, op.name(), sf.name(), df.name(), hw_cf,
                             f.cf, fb_mem[f.addr]));
@@ -711,7 +711,7 @@ module tb_thread;
     l1_expected = 0;
     l1_requests = 0;
     ar_bursts = 0;
-    max_colour_err = 0;
+    max_color_err = 0;
     lines_touched = 0;
     valid_in = 1'b0;
     in_data = '0;
@@ -740,7 +740,7 @@ module tb_thread;
 
     clear_zbuffer();
     $display("[%0t] depth buffer cleared", $time);
-    phase_colour();
+    phase_color();
     phase_depth();
     phase_texture();
 
@@ -754,7 +754,7 @@ module tb_thread;
              seed, accepted, fragments, fb_writes, depth_fails);
     $display("Depth writes %0d; L1 requests %0d, AXI bursts %0d, lines touched %0d",
              depth_writes, l1_requests, ar_bursts, lines_touched);
-    $display("Max colour error %0d LSB", max_colour_err);
+    $display("Max color error %0d LSB", max_color_err);
     if (errors) $fatal(1, "FAIL: %0d errors", errors);
     $display("PASS: thread");
     $finish;

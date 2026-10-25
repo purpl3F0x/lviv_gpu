@@ -10,9 +10,11 @@ object APBFrontendRegs {
   val byteCount = 32 // APB window: 8 words
 }
 
-class APBFrontendRegs(tile_x_width: Int = 5, tile_y_width: Int = 5) extends Component {
-  require(tile_x_width >= 1 && tile_x_width <= 32)
-  require(tile_y_width >= 1 && tile_y_width <= 32)
+// The frontend's status and the tile's box: its first and last pixel on each axis, written with
+// each tile (by the CPU or the command processor) and taken by the frontend as they are.
+class APBFrontendRegs(res_width: Int = 12, tile_size: Int = 128) extends Component {
+  require(res_width >= 1 && res_width <= 16)
+  require(tile_size >= 1 && tile_size <= (1 << res_width))
 
   val io = new Bundle {
     val apb_clock = in Bool ()
@@ -24,8 +26,10 @@ class APBFrontendRegs(tile_x_width: Int = 5, tile_y_width: Int = 5) extends Comp
     val orchestrator_empty = in Bool ()
     val input_fifo_idle = in Bool ()
     val thread_sw_reset = out Bool ()
-    val tile_x_index = out UInt (tile_x_width bits)
-    val tile_y_index = out UInt (tile_y_width bits)
+    val bb_min_x = out UInt (res_width bits)
+    val bb_min_y = out UInt (res_width bits)
+    val bb_max_x = out UInt (res_width bits)
+    val bb_max_y = out UInt (res_width bits)
   }
 
   noIoPrefix()
@@ -41,6 +45,10 @@ class APBFrontendRegs(tile_x_width: Int = 5, tile_y_width: Int = 5) extends Comp
     config = ClockDomainConfig(resetActiveLevel = LOW, resetKind = SYNC)
   )
 
+  // Reset: tile 0's box
+  val bbMinReset = 0
+  val bbMaxReset = tile_size - 1
+
   val apbArea = new ClockingArea(apbClockDomain) {
     val busif = Apb3BusInterface(io.s_apb, (0x0000, APBFrontendRegs.byteCount), "FRONTEND")
 
@@ -54,24 +62,33 @@ class APBFrontendRegs(tile_x_width: Int = 5, tile_y_width: Int = 5) extends Comp
     ORCHESTRATOR_EMPTY := BufferCC(io.orchestrator_empty, init = False)
     INPUT_FIFO_IDLE := BufferCC(io.input_fifo_idle, init = False)
 
-    // 0x04: Tile X index
-    val REG_TILE_X = busif.newRegAt(address = 0x04, doc = "Tile X Index")
-    val TILE_X = REG_TILE_X.field(UInt(tile_x_width bits), RW, resetValue = 0, doc = "Tile X index")
-    if (tile_x_width < 32) REG_TILE_X.reserved((32 - tile_x_width) bits)
-    val tileXWriteStream = Stream(UInt(tile_x_width bits))
-    tileXWriteStream.valid := REG_TILE_X.hitDoWrite
-    tileXWriteStream.payload := busif.writeData(tile_x_width - 1 downto 0).asUInt
-
-    // 0x08: Tile Y index
-    val REG_TILE_Y = busif.newRegAt(address = 0x08, doc = "Tile Y Index")
-    val TILE_Y = REG_TILE_Y.field(UInt(tile_y_width bits), RW, resetValue = 0, doc = "Tile Y index")
-    if (tile_y_width < 32) REG_TILE_Y.reserved((32 - tile_y_width) bits)
-    val tileYWriteStream = Stream(UInt(tile_y_width bits))
-    tileYWriteStream.valid := REG_TILE_Y.hitDoWrite
-    tileYWriteStream.payload := busif.writeData(tile_y_width - 1 downto 0).asUInt
+    // 0x04 - 0x10: the tile's box, in pixels. A write goes to the frontend's clock as a stream.
+    def boxEdge(address: Int, name: String, doc: String, resetValue: Int) = {
+      val reg = busif.newRegAt(address = address, doc = doc)(SymbolName(s"REG_$name"))
+      reg.field(UInt(res_width bits), RW, resetValue = resetValue, doc = doc)(SymbolName(name))
+      reg.reserved((32 - res_width) bits)
+      val stream = Stream(UInt(res_width bits))
+      stream.valid := reg.hitDoWrite
+      stream.payload := busif.writeData(res_width - 1 downto 0).asUInt
+      stream
+    }
+    val bbMinXWrite = boxEdge(0x04, "BB_MIN_X", "First pixel x of the tile's box", bbMinReset)
+    val bbMinYWrite = boxEdge(0x08, "BB_MIN_Y", "First pixel y of the tile's box", bbMinReset)
+    val bbMaxXWrite = boxEdge(
+      0x0c,
+      "BB_MAX_X",
+      "Last pixel x of the tile's box: the tile's own, or the frame's when the tile runs past it",
+      bbMaxReset
+    )
+    val bbMaxYWrite = boxEdge(
+      0x10,
+      "BB_MAX_Y",
+      "Last pixel y of the tile's box: the tile's own, or the frame's when the tile runs past it",
+      bbMaxReset
+    )
 
     // Named by address, as in ApbThreadRegs: under one name the C header defines each twice.
-    for (address <- 0x0c until APBFrontendRegs.byteCount by 4) {
+    for (address <- 0x14 until APBFrontendRegs.byteCount by 4) {
       val reservedReg = busif.newRegAt(address = address, doc = "Reserved")(SymbolName(f"REG_RESERVED_$address%02X"))
       reservedReg.reserved(32 bits)
     }
@@ -86,18 +103,17 @@ class APBFrontendRegs(tile_x_width: Int = 5, tile_y_width: Int = 5) extends Comp
   io.thread_sw_reset := PulseCCByToggle(apbArea.resetRequest, apbClockDomain, threadClockDomain)
 
   val threadArea = new ClockingArea(threadClockDomain) {
-    val tileXReadStream = StreamCCByToggle(apbArea.tileXWriteStream, apbClockDomain, threadClockDomain)
-    val tileYReadStream = StreamCCByToggle(apbArea.tileYWriteStream, apbClockDomain, threadClockDomain)
-    val tileXIndex = Reg(UInt(tile_x_width bits)) init (0)
-    val tileYIndex = Reg(UInt(tile_y_width bits)) init (0)
-
-    tileXReadStream.ready := True
-    tileYReadStream.ready := True
-    when(tileXReadStream.fire) { tileXIndex := tileXReadStream.payload }
-    when(tileYReadStream.fire) { tileYIndex := tileYReadStream.payload }
-
-    io.tile_x_index := tileXIndex
-    io.tile_y_index := tileYIndex
+    def boxEdge(write: Stream[UInt], resetValue: Int) = {
+      val read = StreamCCByToggle(write, apbClockDomain, threadClockDomain)
+      val value = Reg(UInt(res_width bits)) init (resetValue)
+      read.ready := True
+      when(read.fire) { value := read.payload }
+      value
+    }
+    io.bb_min_x := boxEdge(apbArea.bbMinXWrite, bbMinReset)
+    io.bb_min_y := boxEdge(apbArea.bbMinYWrite, bbMinReset)
+    io.bb_max_x := boxEdge(apbArea.bbMaxXWrite, bbMaxReset)
+    io.bb_max_y := boxEdge(apbArea.bbMaxYWrite, bbMaxReset)
   }
 }
 
@@ -110,8 +126,8 @@ object APBFrontendRegsVerilog extends App {
     )
   ).withPrivateNamespace.generateVerilog(
     new APBFrontendRegs(
-      tile_x_width = log2Up(4096 / 128),
-      tile_y_width = log2Up(4096 / 128)
+      res_width = log2Up(4096),
+      tile_size = 128
     )
   )
 }

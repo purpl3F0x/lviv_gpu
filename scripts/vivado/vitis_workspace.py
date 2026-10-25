@@ -77,14 +77,19 @@ def make_workspace(client):
 def refresh_launch_files():
     # The IDE's launch configurations program copies of the platform's bitstream and psu_init.tcl,
     # made in <app>/_ide/ with them, and do not refresh them when the platform takes a new XSA: the
-    # board would run the new software on the old hardware.
+    # board would run the new software on the old hardware. The platform keeps them below hw/
+    # (hw/sdt/ in 2025.2); the newest, should there be more than one.
     hw = os.path.join(export, "hw")
     ide = os.path.join(workspace, args["app"], "_ide")
     for directory, pattern in (("bitstream", "*.bit"), ("psinit", "psu_init.tcl")):
-        if os.path.isdir(os.path.join(ide, directory)):
-            for f in glob.glob(os.path.join(hw, pattern)):
-                shutil.copy2(f, os.path.join(ide, directory))
-                print(f"Launch file: {os.path.join(args['app'], '_ide', directory, os.path.basename(f))}")
+        if not os.path.isdir(os.path.join(ide, directory)):
+            continue  # no launch configuration yet: the IDE copies the platform's when it makes one
+        found = glob.glob(os.path.join(hw, "**", pattern), recursive=True)
+        if not found:
+            raise RuntimeError(f"no {pattern} below {hw} for {args['app']}'s launch configuration")
+        f = max(found, key=os.path.getmtime)
+        shutil.copy2(f, os.path.join(ide, directory))
+        print(f"Launch file: {os.path.join(args['app'], '_ide', directory, os.path.basename(f))}")
 
 
 def files(directory, patterns):

@@ -11,8 +11,8 @@ import gpu_types_pkg::*;
 //   2. stream the bin's triangles into the frontend
 //   3. wait until the frontend, the orchestrator and all four threads report empty
 //   4. read the four frame buffer slices back through the host ports into the frame
-//   5. fill the frame buffers with the clear colour and clear the z-buffers for the next bin
-// Bins without triangles keep the clear colour, as in raster_sw.
+//   5. fill the frame buffers with the clear color and clear the z-buffers for the next bin
+// Bins without triangles keep the clear color, as in raster_sw.
 //
 // Texture 0 comes from +TEXTURE, an uncompressed 24- or 32-bit TGA, square and a power of two. It
 // is stored Morton-ordered at word address 0 (as texture_address_generator addresses it), in one
@@ -28,7 +28,7 @@ module tb_raster_core #(
   localparam int Lanes = NUM_OF_THREADS;
   localparam int HostWords = 1 << (PIXEL_ADDR_W_THREAD - 1);
   localparam int HostReadLatency = 4;  // frame_buffer_ram: data 4 cycles after r1_en
-  localparam logic [31:0] ClearColor = 32'hFF636363;  // raster_sw's clear colour (ARGB)
+  localparam logic [31:0] ClearColor = 32'hFF636363;  // raster_sw's clear color (ARGB)
   localparam int WaitLimit = 200000;  // cycles before a wait is declared hung
 
   // APB slaves: 0..3 thread register blocks, 4 frontend, 5 texture table.
@@ -140,7 +140,11 @@ module tb_raster_core #(
       .tex_m_axi_rresp(tex_m_axi_rresp),
       .tex_m_axi_rvalid(tex_m_axi_rvalid),
       .tex_m_axi_rready(tex_m_axi_rready),
-      .tex_m_axi_rlast(tex_m_axi_rlast)
+      .tex_m_axi_rlast(tex_m_axi_rlast),
+      .frontend_empty(),
+      .orchestrator_empty(),
+      .thread_empty(),
+      .zbuf_ready()
   );
 
   // -------------------------------------------------------------------------
@@ -239,7 +243,7 @@ module tb_raster_core #(
     bpp = header[16];
     desc = header[17];
     if (header[1] != 0 || header[2] != 2 || (bpp != 24 && bpp != 32))
-      $fatal(1, "%s: need an uncompressed 24- or 32-bit true-colour TGA", path);
+      $fatal(1, "%s: need an uncompressed 24- or 32-bit true-color TGA", path);
     if (w != h || (w & (w - 1)) != 0 || w > (1 << MaxTexLog2))
       $fatal(1, "%s is %0dx%0d: need a square power of two up to %0d", path, w, h,
              1 << MaxTexLog2);
@@ -464,13 +468,13 @@ module tb_raster_core #(
         end
   endtask
 
-  // Uncompressed 32-bit true-colour TGA, top-left origin. An ARGB word is B, G, R, A in memory order.
+  // Uncompressed 32-bit true-color TGA, top-left origin. An ARGB word is B, G, R, A in memory order.
   task automatic write_tga(input string path);
     int fd;
     fd = $fopen(path, "wb");
     if (fd == 0) $fatal(1, "cannot open %s", path);
-    $fwrite(fd, "%c%c%c", 8'd0, 8'd0, 8'd2);  // no image id, no colour map, true colour
-    $fwrite(fd, "%c%c%c%c%c", 8'd0, 8'd0, 8'd0, 8'd0, 8'd0);  // colour map spec
+    $fwrite(fd, "%c%c%c", 8'd0, 8'd0, 8'd2);  // no image id, no color map, true color
+    $fwrite(fd, "%c%c%c%c%c", 8'd0, 8'd0, 8'd0, 8'd0, 8'd0);  // color map spec
     $fwrite(fd, "%c%c%c%c", 8'd0, 8'd0, 8'd0, 8'd0);  // x, y origin
     $fwrite(fd, "%c%c%c%c", WIDTH[7:0], WIDTH[15:8], HEIGHT[7:0], HEIGHT[15:8]);
     $fwrite(fd, "%c%c", 8'd32, 8'h28);  // 32 bpp; 8 alpha bits, top-left origin

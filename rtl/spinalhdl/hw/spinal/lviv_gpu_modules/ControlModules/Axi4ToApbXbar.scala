@@ -8,7 +8,8 @@ import spinal.lib.bus.misc.SizeMapping
 
 // Address map:
 //   0x000 - 0x3FF  LUT (0x000 texture base, 0x200 texture size; 128 entries each)
-//   0x400 - 0x7FF  Reserved
+//   0x400 - 0x47F  Command processor
+//   0x480 - 0x7FF  Reserved
 //   0x800 - 0x81F  Frontend config, 8 words
 //   0x820 - 0x89F  Thread[0..3] regs, 8 words (32 B) each
 //   0x8A0 - 0xEFF  Reserved
@@ -33,6 +34,19 @@ case class XbarRegion(
     regmap: Option[String] = None, // Slave's regif JSON, relative to address_map.json
     subregions: Seq[XbarSubRegion] = Nil
 )
+
+object Axi4ToApbXbar {
+  val addressWidth = 12
+  val idWidth = 4
+
+  // Where the register blocks sit; the command processor writes them at these addresses
+  val cpBase = 0x400
+  val frontendBase = 0x800
+  val threadBase = frontendBase + APBFrontendRegs.byteCount // 4 windows of ApbThreadRegs.byteCount
+  val tileDmaBase = 0xf00
+  val visDmaBase = 0xf80
+  val dmaBytes = 0x080
+}
 
 case class Axi4ToApbXbar(
     masters: Int = 2,
@@ -64,11 +78,13 @@ case class Axi4ToApbXbar(
   val lutApbConfig = apbConfig.copy(addressWidth = log2Up(lutBytes))
   val frontendApbConfig = apbConfig.copy(addressWidth = log2Up(APBFrontendRegs.byteCount))
   val threadApbConfig = apbConfig.copy(addressWidth = log2Up(ApbThreadRegs.byteCount))
-  val dmaApbConfig = apbConfig.copy(addressWidth = 7)
+  val dmaApbConfig = apbConfig.copy(addressWidth = log2Up(Axi4ToApbXbar.dmaBytes))
+  val cpApbConfig = apbConfig.copy(addressWidth = log2Up(CommandProcessor.byteCount))
 
   val io = new Bundle {
     val m_axi = Vec(slave(Axi4(axiConfig)), masters)
     val lut = master(Apb3(lutApbConfig))
+    val cp = master(Apb3(cpApbConfig))
     val frontend = master(Apb3(frontendApbConfig))
     val threadRegs = Vec(master(Apb3(threadApbConfig)), 4)
     val tileDma = master(Apb3(dmaApbConfig))
@@ -118,7 +134,9 @@ case class Axi4ToApbXbar(
   val lutSlice = Apb3RegSlice(lutApbConfig, apbPipelineStages)
   val frontendSlice = Apb3RegSlice(frontendApbConfig, apbPipelineStages)
   val threadSlices = Array.fill(4)(Apb3RegSlice(threadApbConfig, apbPipelineStages))
+  val cpSlice = Apb3RegSlice(cpApbConfig, apbPipelineStages)
   lutSlice.io.m >> io.lut
+  cpSlice.io.m >> io.cp
   frontendSlice.io.m >> io.frontend
   for (i <- 0 until 4) threadSlices(i).io.m >> io.threadRegs(i)
   val tileDmaSlice = Apb3RegSlice(dmaApbConfig, apbPipelineStages)
@@ -127,8 +145,8 @@ case class Axi4ToApbXbar(
   visDmaSlice.io.m >> io.visDma
 
   // Frontend window followed by the 4 thread windows, each sized by its slave module
-  val frontendBase = 0x800
-  val threadBase = frontendBase + APBFrontendRegs.byteCount
+  val frontendBase = Axi4ToApbXbar.frontendBase
+  val threadBase = Axi4ToApbXbar.threadBase
 
   // LUT tables, laid out by ApbLutRam
   val lutSubregions = Seq(
@@ -153,7 +171,7 @@ case class Axi4ToApbXbar(
   // Decoded windows in address order; also used to emit the JSON address map
   val addressMap = List(
     XbarRegion(
-      "lut",
+      "Texture LUT",
       lutSlice.io.s,
       SizeMapping(0x000, lutBytes),
       "table",
@@ -161,7 +179,15 @@ case class Axi4ToApbXbar(
       subregions = lutSubregions
     ),
     XbarRegion(
-      "frontend",
+      "Command Processor",
+      cpSlice.io.s,
+      SizeMapping(Axi4ToApbXbar.cpBase, CommandProcessor.byteCount),
+      "regs",
+      "Command processor: renders a frame on one START",
+      Some("../CommandProcessor/command_processor_regmap.json")
+    ),
+    XbarRegion(
+      "Front-end",
       frontendSlice.io.s,
       SizeMapping(frontendBase, APBFrontendRegs.byteCount),
       "regs",
@@ -170,7 +196,7 @@ case class Axi4ToApbXbar(
     )
   ) ++ (0 until 4).map { i =>
     XbarRegion(
-      s"thread$i",
+      s"Thread #$i",
       threadSlices(i).io.s,
       SizeMapping(threadBase + i * ApbThreadRegs.byteCount, ApbThreadRegs.byteCount),
       "regs",
@@ -179,17 +205,17 @@ case class Axi4ToApbXbar(
     )
   } ++ List(
     XbarRegion(
-      "tileDma",
+      "Tile DMA",
       tileDmaSlice.io.s,
-      SizeMapping(0xf00, 0x080),
+      SizeMapping(Axi4ToApbXbar.tileDmaBase, Axi4ToApbXbar.dmaBytes),
       "regs",
       "Tile DMA (AxiTileDma)",
       Some("../AxiTileDma/axi_tile_dma_regmap.json")
     ),
     XbarRegion(
-      "visDma",
+      "Visibility DMA",
       visDmaSlice.io.s,
-      SizeMapping(0xf80, 0x080),
+      SizeMapping(Axi4ToApbXbar.visDmaBase, Axi4ToApbXbar.dmaBytes),
       "regs",
       "Visibility DMA (AxiVisibilityDma)",
       Some("../AxiVisibilityDma/axi_visibility_dma_regmap.json")

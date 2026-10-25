@@ -47,8 +47,8 @@ module raster_frontend (
     output orchestrator_data_in_t out_data,
 
     // * Status Signal * //
-    input  logic orchestrator_empty,  // We use the APB of the frontend since it's just 1 signal
-    input  logic input_fifo_idle,  // the raster core's triangle FIFO, also reported here
+    input logic orchestrator_empty,  // We use the APB of the frontend since it's just 1 signal
+    input logic input_fifo_idle,  // the raster core's triangle FIFO, also reported here
     output logic core_empty,
 
     // * Reset * //
@@ -78,8 +78,6 @@ module raster_frontend (
   localparam int FrontendLatency = RASTER_FRONTEND_FIXED_LATENCY;
   localparam int InputWidth = $bits(frontend_data_in_t);
   localparam int OutputWidth = $bits(orchestrator_data_in_t);
-  localparam int TileOffsetWidthX = SCREEN_RES_X_WIDTH - TILE_ID_W_X;
-  localparam int TileOffsetWidthY = SCREEN_RES_Y_WIDTH - TILE_ID_W_Y;
 
   frontend_data_in_t input_skid_source;
   frontend_data_in_t input_skid_data;
@@ -95,8 +93,6 @@ module raster_frontend (
   frontend_passthrough_t passthrough_in;
   frontend_passthrough_t passthrough_out;
   wire orchestrator_data_in_t output_data_internal;
-  logic [TILE_ID_W_X-1:0] tile_x_index;
-  logic [TILE_ID_W_Y-1:0] tile_y_index;
   logic frontend_sw_reset;
 
   screen_addr_x_t bb_min_x;
@@ -130,14 +126,11 @@ module raster_frontend (
       .orchestrator_empty(orchestrator_empty),
       .input_fifo_idle(input_fifo_idle),
       .thread_sw_reset(frontend_sw_reset),
-      .tile_x_index(tile_x_index),
-      .tile_y_index(tile_y_index)
+      .bb_min_x(bb_min_x),  // the tile's box, written with the tile
+      .bb_min_y(bb_min_y),
+      .bb_max_x(bb_max_x),
+      .bb_max_y(bb_max_y)
   );
-
-  assign bb_min_x = {tile_x_index, {TileOffsetWidthX{1'b0}}};
-  assign bb_min_y = {tile_y_index, {TileOffsetWidthY{1'b0}}};
-  assign bb_max_x = {tile_x_index, {TileOffsetWidthX{1'b1}}};
-  assign bb_max_y = {tile_y_index, {TileOffsetWidthY{1'b1}}};
 
   assign input_skid_source = in_data;
   assign pipe_advance = output_skid_s_ready;

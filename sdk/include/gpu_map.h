@@ -9,9 +9,11 @@
 #include "generated/ApbThreadRegs/apb_thread_regmap.h"
 #include "generated/AxiTileDma/axi_tile_dma_regmap.h"
 #include "generated/AxiVisibilityDma/axi_visibility_dma_regmap.h"
+#include "generated/CommandProcessor/command_processor_regmap.h"
 
 #define GPU_THREADS 4
 #define GPU_TILE_SIZE 128
+#define GPU_MAX_TILES 64 // bits in a triangle's visibility word
 
 // Textures: up to 128 (a triangle's tex_id), square, up to 2048 x 2048 (size code: log2 of the
 // width). The texture caches reach the 128 MiB from GPU_TEXTURE_WINDOW, gpu_top's TEXTURE_WINDOW
@@ -25,6 +27,7 @@
 #define GPU_LUT_OFFSET 0x000 // texture table: 128 base words, then 128 size codes
 #define GPU_LUT_BASE(id) (GPU_LUT_OFFSET + 0x000 + 4 * (id))
 #define GPU_LUT_SIZE(id) (GPU_LUT_OFFSET + 0x200 + 4 * (id))
+#define GPU_CP_OFFSET 0x400 // command processor
 #define GPU_FRONTEND_OFFSET 0x800
 #define GPU_THREAD_OFFSET(n) (0x820 + 0x20 * (n))
 #define GPU_TILE_DMA_OFFSET 0xF00
@@ -39,7 +42,8 @@
 #define GPU_INT_STATUS AXI_TILE_DMA_INTR_INT_STATUS
 #define GPU_INT_DONE (1u << AXI_TILE_DMA_INTR_INT_RAW_DONE_RAW_SHIFT)
 #define GPU_INT_ERROR (1u << AXI_TILE_DMA_INTR_INT_RAW_ERROR_RAW_SHIFT)
-#define GPU_INT_ALL (GPU_INT_DONE | GPU_INT_ERROR | (1u << AXI_TILE_DMA_INTR_INT_RAW_FRAME_DONE_RAW_SHIFT))
+#define GPU_INT_FRAME_DONE (1u << AXI_TILE_DMA_INTR_INT_RAW_FRAME_DONE_RAW_SHIFT)
+#define GPU_INT_ALL (GPU_INT_DONE | GPU_INT_ERROR | GPU_INT_FRAME_DONE)
 _Static_assert(GPU_INT_RAW == AXI_VISIBILITY_DMA_INTR_INT_RAW && GPU_INT_FORCE == AXI_VISIBILITY_DMA_INTR_INT_FORCE &&
                    GPU_INT_MASK == AXI_VISIBILITY_DMA_INTR_INT_MASK &&
                    GPU_INT_STATUS == AXI_VISIBILITY_DMA_INTR_INT_STATUS &&

@@ -159,8 +159,7 @@ object AxiVisibilityDmaSim extends App {
     addressWidth = 32,
     axiDataWidth = 128, // 128-bit AXI Read Master (configurable >= 64 bits)
     bttWidth = 23, // 23-bit configurable BTT
-    gridWidth = 10,
-    gridHeight = 6,
+    maxTiles = 64,
     vbWordBits = 64,
     triangleSizeBytes = 96, // 96 B triangles: odd triangles start 32 B into a 64 B beat
     maxBurstLength = 64,

@@ -3,8 +3,11 @@
 //
 // The GPU as the CPU sees it: one AXI control port and the memory masters, around the raster core.
 //
-//   CPU ── s_axi_ctrl ──► Axi4ToApbXbar ──► APB: frontend, threads 0..3, texture LUT,
-//                                              tile DMA, visibility DMA
+//   CPU ── s_axi_ctrl ──► Axi4ToApbXbar ──► APB: command processor, frontend, threads 0..3,
+//   command processor ──►                        texture LUT, tile DMA, visibility DMA (these two
+//                                                through a clock crossing each)
+//     (renders a frame on one START: the per-tile register writes as the crossbar's second master,
+//      the DMAs' events and the units' idle flags as wires)
 //   visibility DMA ◄── m_axi_vb (PS DDR): one 64-bit tile mask per triangle
 //        │ DataMover commands
 //        ▼
@@ -16,17 +19,17 @@
 //                          CLEAR_VALUE back over what it read, and fills them with it on CLEAR
 //   thread n's L1 texture cache ◄── m_axi_tex[n] (PS DDR, thread_clk): 256-byte lines
 //
-// Control map (4 KiB, from Axi4ToApbXbar): 0x000 texture LUT, 0x800 frontend, 0x820 + 0x20 * n
-// thread n, 0xF00 tile DMA, 0xF80 visibility DMA.
+// Control map (4 KiB, from Axi4ToApbXbar): 0x000 texture LUT, 0x400 command processor, 0x800
+// frontend, 0x820 + 0x20 * n thread n, 0xF00 tile DMA, 0xF80 visibility DMA.
 //
-// Clocks: aclk runs the crossbar, every APB slave, both DMAs and the DataMover; the core runs on
-// frontend_clk and thread_clk. The tile DMA reads the frame buffers on thread_clk, and the
-// texture masters run on it.
+// Clocks: ctrl_clk (100 to 150 MHz) runs the control port, the crossbar, the command processor and
+// every APB slave's registers; aclk (the AXI clock, 300 MHz) the memory masters, both DMAs (their
+// registers too, behind an APB clock crossing each) and the DataMover; the core frontend_clk and
+// thread_clk. The tile DMA reads the frame buffers on thread_clk, and the texture masters run on it.
+// The command processor synchronises what it watches from the other clocks itself.
 //
 // Texture addresses: a texture cache makes 27-bit byte addresses (the texture LUT holds word
 // addresses), so 128 MiB; TEXTURE_WINDOW supplies the bits above, picking which 128 MiB.
-//
-// Not connected yet: the Control Unit's crossbar port (tied off).
 
 `timescale 1ns / 1ps
 
@@ -41,6 +44,8 @@ module gpu_top #(
     parameter logic [31:0] TEXTURE_WINDOW = 32'h0000_0000
 ) (
     // * Clocks and resets * //
+    input logic ctrl_clk,
+    input logic ctrl_rst_n,
     input logic aclk,
     input logic aresetn,
     input logic frontend_clk,
@@ -48,7 +53,7 @@ module gpu_top #(
     input logic thread_clk,
     input logic thread_rst_n,
 
-    // * CPU control port: AXI4, 32-bit, 4 KiB * //
+    // * CPU control port: AXI4, 32-bit, 4 KiB (ctrl_clk) * //
     input  logic [11:0] s_axi_ctrl_awaddr,
     input  logic [ 3:0] s_axi_ctrl_awid,
     input  logic [ 7:0] s_axi_ctrl_awlen,
@@ -165,7 +170,24 @@ module gpu_top #(
   logic [9:0] lut_PADDR;
   logic [4:0] frontend_PADDR;
   logic [NUM_OF_THREADS-1:0][4:0] thread_PADDR;
-  logic [6:0] tile_dma_PADDR, vis_dma_PADDR;
+  logic [6:0] tile_dma_PADDR, vis_dma_PADDR, cp_PADDR;
+  logic cp_PSEL, cp_PENABLE, cp_PREADY, cp_PWRITE, cp_PSLVERROR;
+  logic [31:0] cp_PWDATA, cp_PRDATA;
+
+  // The command processor's register accesses, the crossbar's second master
+  logic [11:0] cp_awaddr, cp_araddr;
+  logic [3:0] cp_awid, cp_arid, cp_bid, cp_rid, cp_wstrb;
+  logic [7:0] cp_awlen, cp_arlen;
+  logic [2:0] cp_awsize, cp_arsize;
+  logic [1:0] cp_awburst, cp_arburst, cp_bresp, cp_rresp;
+  logic [31:0] cp_wdata, cp_rdata;
+  logic cp_awvalid, cp_awready, cp_wvalid, cp_wready, cp_wlast, cp_bvalid, cp_bready;
+  logic cp_arvalid, cp_arready, cp_rvalid, cp_rready, cp_rlast;
+
+  // What the command processor watches: the DMAs' events (their INT_RAW bits, aclk) and idle flags
+  logic vis_irq_done, vis_irq_error, tile_irq_done, tile_irq_error, tile_irq_frame_done;
+  logic tri_path_idle, core_frontend_empty, core_orchestrator_empty;
+  logic [NUM_OF_THREADS-1:0] core_thread_empty, core_zbuf_ready;
   logic lut_PSEL, lut_PENABLE, lut_PREADY, lut_PWRITE, lut_PSLVERROR;
   logic frontend_PSEL, frontend_PENABLE, frontend_PREADY, frontend_PWRITE, frontend_PSLVERROR;
   logic tile_dma_PSEL, tile_dma_PENABLE, tile_dma_PREADY, tile_dma_PWRITE, tile_dma_PSLVERROR;
@@ -177,8 +199,8 @@ module gpu_top #(
   logic [NUM_OF_THREADS-1:0][31:0] thread_PWDATA, thread_PRDATA;
 
   Axi4ToApbXbar u_xbar (
-      .clk(aclk),
-      .resetn(aresetn),
+      .clk(ctrl_clk),
+      .resetn(ctrl_rst_n),
       // CPU
       .m_axi_0_awvalid(s_axi_ctrl_awvalid),
       .m_axi_0_awready(s_axi_ctrl_awready),
@@ -209,37 +231,45 @@ module gpu_top #(
       .m_axi_0_rid(s_axi_ctrl_rid),
       .m_axi_0_rresp(s_axi_ctrl_rresp),
       .m_axi_0_rlast(s_axi_ctrl_rlast),
-      // Control Unit: not there yet
-      .m_axi_1_awvalid(1'b0),
-      .m_axi_1_awready(),
-      .m_axi_1_awaddr('0),
-      .m_axi_1_awid('0),
-      .m_axi_1_awlen('0),
-      .m_axi_1_awsize('0),
-      .m_axi_1_awburst('0),
-      .m_axi_1_wvalid(1'b0),
-      .m_axi_1_wready(),
-      .m_axi_1_wdata('0),
-      .m_axi_1_wstrb('0),
-      .m_axi_1_wlast(1'b0),
-      .m_axi_1_bvalid(),
-      .m_axi_1_bready(1'b1),
-      .m_axi_1_bid(),
-      .m_axi_1_bresp(),
-      .m_axi_1_arvalid(1'b0),
-      .m_axi_1_arready(),
-      .m_axi_1_araddr('0),
-      .m_axi_1_arid('0),
-      .m_axi_1_arlen('0),
-      .m_axi_1_arsize('0),
-      .m_axi_1_arburst('0),
-      .m_axi_1_rvalid(),
-      .m_axi_1_rready(1'b1),
-      .m_axi_1_rdata(),
-      .m_axi_1_rid(),
-      .m_axi_1_rresp(),
-      .m_axi_1_rlast(),
+      // Command processor
+      .m_axi_1_awvalid(cp_awvalid),
+      .m_axi_1_awready(cp_awready),
+      .m_axi_1_awaddr(cp_awaddr),
+      .m_axi_1_awid(cp_awid),
+      .m_axi_1_awlen(cp_awlen),
+      .m_axi_1_awsize(cp_awsize),
+      .m_axi_1_awburst(cp_awburst),
+      .m_axi_1_wvalid(cp_wvalid),
+      .m_axi_1_wready(cp_wready),
+      .m_axi_1_wdata(cp_wdata),
+      .m_axi_1_wstrb(cp_wstrb),
+      .m_axi_1_wlast(cp_wlast),
+      .m_axi_1_bvalid(cp_bvalid),
+      .m_axi_1_bready(cp_bready),
+      .m_axi_1_bid(cp_bid),
+      .m_axi_1_bresp(cp_bresp),
+      .m_axi_1_arvalid(cp_arvalid),
+      .m_axi_1_arready(cp_arready),
+      .m_axi_1_araddr(cp_araddr),
+      .m_axi_1_arid(cp_arid),
+      .m_axi_1_arlen(cp_arlen),
+      .m_axi_1_arsize(cp_arsize),
+      .m_axi_1_arburst(cp_arburst),
+      .m_axi_1_rvalid(cp_rvalid),
+      .m_axi_1_rready(cp_rready),
+      .m_axi_1_rdata(cp_rdata),
+      .m_axi_1_rid(cp_rid),
+      .m_axi_1_rresp(cp_rresp),
+      .m_axi_1_rlast(cp_rlast),
       // APB slaves
+      .cp_PADDR(cp_PADDR),
+      .cp_PSEL(cp_PSEL),
+      .cp_PENABLE(cp_PENABLE),
+      .cp_PREADY(cp_PREADY),
+      .cp_PWRITE(cp_PWRITE),
+      .cp_PWDATA(cp_PWDATA),
+      .cp_PRDATA(cp_PRDATA),
+      .cp_PSLVERROR(cp_PSLVERROR),
       .lut_PADDR(lut_PADDR),
       .lut_PSEL(lut_PSEL),
       .lut_PENABLE(lut_PENABLE),
@@ -307,20 +337,19 @@ module gpu_top #(
   );
 
   //
-  // Visibility DMA, triangle DMA and the triangle stream
+  // The DMAs' register ports: from the crossbar's clock into aclk, where their registers run with
+  // their engines
   //
 
-  logic        vis_cmd_tvalid, vis_cmd_tready;
-  logic [71:0] vis_cmd_tdata;
-  logic dm_sts_tvalid, dm_sts_tready;
-  logic [7:0] dm_sts_tdata;
-  logic [511:0] tri_stream_tdata;
-  logic [63:0] tri_stream_tkeep;
-  logic tri_stream_tvalid, tri_stream_tready;
+  logic [6:0] tile_dma_apb_PADDR, vis_dma_apb_PADDR;
+  logic tile_dma_apb_PSEL, tile_dma_apb_PENABLE, tile_dma_apb_PREADY, tile_dma_apb_PWRITE;
+  logic vis_dma_apb_PSEL, vis_dma_apb_PENABLE, vis_dma_apb_PREADY, vis_dma_apb_PWRITE;
+  logic tile_dma_apb_PSLVERROR, vis_dma_apb_PSLVERROR;
+  logic [31:0] tile_dma_apb_PWDATA, tile_dma_apb_PRDATA, vis_dma_apb_PWDATA, vis_dma_apb_PRDATA;
 
-  AxiVisibilityDma u_vis_dma (
-      .aclk(aclk),
-      .aresetn(aresetn),
+  ApbClockCrossing u_vis_dma_cc (
+      .s_clk(ctrl_clk),
+      .s_resetn(ctrl_rst_n),
       .s_apb_PADDR(vis_dma_PADDR),
       .s_apb_PSEL(vis_dma_PSEL),
       .s_apb_PENABLE(vis_dma_PENABLE),
@@ -329,6 +358,64 @@ module gpu_top #(
       .s_apb_PWDATA(vis_dma_PWDATA),
       .s_apb_PRDATA(vis_dma_PRDATA),
       .s_apb_PSLVERROR(vis_dma_PSLVERROR),
+      .m_clk(aclk),
+      .m_resetn(aresetn),
+      .m_apb_PADDR(vis_dma_apb_PADDR),
+      .m_apb_PSEL(vis_dma_apb_PSEL),
+      .m_apb_PENABLE(vis_dma_apb_PENABLE),
+      .m_apb_PREADY(vis_dma_apb_PREADY),
+      .m_apb_PWRITE(vis_dma_apb_PWRITE),
+      .m_apb_PWDATA(vis_dma_apb_PWDATA),
+      .m_apb_PRDATA(vis_dma_apb_PRDATA),
+      .m_apb_PSLVERROR(vis_dma_apb_PSLVERROR)
+  );
+
+  ApbClockCrossing u_tile_dma_cc (
+      .s_clk(ctrl_clk),
+      .s_resetn(ctrl_rst_n),
+      .s_apb_PADDR(tile_dma_PADDR),
+      .s_apb_PSEL(tile_dma_PSEL),
+      .s_apb_PENABLE(tile_dma_PENABLE),
+      .s_apb_PREADY(tile_dma_PREADY),
+      .s_apb_PWRITE(tile_dma_PWRITE),
+      .s_apb_PWDATA(tile_dma_PWDATA),
+      .s_apb_PRDATA(tile_dma_PRDATA),
+      .s_apb_PSLVERROR(tile_dma_PSLVERROR),
+      .m_clk(aclk),
+      .m_resetn(aresetn),
+      .m_apb_PADDR(tile_dma_apb_PADDR),
+      .m_apb_PSEL(tile_dma_apb_PSEL),
+      .m_apb_PENABLE(tile_dma_apb_PENABLE),
+      .m_apb_PREADY(tile_dma_apb_PREADY),
+      .m_apb_PWRITE(tile_dma_apb_PWRITE),
+      .m_apb_PWDATA(tile_dma_apb_PWDATA),
+      .m_apb_PRDATA(tile_dma_apb_PRDATA),
+      .m_apb_PSLVERROR(tile_dma_apb_PSLVERROR)
+  );
+
+  //
+  // Visibility DMA, triangle DMA and the triangle stream
+  //
+
+  logic vis_cmd_tvalid, vis_cmd_tready;
+  logic [71:0] vis_cmd_tdata;
+  logic dm_sts_tvalid, dm_sts_tready;
+  logic [  7:0] dm_sts_tdata;
+  logic [511:0] tri_stream_tdata;
+  logic [ 63:0] tri_stream_tkeep;
+  logic tri_stream_tvalid, tri_stream_tready;
+
+  AxiVisibilityDma u_vis_dma (
+      .aclk(aclk),
+      .aresetn(aresetn),
+      .s_apb_PADDR(vis_dma_apb_PADDR),
+      .s_apb_PSEL(vis_dma_apb_PSEL),
+      .s_apb_PENABLE(vis_dma_apb_PENABLE),
+      .s_apb_PREADY(vis_dma_apb_PREADY),
+      .s_apb_PWRITE(vis_dma_apb_PWRITE),
+      .s_apb_PWDATA(vis_dma_apb_PWDATA),
+      .s_apb_PRDATA(vis_dma_apb_PRDATA),
+      .s_apb_PSLVERROR(vis_dma_apb_PSLVERROR),
       .m_axi_vb_arvalid(m_axi_vb_arvalid),
       .m_axi_vb_arready(m_axi_vb_arready),
       .m_axi_vb_araddr(m_axi_vb_araddr),
@@ -355,13 +442,14 @@ module gpu_top #(
       .s_axis_datamover_sts_tdata(dm_sts_tdata),
       .ready(),
       .irq(vis_dma_irq),
-      .irq_done(),
-      .irq_error(),
+      .irq_done(vis_irq_done),
+      .irq_error(vis_irq_error),
       .irq_frame_done()
   );
 
   frontend_data_in_t adapted_tri, core_tri;
   logic adapted_tri_valid, tri_cdc_full, tri_cdc_empty, core_tri_ready;
+  logic [5:0] tri_cdc_fill;  // write side: counts a triangle until its pop has crossed back
 
   triangle_stream_adapter #(
       .TRIANGLE_STRIDE(TRIANGLE_STRIDE)
@@ -422,7 +510,7 @@ module gpu_top #(
       .data_i(adapted_tri),
       .fifo_full(tri_cdc_full),
       .fifo_almost_full(),
-      .fill_cnt(),
+      .fill_cnt(tri_cdc_fill),
       .rd_clk(frontend_clk),
       .rd_rst_n(frontend_rst_n),
       .rd_en(core_tri_ready),
@@ -432,6 +520,11 @@ module gpu_top #(
   );
 
   assign core_tri = frontend_data_in_t'(core_tri_bits);
+
+  // Nothing between the DataMover and the core: the stream and the clock crossing. The adapter
+  // holds a triangle for a few cycles, which the command processor's drain window covers (it holds
+  // one longer only while the crossing is full).
+  assign tri_path_idle = !tri_stream_tvalid && tri_cdc_fill == '0;
 
   //
   // Core
@@ -463,8 +556,8 @@ module gpu_top #(
       .frontend_rst_n(frontend_rst_n),
       .thread_clk(thread_clk),
       .thread_rst_n(thread_rst_n),
-      .apb_clk(aclk),
-      .apb_rst_n(aresetn),
+      .apb_clk(ctrl_clk),
+      .apb_rst_n(ctrl_rst_n),
       .valid_in(!tri_cdc_empty),
       .ready_out(core_tri_ready),
       .in_data(core_tri),
@@ -508,7 +601,11 @@ module gpu_top #(
       .tex_m_axi_rresp(m_axi_tex_rresp),
       .tex_m_axi_rvalid(m_axi_tex_rvalid),
       .tex_m_axi_rready(m_axi_tex_rready),
-      .tex_m_axi_rlast(m_axi_tex_rlast)
+      .tex_m_axi_rlast(m_axi_tex_rlast),
+      .frontend_empty(core_frontend_empty),
+      .orchestrator_empty(core_orchestrator_empty),
+      .thread_empty(core_thread_empty),
+      .zbuf_ready(core_zbuf_ready)
   );
 
   //
@@ -523,14 +620,14 @@ module gpu_top #(
       .aresetn(aresetn),
       .ram_clk(thread_clk),
       .ram_resetn(thread_rst_n),
-      .s_apb_PADDR(tile_dma_PADDR),
-      .s_apb_PSEL(tile_dma_PSEL),
-      .s_apb_PENABLE(tile_dma_PENABLE),
-      .s_apb_PREADY(tile_dma_PREADY),
-      .s_apb_PWRITE(tile_dma_PWRITE),
-      .s_apb_PWDATA(tile_dma_PWDATA),
-      .s_apb_PRDATA(tile_dma_PRDATA),
-      .s_apb_PSLVERROR(tile_dma_PSLVERROR),
+      .s_apb_PADDR(tile_dma_apb_PADDR),
+      .s_apb_PSEL(tile_dma_apb_PSEL),
+      .s_apb_PENABLE(tile_dma_apb_PENABLE),
+      .s_apb_PREADY(tile_dma_apb_PREADY),
+      .s_apb_PWRITE(tile_dma_apb_PWRITE),
+      .s_apb_PWDATA(tile_dma_apb_PWDATA),
+      .s_apb_PRDATA(tile_dma_apb_PRDATA),
+      .s_apb_PSLVERROR(tile_dma_apb_PSLVERROR),
       .m_axi_awvalid(m_axi_tile_awvalid),
       .m_axi_awready(m_axi_tile_awready),
       .m_axi_awaddr(m_axi_tile_awaddr),
@@ -585,14 +682,77 @@ module gpu_top #(
       .tile_ram_3_wr_addr(tile_ram_wr_addr[3]),
       .tile_ram_3_wr_data(fb_wr_data[3]),
       .irq(tile_dma_irq),
-      .irq_done(),
-      .irq_error(),
-      .irq_frame_done()
+      .irq_done(tile_irq_done),
+      .irq_error(tile_irq_error),
+      .irq_frame_done(tile_irq_frame_done)
   );
 
   for (genvar lane = 0; lane < NUM_OF_THREADS; lane++) begin : g_tile_ram_addr
     assign fb_rd_addr[lane] = tile_ram_addr[lane][13:3];
     assign fb_wr_addr[lane] = tile_ram_wr_addr[lane][13:3];
   end
+
+  //
+  // Command processor: renders a frame on one START (MODE 1), writing the units' registers as the
+  // crossbar's second master and watching the DMAs' events and the units' idle flags
+  //
+
+  CommandProcessor u_cp (
+      .clk(ctrl_clk),
+      .resetn(ctrl_rst_n),
+      .s_apb_PADDR(cp_PADDR),
+      .s_apb_PSEL(cp_PSEL),
+      .s_apb_PENABLE(cp_PENABLE),
+      .s_apb_PREADY(cp_PREADY),
+      .s_apb_PWRITE(cp_PWRITE),
+      .s_apb_PWDATA(cp_PWDATA),
+      .s_apb_PRDATA(cp_PRDATA),
+      .s_apb_PSLVERROR(cp_PSLVERROR),
+      .m_axi_awvalid(cp_awvalid),
+      .m_axi_awready(cp_awready),
+      .m_axi_awaddr(cp_awaddr),
+      .m_axi_awid(cp_awid),
+      .m_axi_awlen(cp_awlen),
+      .m_axi_awsize(cp_awsize),
+      .m_axi_awburst(cp_awburst),
+      .m_axi_wvalid(cp_wvalid),
+      .m_axi_wready(cp_wready),
+      .m_axi_wdata(cp_wdata),
+      .m_axi_wstrb(cp_wstrb),
+      .m_axi_wlast(cp_wlast),
+      .m_axi_bvalid(cp_bvalid),
+      .m_axi_bready(cp_bready),
+      .m_axi_bid(cp_bid),
+      .m_axi_bresp(cp_bresp),
+      .m_axi_arvalid(cp_arvalid),
+      .m_axi_arready(cp_arready),
+      .m_axi_araddr(cp_araddr),
+      .m_axi_arid(cp_arid),
+      .m_axi_arlen(cp_arlen),
+      .m_axi_arsize(cp_arsize),
+      .m_axi_arburst(cp_arburst),
+      .m_axi_rvalid(cp_rvalid),
+      .m_axi_rready(cp_rready),
+      .m_axi_rdata(cp_rdata),
+      .m_axi_rid(cp_rid),
+      .m_axi_rresp(cp_rresp),
+      .m_axi_rlast(cp_rlast),
+      .dma_clk(aclk),
+      .dma_resetn(aresetn),
+      .vis_irq_done(vis_irq_done),
+      .vis_irq_error(vis_irq_error),
+      .tile_irq_done(tile_irq_done),
+      .tile_irq_error(tile_irq_error),
+      .tile_irq_frame_done(tile_irq_frame_done),
+      .tri_path_idle(tri_path_idle),
+      .frontend_clk(frontend_clk),
+      .frontend_resetn(frontend_rst_n),
+      .frontend_empty(core_frontend_empty),
+      .thread_clk(thread_clk),
+      .thread_resetn(thread_rst_n),
+      .orchestrator_empty(core_orchestrator_empty),
+      .thread_empty(core_thread_empty),
+      .zbuf_ready(core_zbuf_ready)
+  );
 
 endmodule

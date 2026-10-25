@@ -86,7 +86,7 @@ void Rasterizer::dumpFrontendExpectedCsv(const std::string &path) const
 
 // One row per (triangle, bin), in bin order: everything raster_core's frontend_data_in_t takes. The
 // render state is the rasterizer's global state, written per row because the hardware takes it per
-// triangle. Enum columns use the RTL encodings (gpu_types_pkg.sv); colours are ARGB hex.
+// triangle. Enum columns use the RTL encodings (gpu_types_pkg.sv); colors are ARGB hex.
 Rasterizer::RasterCoreState Rasterizer::rasterCoreState() const
 {
     // gpu_types_pkg.sv encodings

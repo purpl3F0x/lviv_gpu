@@ -7,16 +7,22 @@ import gpu_types_pkg::*;
 // 1280 x 720 in 10 x 6 tiles:
 //
 //   1. register access through the crossbar to every slave
-//   2. the tile DMA's CLEAR fills the frame buffers with raster_sw's clear colour; each write-back
+//   2. the tile DMA's CLEAR fills the frame buffers with raster_sw's clear color; each write-back
 //      leaves it behind
-//   3. per tile: clear the z-buffers, set the frontend tile, run the visibility DMA over the
-//      visibility buffer, wait for the core to go idle, run the tile DMA
-//   4. a second write-back of the first tile must read the clear colour everywhere
+//   3. per tile: clear the z-buffers, set the frontend's tile box (BB_MIN, BB_MAX: the tile's
+//      first pixel to its last, or the screen's), run the visibility DMA over the visibility
+//      buffer, wait for the core to go idle, run the tile DMA
+//   4. the same frame from the command processor (MODE 1, one START): its checks first (START
+//      ignored in MODE 0, a size of 0, MODE kept while busy, SOFT_RESET mid-frame), then the frame,
+//      which must end with the tile DMA's frame_done and give the per-tile frame's image (rows
+//      past the screen: the clear color, as BB_MAX clips them)
+//   5. a second write-back of the first tile must read the clear color everywhere
 //
 // Every triangle that reaches the core is checked against the next one the tile should get, so the
 // visibility DMA, the DataMover (its simulation model), triangle_stream_adapter and the clock
-// crossing are checked end to end. The image is written to +OUT (default gpu_top.tga), and make
-// compares it with raster_sw's.
+// crossing are checked end to end; in the command processor's frame the tile comes from the
+// frontend's box (BB_MIN), which it sets before the tile's triangles. The image (the command
+// processor's) is written to +OUT (default gpu_top.tga), and make compares it with raster_sw's.
 //
 // +TEXTURE: a texture for LUT entry 0, in the texture memory that every thread's texture cache
 // reads through its own port. gpu_top's TEXTURE_WINDOW is not 0 here, and every texture read must
@@ -28,7 +34,7 @@ module tb_gpu_top;
   localparam int Width = TilesX * TILE_SIZE_X;
   localparam int Height = 720;  // the rows written out
   localparam int RowBytes = Width * 4;
-  localparam logic [31:0] ClearColor = 32'hFF636363;  // raster_sw's clear colour (ARGB)
+  localparam logic [31:0] ClearColor = 32'hFF636363;  // raster_sw's clear color (ARGB)
 
   // Memory map of the three behavioural memories (byte addresses, inside each RAM).
   localparam logic [31:0] VbBase = 32'h0000_1000;
@@ -39,14 +45,18 @@ module tb_gpu_top;
   localparam int MaxTriangles = ((1 << TriAddrW) - int'(TriBase)) / TriangleStride;
 
   // Control map
-  localparam logic [11:0] FrontendStatus = 12'h800, FrontendTileX = 12'h804;
-  localparam logic [11:0] FrontendTileY = 12'h808, LutBase = 12'h000, LutSize = 12'h200;
+  localparam logic [11:0] FrontendStatus = 12'h800, FrontendBbMinX = 12'h804;
+  localparam logic [11:0] FrontendBbMinY = 12'h808, LutBase = 12'h000, LutSize = 12'h200;
   localparam logic [11:0] VisCtrl = 12'hF80, VisStatus = 12'hF84, VisVbBase = 12'hF88;
   localparam logic [11:0] VisTriBase = 12'hF90, VisTriCount = 12'hF98, VisTileIndex = 12'hF9C;
   localparam logic [11:0] TileCtrl = 12'hF00, TileStatus = 12'hF04, TileBase = 12'hF08;
   localparam logic [11:0] TileStride = 12'hF10, TileTilesX = 12'hF14, TileTilesY = 12'hF18;
   localparam logic [11:0] TileCur = 12'hF1C, TileIrqRaw = 12'hF44, TileIrqClear = 12'hF40;
-  localparam logic [11:0] TileClearValue = 12'hF28;
+  localparam logic [11:0] TileClearValue = 12'hF28, VisIrqRaw = 12'hFC0, VisTileCount = 12'hFB8;
+  localparam logic [11:0] FrontendBbMaxX = 12'h80C, FrontendBbMaxY = 12'h810;
+  localparam logic [11:0] CpCtrl = 12'h400, CpStatus = 12'h404, CpMode = 12'h408;
+  localparam logic [11:0] CpSize = 12'h40C, CpCycles = 12'h410;
+  // CP CTRL: START 1, SOFT_RESET 2; STATUS: BUSY 1, DONE 2, ERROR 4, CAUSE [6:4], TILE [13:8]
 
   function automatic logic [11:0] thread_reg(input int lane, input int offset);
     return 12'(12'h820 + 32 * lane + offset);
@@ -56,11 +66,28 @@ module tb_gpu_top;
   // Clocks, resets, DUT
   // -------------------------------------------------------------------------
 
-  logic aclk = 0, frontend_clk = 0, thread_clk = 0;
-  logic aresetn = 0, frontend_rst_n = 0, thread_rst_n = 0;
-  always #5 aclk = ~aclk;
-  always #3 frontend_clk = ~frontend_clk;
-  always #2 thread_clk = ~thread_clk;
+  // Clock periods (ns), the design's: the control port and the command processor at 150 MHz, the
+  // AXI clock and the frontend at 300 MHz, the orchestrator and the threads at 500 MHz; or
+  // +CTRL_NS=, +ACLK_NS=, +FRONTEND_NS=, +THREAD_NS= (the board's today: all 10)
+  logic ctrl_clk = 0, aclk = 0, frontend_clk = 0, thread_clk = 0;
+  logic ctrl_rst_n = 0, aresetn = 0, frontend_rst_n = 0, thread_rst_n = 0;
+  real ctrl_ns = 6.667, aclk_ns = 3.334, frontend_ns = 3.334, thread_ns = 2;
+  initial begin
+    void'($value$plusargs("CTRL_NS=%f", ctrl_ns));
+    void'($value$plusargs("ACLK_NS=%f", aclk_ns));
+    void'($value$plusargs("FRONTEND_NS=%f", frontend_ns));
+    void'($value$plusargs("THREAD_NS=%f", thread_ns));
+    $display("clocks (ns): ctrl %0.3f, aclk %0.3f, frontend %0.3f, thread %0.3f", ctrl_ns, aclk_ns,
+             frontend_ns, thread_ns);
+    /* verilator lint_off ZERODLY */  // set at run time, never 0
+    fork
+      forever #(ctrl_ns / 2) ctrl_clk = ~ctrl_clk;
+      forever #(aclk_ns / 2) aclk = ~aclk;
+      forever #(frontend_ns / 2) frontend_clk = ~frontend_clk;
+      forever #(thread_ns / 2) thread_clk = ~thread_clk;
+    join_none
+    /* verilator lint_on ZERODLY */
+  end
 
   logic [11:0] awaddr = '0, araddr = '0;
   logic awvalid = 0, wvalid = 0, bready = 0, arvalid = 0, rready = 0;
@@ -93,6 +120,8 @@ module tb_gpu_top;
       .TRIANGLE_STRIDE(TriangleStride),
       .TEXTURE_WINDOW(TextureWindow)
   ) dut (
+      .ctrl_clk(ctrl_clk),
+      .ctrl_rst_n(ctrl_rst_n),
       .aclk(aclk),
       .aresetn(aresetn),
       .frontend_clk(frontend_clk),
@@ -491,7 +520,7 @@ module tb_gpu_top;
   // Through the thread registers: ZBUF_CLEAR reads 1 until the clear is done.
   task automatic clear_zbuffers();
     for (int lane = 0; lane < NUM_OF_THREADS; lane++) axi_write(thread_reg(lane, 4), 32'h1);
-    repeat (8) @(posedge aclk);  // the clear pulse crosses into the thread clock
+    repeat (8) @(posedge ctrl_clk);  // the clear pulse crosses into the thread clock
     for (int lane = 0; lane < NUM_OF_THREADS; lane++)
       wait_bits(thread_reg(lane, 4), 32'h1, 32'h0, $sformatf("thread %0d z-buffer clear", lane));
   endtask
@@ -503,9 +532,35 @@ module tb_gpu_top;
   int current_tile = -1;
   int received, errors;
   int tile_order[$];
+  bit monitor_on = 1'b1;
+  bit cp_mode = 1'b0;  // the tile from the frontend, not from render_tile
+  int cp_received, cp_expected;  // the command processor's frame, all tiles
+
+  function automatic void open_tile(input int tile);
+    tile_order.delete();
+    for (int t = 0; t < triangles; t++) if (tile_mask[t][tile]) tile_order.push_back(t);
+    received = 0;
+    current_tile = tile;
+  endfunction
+
+  function automatic void close_tile();
+    if (current_tile >= 0 && received != tile_order.size())
+      error($sformatf("tile %0d: the core received %0d triangles, expected %0d", current_tile,
+                      received, tile_order.size()));
+  endfunction
 
   always @(posedge frontend_clk) begin
-    if (frontend_rst_n && !dut.tri_cdc_empty && dut.core_tri_ready) begin
+    if (monitor_on && frontend_rst_n && !dut.tri_cdc_empty && dut.core_tri_ready) begin
+      if (cp_mode) begin
+        int tile;
+        tile = int'(dut.u_core.u_frontend.bb_min_y) / TILE_SIZE_Y * TilesX +
+            int'(dut.u_core.u_frontend.bb_min_x) / TILE_SIZE_X;
+        if (tile != current_tile) begin
+          close_tile();
+          open_tile(tile);
+        end
+        cp_received++;
+      end
       if (received >= tile_order.size()) begin
         error($sformatf("tile %0d: unexpected extra triangle", current_tile));
       end else if (dut.core_tri !== expected[tile_order[received]]) begin
@@ -535,13 +590,26 @@ module tb_gpu_top;
       $display("[%0t] status: %02h", $time, dut.dm_sts_tdata);
   end
 
+  // The command processor's idle flags after the visibility DMA's done (from its acknowledge to
+  // the next tile's start): every unit empty for some cycles, then one busy again is a triangle
+  // between two units that no flag showed. The longest such run, against the CP's idle window.
+  int cp_idle_run, cp_false_idle_max;
+  always @(posedge ctrl_clk) begin
+    if (dut.u_cp.frame_sequencer_stateReg < 4'd4) cp_idle_run <= 0;  // up to visWait
+    else if (dut.u_cp.frame_unitsIdle) cp_idle_run <= cp_idle_run + 1;
+    else begin
+      if (cp_idle_run > cp_false_idle_max) cp_false_idle_max <= cp_idle_run;
+      cp_idle_run <= 0;
+    end
+  end
+
   // -------------------------------------------------------------------------
   // CPU port
   // -------------------------------------------------------------------------
 
   task automatic axi_write(input logic [11:0] addr, input logic [31:0] data);
     bit aw_done, w_done;
-    @(posedge aclk);
+    @(posedge ctrl_clk);
     awaddr <= addr;
     awvalid <= 1'b1;
     wdata <= data;
@@ -549,7 +617,7 @@ module tb_gpu_top;
     aw_done = 0;
     w_done = 0;
     while (!(aw_done && w_done)) begin
-      @(posedge aclk);
+      @(posedge ctrl_clk);
       if (awvalid && awready) begin
         aw_done = 1;
         awvalid <= 1'b0;
@@ -560,19 +628,19 @@ module tb_gpu_top;
       end
     end
     bready <= 1'b1;
-    do @(posedge aclk); while (!bvalid);
+    do @(posedge ctrl_clk); while (!bvalid);
     bready <= 1'b0;
     if (bresp != 2'b00) error($sformatf("write 0x%03h: BRESP %0d", addr, bresp));
   endtask
 
   task automatic axi_read(input logic [11:0] addr, output logic [31:0] data);
-    @(posedge aclk);
+    @(posedge ctrl_clk);
     araddr  <= addr;
     arvalid <= 1'b1;
-    do @(posedge aclk); while (!arready);
+    do @(posedge ctrl_clk); while (!arready);
     arvalid <= 1'b0;
     rready  <= 1'b1;
-    do @(posedge aclk); while (!rvalid);
+    do @(posedge ctrl_clk); while (!rvalid);
     data = rdata;
     rready <= 1'b0;
     if (rresp != 2'b00) error($sformatf("read 0x%03h: RRESP %0d", addr, rresp));
@@ -603,9 +671,9 @@ module tb_gpu_top;
   // -------------------------------------------------------------------------
 
   task automatic register_access();
-    axi_write(FrontendTileX, 32'd3);
-    expect_read(FrontendTileX, 32'h1F, 32'd3, "frontend tile X");
-    axi_write(FrontendTileX, 32'd0);
+    axi_write(FrontendBbMinX, 32'h183);
+    expect_read(FrontendBbMinX, 32'hFFF, 32'h183, "frontend BB_MIN_X");
+    axi_write(FrontendBbMinX, 32'd0);
     expect_read(FrontendStatus, 32'h7, 32'h7, "frontend status, idle");
     for (int lane = 0; lane < NUM_OF_THREADS; lane++)
       expect_read(thread_reg(lane, 0), 32'h1, 32'h0, $sformatf("thread %0d busy", lane));
@@ -638,23 +706,28 @@ module tb_gpu_top;
     end
   endtask
 
+  // The last pixel of tile t's box: the tile's own, or the screen's when the tile runs past it
+  function automatic logic [31:0] box_end(input int t, input int tile_size, input int size);
+    return 32'((t + 1) * tile_size - 1 < size ? (t + 1) * tile_size - 1 : size - 1);
+  endfunction
+
   task automatic render_tile(input int tx, input int ty);
     int tile;
     tile = ty * TilesX + tx;
-    tile_order.delete();
-    for (int t = 0; t < triangles; t++) if (tile_mask[t][tile]) tile_order.push_back(t);
-    received = 0;
-    current_tile = tile;
+    open_tile(tile);
 
     clear_zbuffers();
 
-    axi_write(FrontendTileX, tx);
-    axi_write(FrontendTileY, ty);
+    axi_write(FrontendBbMinX, tx * TILE_SIZE_X);
+    axi_write(FrontendBbMinY, ty * TILE_SIZE_Y);
+    axi_write(FrontendBbMaxX, box_end(tx, TILE_SIZE_X, Width));
+    axi_write(FrontendBbMaxY, box_end(ty, TILE_SIZE_Y, Height));
 
     axi_write(VisVbBase, VbBase);
     axi_write(VisTriBase, TriBase);
     axi_write(VisTriCount, triangles);
     axi_write(VisTileIndex, tile);
+    axi_write(VisStatus, 32'h2);  // DONE left by an earlier tile or frame cleared
     axi_write(VisCtrl, 32'h1);  // START
     wait_bits(VisStatus, 32'h2, 32'h2, "visibility DMA DONE");
     expect_read(VisStatus, 32'h64, 32'h0, "visibility DMA error flags");
@@ -676,6 +749,7 @@ module tb_gpu_top;
     axi_write(TileTilesX, TilesX);
     axi_write(TileTilesY, TilesY);
     axi_write(TileCur, {16'(ty), 16'(tx)});
+    axi_write(TileIrqClear, 32'h1);  // done left by an earlier tile (the command processor's)
     axi_write(TileCtrl, 32'h1);  // START
     wait_bits(TileIrqRaw, 32'h1, 32'h1, "tile DMA done");
     axi_write(TileIrqClear, 32'h1);
@@ -723,6 +797,147 @@ module tb_gpu_top;
     $fclose(fd);
   endtask
 
+  // -------------------------------------------------------------------------
+  // Command processor
+  // -------------------------------------------------------------------------
+
+  logic [31:0] cpu_image[Height][Width];  // the per-tile frame, to compare with
+
+  task automatic cp_wait_stopped(output logic [31:0] status);
+    int polls;
+    polls = 0;
+    do begin
+      axi_read(CpStatus, status);
+      if (++polls > 200000) $fatal(1, "command processor: still busy, STATUS %08h", status);
+    end while (status[0]);
+  endtask
+
+  task automatic expect_cp(input logic [31:0] mask, input logic [31:0] value, input string what);
+    expect_read(CpStatus, mask, value, $sformatf("command processor STATUS: %s", what));
+  endtask
+
+  // The frame, set up as the CPU does it for the command processor: the DMAs' events cleared and
+  // their frame registers at tile 0 (the visibility DMA's tile count too: it moves on by itself),
+  // the frame buffers and z-buffers cleared, tile 0's box
+  task automatic cp_program();
+    axi_write(VisIrqRaw, 32'h7);
+    axi_write(TileIrqClear, 32'h7);
+    axi_write(VisVbBase, VbBase);
+    axi_write(VisTriBase, TriBase);
+    axi_write(VisTriCount, triangles);
+    axi_write(VisTileIndex, 32'h0);
+    axi_write(VisTileCount, TilesX * TilesY);
+    axi_write(TileBase, ImgBase);
+    axi_write(TileStride, RowBytes);
+    axi_write(TileTilesX, TilesX);
+    axi_write(TileTilesY, TilesY);
+    axi_write(TileCtrl, 32'h2);  // RESET_POS: tile (0, 0)
+    clear_frame_buffers(ClearColor);
+    clear_zbuffers();
+    axi_write(FrontendBbMinX, 32'h0);
+    axi_write(FrontendBbMinY, 32'h0);
+    axi_write(FrontendBbMaxX, box_end(0, TILE_SIZE_X, Width));
+    axi_write(FrontendBbMaxY, box_end(0, TILE_SIZE_Y, Height));
+    axi_write(CpSize, {16'(Height), 16'(Width)});
+  endtask
+
+  task automatic cp_checks();
+    logic [31:0] status, data;
+    int polls;
+
+    // MODE 0: START does nothing
+    axi_write(CpMode, 32'h0);
+    axi_write(CpCtrl, 32'h1);
+    repeat (20) @(posedge ctrl_clk);
+    expect_cp(32'h7, 32'h0, "after START in MODE 0");
+
+    // A size of 0: ERROR, CAUSE 4, at once
+    axi_write(CpMode, 32'h1);
+    axi_write(CpSize, 32'h0);
+    axi_write(CpCtrl, 32'h1);
+    cp_wait_stopped(status);
+    expect_cp(32'h77, 32'h44, "after START with a size of 0");
+
+    // Mid-frame: MODE kept, then SOFT_RESET back to idle
+    monitor_on = 1'b0;
+    cp_program();
+    axi_write(CpCtrl, 32'h1);
+    polls = 0;
+    do begin
+      axi_read(CpStatus, status);
+      if (++polls > 200000) $fatal(1, "command processor: never reached tile 2");
+    end while (status[13:8] < 2);
+    axi_write(CpMode, 32'h0);
+    expect_read(CpMode, 32'h1, 32'h1, "command processor MODE written while busy");
+    axi_write(CpCtrl, 32'h2);  // SOFT_RESET
+    repeat (10) @(posedge ctrl_clk);
+    expect_cp(32'h3F07, 32'h0, "after SOFT_RESET");
+    // The units finish what they had
+    wait_bits(VisStatus, 32'h1, 32'h0, "visibility DMA BUSY after SOFT_RESET");
+    wait_bits(TileStatus, 32'h1, 32'h0, "tile DMA BUSY after SOFT_RESET");
+    wait_core_idle();
+    monitor_on = 1'b1;
+    $display("[%0t] command processor: START in MODE 0, size 0, MODE while busy, SOFT_RESET",
+             $time);
+  endtask
+
+  task automatic cp_frame();
+    logic [31:0] status, cycles;
+    int wrong, past_screen;
+
+    for (int y = 0; y < Height; y++)
+      for (int x = 0; x < Width; x++) cpu_image[y][x] = image_pixel(x, y);
+    // Every word of the image overwritten, or it shows
+    for (int i = 0; i < (1 << (ImgAddrW - 4)); i++) u_img_ram.mem[i] = {4{32'hDEAD_BEEF}};
+
+    cp_program();
+    axi_write(CpMode, 32'h1);
+    current_tile = -1;
+    cp_received = 0;
+    cp_false_idle_max = 0;
+    cp_expected = 0;
+    for (int tile = 0; tile < TilesX * TilesY; tile++)
+      for (int t = 0; t < triangles; t++) if (tile_mask[t][tile]) cp_expected++;
+    cp_mode = 1'b1;
+    axi_write(CpCtrl, 32'h1);
+    cp_wait_stopped(status);
+    cp_mode = 1'b0;
+    close_tile();
+    axi_read(CpCycles, cycles);
+    $display("[%0t] command processor: frame in %0d cycles, STATUS %08h", $time, cycles, status);
+    $display("[%0t] command processor: longest false idle %0d cycles", $time, cp_false_idle_max);
+    expect_cp(32'h76, 32'h2, "after the frame");
+    if (cp_received != cp_expected)
+      error($sformatf("command processor frame: the core received %0d triangles, expected %0d",
+                      cp_received, cp_expected));
+    expect_read(TileIrqRaw, 32'h4, 32'h4, "tile DMA frame_done after the frame");
+    expect_read(VisIrqRaw, 32'h4, 32'h4, "visibility DMA frame_done after the frame");
+    expect_read(VisTileIndex, 32'h3F, 32'h0, "visibility DMA TILE_INDEX after the frame (wrapped)");
+
+    wrong = 0;
+    for (int y = 0; y < Height; y++)
+      for (int x = 0; x < Width; x++)
+        if (image_pixel(x, y) !== cpu_image[y][x]) begin
+          if (wrong < 8)
+            error($sformatf("command processor frame, pixel (%0d, %0d): %08h, per tile %08h", x,
+                            y, image_pixel(x, y), cpu_image[y][x]));
+          wrong++;
+        end
+    past_screen = 0;
+    for (int y = Height; y < TilesY * TILE_SIZE_Y; y++)
+      for (int x = 0; x < Width; x++)
+        if (image_pixel(x, y) !== ClearColor) begin
+          if (past_screen < 8)
+            error($sformatf("command processor frame, pixel (%0d, %0d) past the screen: %08h", x,
+                            y, image_pixel(x, y)));
+          past_screen++;
+        end
+    $display("[%0t] command processor frame: %0d of %0d pixels unlike the per-tile frame",
+             $time, wrong, Width * Height);
+    $display("[%0t] command processor frame: %0d pixels past the screen not the clear color",
+             $time, past_screen);
+  endtask
+
   initial begin : run
     string out_path, scene_path, texture_path;
     out_path = "gpu_top.tga";
@@ -734,11 +949,12 @@ module tb_gpu_top;
     #20;  // after axi_ram's own initial blocks
     build_scene(scene_path);
     if ($value$plusargs("TEXTURE=%s", texture_path)) load_texture(texture_path);
-    repeat (10) @(posedge aclk);
+    repeat (10) @(posedge ctrl_clk);
+    ctrl_rst_n = 1;
     aresetn = 1;
     frontend_rst_n = 1;
     thread_rst_n = 1;
-    repeat (10) @(posedge aclk);
+    repeat (10) @(posedge ctrl_clk);
 
     register_access();
     if (tex_loaded) begin
@@ -748,6 +964,8 @@ module tb_gpu_top;
     clear_frame_buffers(ClearColor);
     for (int ty = 0; ty < TilesY; ty++)
       for (int tx = 0; tx < TilesX; tx++) render_tile(tx, ty);
+    cp_checks();
+    cp_frame();
     $display("[%0t] image not checked here (make compares it with raster_sw's)", $time);
     write_tga(out_path);
     check_cleared();

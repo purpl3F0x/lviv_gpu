@@ -3,8 +3,8 @@
 #   PS M_AXI_HPM0_FPD ──► sc_ctrl ──► gpu_0 s_axi_ctrl     (4 KiB at 0xA000_0000)
 #   gpu_0 m_axi_vb, m_axi_tri, m_axi_tile ──► sc_mem ──► PS S_AXI_HP0_FPD (PS DDR)
 #   gpu_0 m_axi_tex0..3 (the threads' texture caches) ──► sc_tex ──► PS S_AXI_HP1_FPD (PS DDR)
-#   pl_clk0 100 MHz: everything, gpu_0's aclk, frontend_clk and thread_clk included (its clock
-#                    crossings work with equal clocks too)
+#   pl_clk0 100 MHz: everything, gpu_0's ctrl_clk, aclk, frontend_clk and thread_clk included (its
+#                    clock crossings work with equal clocks too)
 #   gpu_0 vis_dma_irq, tile_dma_irq ──► pl_ps_irq0[1:0]
 #
 # The triangles live in PS DDR for now: the GPU's triangle master (PL DDR in the full design) is
@@ -87,14 +87,14 @@ connect_bd_intf_net [get_bd_intf_pins sc_tex/M00_AXI] [get_bd_intf_pins $ps/S_AX
 # Clocks and resets
 #
 
-connect_bd_net [get_bd_pins $ps/pl_clk0] [get_bd_pins gpu_0/aclk] \
+connect_bd_net [get_bd_pins $ps/pl_clk0] [get_bd_pins gpu_0/ctrl_clk] [get_bd_pins gpu_0/aclk] \
     [get_bd_pins gpu_0/frontend_clk] [get_bd_pins gpu_0/thread_clk] \
     [get_bd_pins $ps/maxihpm0_fpd_aclk] [get_bd_pins $ps/saxihp0_fpd_aclk] \
     [get_bd_pins $ps/saxihp1_fpd_aclk] [get_bd_pins sc_ctrl/aclk] [get_bd_pins sc_mem/aclk] \
     [get_bd_pins sc_tex/aclk] [get_bd_pins rst_pl_clk0/slowest_sync_clk]
 
-connect_bd_net [get_bd_pins rst_pl_clk0/peripheral_aresetn] [get_bd_pins gpu_0/aresetn] \
-    [get_bd_pins gpu_0/frontend_rst_n] [get_bd_pins gpu_0/thread_rst_n] \
+connect_bd_net [get_bd_pins rst_pl_clk0/peripheral_aresetn] [get_bd_pins gpu_0/ctrl_rst_n] \
+    [get_bd_pins gpu_0/aresetn] [get_bd_pins gpu_0/frontend_rst_n] [get_bd_pins gpu_0/thread_rst_n] \
     [get_bd_pins sc_ctrl/aresetn] [get_bd_pins sc_mem/aresetn] [get_bd_pins sc_tex/aresetn]
 
 #

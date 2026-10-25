@@ -22,11 +22,16 @@ SBT ?= sbt
 
 # Per module: its generator object, the Scala files it is built from (keep these in step with the
 # code: the crossbar sizes its windows from the register blocks), and its register map files.
-SPINAL_MODULES = APBFrontendRegs ApbLutRam ApbThreadRegs Axi4ToApbXbar AxiTileDma AxiVisibilityDma
+SPINAL_MODULES = APBFrontendRegs ApbClockCrossing ApbLutRam ApbThreadRegs Axi4ToApbXbar AxiTileDma \
+                 AxiVisibilityDma CommandProcessor
 
 SPINAL_MAIN_APBFrontendRegs = APBFrontendRegsVerilog
 SPINAL_SRCS_APBFrontendRegs = ControlModules/APBFrontendRegs.scala
 SPINAL_DOCS_APBFrontendRegs = $(addprefix apb_front_end_regmap.,h json html)
+
+SPINAL_MAIN_ApbClockCrossing = ApbClockCrossingVerilog
+SPINAL_SRCS_ApbClockCrossing = ControlModules/ApbClockCrossing.scala
+SPINAL_DOCS_ApbClockCrossing =
 
 SPINAL_MAIN_ApbLutRam = ApbLutRamVerilog
 SPINAL_SRCS_ApbLutRam = ControlModules/APBAddressLUT.scala
@@ -39,7 +44,7 @@ SPINAL_DOCS_ApbThreadRegs = $(addprefix apb_thread_regmap.,h json html)
 SPINAL_MAIN_Axi4ToApbXbar = Axi4ToApbXbarVerilog
 SPINAL_SRCS_Axi4ToApbXbar = ControlModules/Axi4ToApbXbar.scala ControlModules/Apb3RegSlice.scala \
                             ControlModules/APBAddressLUT.scala ControlModules/APBFrontendRegs.scala \
-                            ControlModules/ApbThreadRegs.scala
+                            ControlModules/ApbThreadRegs.scala ControlModules/CommandProcessor.scala
 SPINAL_DOCS_Axi4ToApbXbar = address_map.json
 
 SPINAL_MAIN_AxiTileDma = AxiTileDmaVerilog
@@ -49,6 +54,11 @@ SPINAL_DOCS_AxiTileDma = $(addprefix axi_tile_dma_regmap.,h json html)
 SPINAL_MAIN_AxiVisibilityDma = AxiVisibilityDmaVerilog
 SPINAL_SRCS_AxiVisibilityDma = VisDMA/AxiVisibilityDma.scala
 SPINAL_DOCS_AxiVisibilityDma = $(addprefix axi_visibility_dma_regmap.,h json html)
+
+SPINAL_MAIN_CommandProcessor = CommandProcessorVerilog
+SPINAL_SRCS_CommandProcessor = ControlModules/CommandProcessor.scala ControlModules/Axi4ToApbXbar.scala \
+                               ControlModules/APBFrontendRegs.scala ControlModules/ApbThreadRegs.scala
+SPINAL_DOCS_CommandProcessor = $(addprefix command_processor_regmap.,h json html)
 
 SPINAL_VERILOG = $(SPINAL_MODULES:%=$(SPINAL_GEN_DIR)/%.v)
 SPINAL_DOCS = $(foreach m,$(SPINAL_MODULES),$(addprefix $(SPINAL_DOC_DIR)/$(m)/,$(SPINAL_DOCS_$(m))))

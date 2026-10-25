@@ -11,16 +11,20 @@ Bare-metal software for the GPU on the ZCU104 (A53, standalone BSP), for `bd/gpu
   - `gpu_map.h`: where each block sits in the control port, and the generated headers
 - `src/`: what applications share
   - `gpu.c`, `gpu.h`: the driver. A frame is rendered one tile at a time: z-buffers cleared,
-    frontend tile, visibility DMA, wait for idle, tile DMA. The DMAs are polled, or their
-    interrupts waited for. `gpu_set_texture` puts a texture in the texture table.
+    the frontend's tile box, visibility DMA, wait for idle, tile DMA. `gpu_set_mode` picks who
+    does that: the CPU (the reset mode; the DMAs polled or their interrupts waited for), or the
+    command processor in gpu_top (the driver sets the frame up at tile 0 and starts it; its end
+    is the tile DMA's frame_done).
+    `gpu_set_texture` puts a texture in the texture table.
   - `dp.c`, `dp.h`: the PS's DisplayPort output (DP TX, AV buffer, DPDMA). It shows a frame
     buffer at 1280 x 720, 60 Hz, and follows hot-plug interrupts: link trained when a monitor is
     plugged in, stream stopped when it is pulled.
   - `board.c`, `board.h`: start-up, with the interrupt controller and an assert printer
 - `raster_test/main.c`: tests of the raster core. It renders one triangle made in the code (blue,
-  red and green corners, colours interpolated) at 1280 x 720, untextured and then with a 64 x 64
-  checkerboard made in the code modulating it, checks every pixel against the same triangle worked
-  out in floating point, then shows the textured frame.
+  red and green corners, colors interpolated) at 1280 x 720, untextured and then with a 64 x 64
+  checkerboard made in the code modulating it, each by the CPU and by the command processor,
+  checks every pixel against the same triangle worked out in floating point, then shows the last
+  frame.
 
 ## Build and run
 
@@ -46,15 +50,19 @@ Run `raster_test` on the board from the IDE and watch the PS UART (115200 8N1):
 ```
 Raster test: gpu_top's raster core at 0xa0000000
 triangle: (640, 60) blue, (160, 660) red, (1120, 660) green; in 48 of 60 tiles
-colour: frame ... us
-colour: inside 285606 pixels, 0 wrong (largest channel error 1, up to 3 allowed)
-colour: outside 692634 pixels, 0 not the clear colour
-colour: 4800 pixels near an edge, not checked
+color, CPU: frame ... us
+color, CPU: inside 285606 pixels, 0 wrong (largest channel error 1, up to 3 allowed)
+color, CPU: outside 692634 pixels, 0 not the clear color
+color, CPU: 4800 pixels near an edge, not checked
+color, CP: frame ... us
+...
 texture: 64 x 64 checkerboard at 0x...
-texture: frame ... us
-texture: inside 267780 pixels, 0 wrong (largest channel error 1, up to 3 allowed)
-texture: outside 692634 pixels, 0 not the clear colour
-texture: 22626 pixels near an edge or a square's border, not checked
+texture, CPU: frame ... us
+texture, CPU: inside 267780 pixels, 0 wrong (largest channel error 1, up to 3 allowed)
+texture, CPU: outside 692634 pixels, 0 not the clear color
+texture, CPU: 22626 pixels near an edge or a square's border, not checked
+texture, CP: frame ... us
+...
 PASS
 DisplayPort: showing the frame, 1280 x 720 at 60 Hz; plug in or pull a monitor
 ```

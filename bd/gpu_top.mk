@@ -26,6 +26,8 @@ GPU_TOP_RTL = ../../rtl/gpu_types_pkg.sv \
               $(SPINAL_GEN_DIR)/ApbLutRam.v \
               ../../rtl/raster_core.sv \
               $(SPINAL_GEN_DIR)/Axi4ToApbXbar.v \
+              $(SPINAL_GEN_DIR)/CommandProcessor.v \
+              $(SPINAL_GEN_DIR)/ApbClockCrossing.v \
               $(SPINAL_GEN_DIR)/AxiVisibilityDma.v \
               $(SPINAL_GEN_DIR)/AxiTileDma.v \
               ../../rtl/generated/triangle_unpack.sv \

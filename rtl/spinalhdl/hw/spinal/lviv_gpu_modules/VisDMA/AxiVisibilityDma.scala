@@ -15,8 +15,7 @@ case class AxiVisibilityDmaConfig(
     addressWidth: Int = 32, // Address width (32 up to 64 bits)
     axiDataWidth: Int = 128, // AXI4 Read Master data width (>= 64 bits, e.g. 64, 128, 256)
     bttWidth: Int = 23, // DataMover BTT (Bytes To Transfer) width (up to 23 bits)
-    gridWidth: Int = 10, // Visibility grid width in tiles (default: 10)
-    gridHeight: Int = 6, // Visibility grid height in tiles (default: 6)
+    maxTiles: Int = 64, // Tiles a frame can have (TILE_COUNT up to this): bits of the visibility word
     vbWordBits: Int = 64, // Visibility buffer word width (64 bits: 60 bits grid + 4 bits padding)
     triangleSizeBytes: Int = 96, // Triangle data footprint in bytes (96 B: odd triangles start 32 B into a 64 B beat)
     maxBurstLength: Int = 256, // Max AXI4 Read burst beats (1..256)
@@ -24,11 +23,12 @@ case class AxiVisibilityDmaConfig(
     cmdFifoDepth: Int = 64, // Depth of DataMover command FIFO (64 entries reduces backpressure)
     stsFifoDepth: Int = 4, // Depth of DataMover status FIFO (4 entries since consumed 1 per clock)
     vbFifoDepth: Int = 256, // Depth of visibility read decoupling FIFO (512 entries fits in BRAM)
-    useAutoAdvance: Boolean = true, // Support automatic tile index advancing (0..59)
+    useAutoAdvance: Boolean = true, // Support automatic tile index advancing (0..TILE_COUNT-1)
     trianglesPerCycle: Int = 2 // Process 2 triangles per clock cycle (600 MTris/s @ 300MHz)
 ) {
-  val gridTiles: Int = gridWidth * gridHeight
-  require(gridTiles <= vbWordBits, s"gridTiles ($gridTiles) cannot exceed vbWordBits ($vbWordBits)")
+  require(maxTiles >= 1 && maxTiles <= vbWordBits, s"maxTiles ($maxTiles) must be 1 to vbWordBits ($vbWordBits)")
+  val tileIndexWidth: Int = log2Up(maxTiles)
+  val tileCountWidth: Int = log2Up(maxTiles + 1)
   require(axiDataWidth >= vbWordBits, s"axiDataWidth ($axiDataWidth) must be >= vbWordBits ($vbWordBits)")
   require(isPow2(axiDataWidth), "axiDataWidth must be a power of 2 (e.g. 64, 128, 256)")
   require(
@@ -244,7 +244,7 @@ class AxiVisibilityDma(
   val IRQ_STATUS = REG_STATUS.field(Bool(), W1C, doc = "Interrupt pending (Write 1 to clear)")
   val FRAME_DONE =
     if (config.useAutoAdvance)
-      REG_STATUS.field(Bool(), W1C, doc = "All 60 tiles completed / wrapped (Write 1 to clear)")
+      REG_STATUS.field(Bool(), W1C, doc = "Last of TILE_COUNT tiles completed, index wrapped (Write 1 to clear)")
     else null
   val AXI_ERR_FLAG = REG_STATUS.field(Bool(), RO, doc = "AXI Read Master Bus Error")
   val DM_ERR_FLAG = REG_STATUS.field(Bool(), RO, doc = "DataMover Status Error")
@@ -296,12 +296,12 @@ class AxiVisibilityDma(
   )
 
   // 0x1C: TILE_INDEX
-  val REG_TILE_IDX = busif.newRegAt(address = 0x1c, doc = "Active Tile Index (0..59)")
+  val REG_TILE_IDX = busif.newRegAt(address = 0x1c, doc = s"Active Tile Index (0..${config.maxTiles - 1})")
   val TILE_INDEX = REG_TILE_IDX.field(
-    UInt(log2Up(config.gridTiles) bits),
+    UInt(config.tileIndexWidth bits),
     RW,
     resetValue = 0,
-    doc = "Tile selection bit index (0..59) in 64-bit visibility word"
+    doc = s"Tile selection bit index (0..${config.maxTiles - 1}) in ${config.vbWordBits}-bit visibility word"
   )
 
   // 0x20: BTT_LIMIT (triangle count; BTT bytes = count * triangleSizeBytes)
@@ -338,6 +338,19 @@ class AxiVisibilityDma(
   val PERF_CYCLES = REG_PERF.field(UInt(32 bits), RO, doc = "Elapsed clock cycles during active tile scan")
   PERF_CYCLES := cycleCounter
 
+  // 0x38: TILE_COUNT
+  val TILE_COUNT =
+    if (config.useAutoAdvance) {
+      val REG_TILE_COUNT = busif.newRegAt(address = 0x38, doc = "Tiles in the frame (auto-advance)")
+      REG_TILE_COUNT.field(
+        UInt(config.tileCountWidth bits),
+        RW,
+        resetValue = config.maxTiles,
+        doc = s"Tiles in the frame (1..${config.maxTiles}): with AUTO_ADV_EN, the done of tile TILE_COUNT - 1 " +
+          "sets FRAME_DONE and TILE_INDEX back to 0"
+      )
+    } else null
+
   // ===========================================================================
   // INTERRUPT FACTORY REGISTERS (0x40 - 0x4C)
   // RegGroup RFMS4:
@@ -348,7 +361,7 @@ class AxiVisibilityDma(
   // Fields:
   //   Bit 0: done           - Tile scan & command generation complete
   //   Bit 1: error          - AXI read error or DataMover status error
-  //   Bit 2: frame_done     - All 60 tiles completed (Auto-Advance wrap)
+  //   Bit 2: frame_done     - The frame's last tile completed (Auto-Advance wrap at TILE_COUNT)
   // ===========================================================================
   val intrDone = False
   val intrError = False
@@ -405,7 +418,7 @@ class AxiVisibilityDma(
   }
 
   // Active tile index (latched upon START and held constant across entire triangle stream)
-  val activeTileIdx = Reg(UInt(log2Up(config.gridTiles) bits)) init (0)
+  val activeTileIdx = Reg(UInt(config.tileIndexWidth bits)) init (0)
 
   // ===========================================================================
   // 2. AXI READ BOUNDARY BUFFER & VISIBILITY FILTER (aclk domain)
@@ -1026,7 +1039,8 @@ class AxiVisibilityDma(
 
         if (config.useAutoAdvance) {
           when(AUTO_ADV_EN) {
-            when(TILE_INDEX === (config.gridTiles - 1)) {
+            // The last tile, or past it (TILE_COUNT lowered, or 0)
+            when(TILE_INDEX.resize(config.tileCountWidth bits) + 1 >= TILE_COUNT) {
               TILE_INDEX := 0
               FRAME_DONE := True
               intrFrameDone := True
@@ -1077,8 +1091,7 @@ object AxiVisibilityDmaVerilog {
       addressWidth = 32,
       axiDataWidth = 128, // 128-bit AXI Read Master (configurable >= 64 bits)
       bttWidth = 23, // Configurable up to 23 bits
-      gridWidth = 10,
-      gridHeight = 6,
+      maxTiles = 64,
       vbWordBits = 64,
       triangleSizeBytes = 96,
       maxBurstLength = 256,

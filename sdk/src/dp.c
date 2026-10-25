@@ -14,7 +14,7 @@
 #define DP_BYTES_PER_PIXEL 4
 #define DP_TRAINING_ATTEMPTS 3
 #define DP_MMU_BLOCK 0x200000 // the standalone translation table maps DDR below 4 GB in 2 MB blocks
-#define DP_CSC_ONE 0x1000     // 1.0 in the blender's colour conversion matrices
+#define DP_CSC_ONE 0x1000     // 1.0 in the blender's color conversion matrices
 
 static XDpPsu dp_tx;
 static XAVBuf avbuf;
@@ -64,7 +64,7 @@ static int connect_interrupt(XScuGic *gic, u32 intr_id, Xil_InterruptHandler han
     return 0;
 }
 
-// The graphics layer's colour conversion into the blender, for 0xAARRGGBB words (DRM's ARGB8888)
+// The graphics layer's color conversion into the blender, for 0xAARRGGBB words (DRM's ARGB8888)
 // read as RGBA8888: the identity XAVBuf_ConfigureGraphicsPipeline writes, with red and blue swapped,
 // as Linux's ZynqMP display driver does for that format.
 static void set_graphics_csc(u32 base)

@@ -30,7 +30,8 @@ Bare-metal software for the GPU on the ZCU104 (A53, standalone BSP), for `bd/gpu
   checkerboard texture alone, `b` the texture modulating the colors; each starts drawing. The
   triangle is then drawn again for every frame, one per vertical sync (60 frames a second while a
   frame takes under 16.7 ms), double-buffered: into the buffer not on the screen, shown from the
-  next vertical sync on. Once a second it prints the frame rate and the frame times. `r` draws
+  next vertical sync on. Once a second it prints the frame rate, the frame time (mean and standard
+deviation) and, with the command processor, its cycle counter (`FRAME_CYCLES`, the mean). `r` draws
   again (after the test pattern or a frame that failed), `p` shows the test pattern, `?` lists the
   keys.
 
@@ -62,8 +63,8 @@ texture: 64 x 64 checkerboard at 0x...
 DisplayPort: 1280 x 720 at 60 Hz, the test pattern; plug in or pull a monitor
 keys: 1 CPU, 2 command processor; c color, t texture, b blend; r draw again; p test pattern; ? keys
 CP, color
-CP, color: 60.0 frames/s, frame ... us on average, ... us the longest
-CP, color: 60.0 frames/s, frame ... us on average, ... us the longest
+CP, color: 60.0 frames/s, frame time ... ± ... us (CP cycle counter: ...)
+CP, color: 60.0 frames/s, frame time ... ± ... us (CP cycle counter: ...)
 ```
 
 (`DisplayPort: monitor plugged in` and the link it trained come before the keys when a monitor is
@@ -71,4 +72,6 @@ plugged in at the start, otherwise whenever one is.)
 
 The control port's address comes from the platform's `xparameters.h` (`XPAR_GPU_TOP_BD_0_BASEADDR`,
 `0xA000_0000`); the two frame buffers (about 4 MB each), the texture and the triangle are static
-arrays in PS DDR, the texture in the first 128 MiB (the texture caches' window).
+arrays in PS DDR, the texture in the first 128 MiB (the texture caches' window). The frame buffers
+are not cached (2 MiB blocks of their own): the GPU and the DPDMA see them as they are, with no
+cache maintenance.

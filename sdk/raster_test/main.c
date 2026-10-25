@@ -4,7 +4,8 @@
 // The DisplayPort output runs in the background from the start, 1280 x 720 at 60 Hz (dp.c). It
 // shows the test pattern first; then the triangle, drawn again for every frame, one a vertical sync
 // (60 frames a second while a frame takes less than 16.7 ms): into the frame buffer not on the
-// screen, shown from the next vertical sync on. Once a second, the frames drawn and their times.
+// screen, shown from the next vertical sync on. Once a second, the frame rate, the frame time (its
+// mean and standard deviation), and with the command processor its cycle counter (the mean).
 // Keys:
 //   1, 2     who draws it: 1 the CPU, tile by tile; 2 the command processor, in one START
 //   c, t, b  the triangle's color: c its corners' colors (untextured), t the texture alone, b the
@@ -28,6 +29,7 @@
 #include "dp.h"
 #include "gpu.h"
 #include "gpu_map.h"
+#include "xil_mmu.h"
 #include "xil_printf.h"
 #include "xiltimer.h" // XTime_GetTime, COUNTS_PER_SECOND
 #include "xparameters.h"
@@ -48,6 +50,7 @@
 #define TILES (TILES_X * TILES_Y)
 #define FRAME_ROWS (TILES_Y * GPU_TILE_SIZE) // the tile DMA writes whole tiles
 #define STRIDE (WIDTH * 4)
+#define FRAME_WORDS (FRAME_ROWS * WIDTH)
 #define CLEAR_COLOR 0xFF000000u // opaque black
 
 // The checkerboard: TEX_SIZE texels square, squares of TEX_CHECK texels.
@@ -94,8 +97,16 @@ static const corner_t corners[3] = {
 
 static gpu_triangle_t triangle __attribute__((aligned(64)));
 static uint64_t visibility __attribute__((aligned(64)));
-// Two frame buffers: one on the screen, the other drawn into, then shown.
-static uint32_t frames[2][FRAME_ROWS * WIDTH] __attribute__((aligned(4096)));
+// Two frame buffers: one on the screen, the other drawn into, then shown. The GPU writes them and
+// the DPDMA reads them, both behind the CPU's caches: they get 2 MiB blocks of their own (the
+// standalone translation table's for DDR below 4 GiB), not cached (main), so that nothing needs a
+// cache flush.
+#define MMU_BLOCK 0x200000
+static union {
+    uint32_t frames[2][FRAME_WORDS];
+    uint8_t blocks[(sizeof(uint32_t[2][FRAME_WORDS]) + MMU_BLOCK - 1) / MMU_BLOCK * MMU_BLOCK];
+} frame_memory __attribute__((aligned(MMU_BLOCK)));
+static uint32_t (*const frames)[FRAME_WORDS] = frame_memory.frames;
 static uint32_t texture[TEX_SIZE * TEX_SIZE] __attribute__((aligned(4 * TEX_SIZE * TEX_SIZE)));
 
 static gpu_t gpu;
@@ -107,9 +118,10 @@ static int drawing;    // a frame after another, not the test pattern
 static gpu_mode_t mode = GPU_MODE_CPU;
 static shade_t shade = SHADE_COLOR;
 
-// Since the last report: the frames drawn, their time all together and the longest, from when.
-static int frames_drawn;
-static XTime frames_time, longest, period_start;
+// Since the last report, from period_start: the frames drawn, the sum of their times (us) and of
+// their squares, and of the command processor's cycle counts.
+static uint64_t frames_drawn, frame_us, frame_us2, cp_cycles;
+static XTime period_start;
 
 // raster_sw's edge function (rasterizer.h): c's distance from edge a -> b times the edge's length,
 // positive on the inside of a triangle counter-clockwise on the screen.
@@ -289,15 +301,28 @@ static void start_drawing(void)
     build_triangle(shade);
     gpu_set_mode(&gpu, mode);
     drawing = 1;
-    frames_drawn = 0;
-    frames_time = longest = 0;
+    frames_drawn = frame_us = frame_us2 = cp_cycles = 0;
     XTime_GetTime(&period_start);
     xil_printf("%s, %s\r\n", mode_names[mode], shade_names[shade]);
 }
 
-static int us(XTime t)
+// No libm: the square root of n, rounded down (bit by bit).
+static uint64_t isqrt(uint64_t n)
 {
-    return (int)(t / (COUNTS_PER_SECOND / 1000000));
+    uint64_t root = 0;
+    for (uint64_t bit = 1ull << 62; bit != 0; bit >>= 2)
+    {
+        if (n >= root + bit)
+        {
+            n -= root + bit;
+            root = (root >> 1) + bit;
+        }
+        else
+        {
+            root >>= 1;
+        }
+    }
+    return root;
 }
 
 // One frame, drawn and shown, and once a second a report; drawing stops at one that fails.
@@ -327,19 +352,26 @@ static void draw_frame(void)
     }
     show_back();
 
+    const uint64_t t = (end - start) / (COUNTS_PER_SECOND / 1000000);
     frames_drawn++;
-    frames_time += end - start;
-    if (end - start > longest)
-        longest = end - start;
+    frame_us += t;
+    frame_us2 += t * t;
+    if (mode == GPU_MODE_CP)
+        cp_cycles += gpu_cp_frame_cycles(&gpu);
     XTime now;
     XTime_GetTime(&now);
     if (now - period_start >= COUNTS_PER_SECOND)
     {
-        const int rate10 = (int)((XTime)frames_drawn * 10 * COUNTS_PER_SECOND / (now - period_start));
-        xil_printf("%s, %s: %d.%d frames/s, frame %d us on average, %d us the longest\r\n", mode_names[mode],
-                   shade_names[shade], rate10 / 10, rate10 % 10, us(frames_time / frames_drawn), us(longest));
-        frames_drawn = 0;
-        frames_time = longest = 0;
+        const uint64_t n = frames_drawn;
+        const int rate10 = (int)(n * 10 * COUNTS_PER_SECOND / (now - period_start));
+        // n * (sum of squares) - sum^2 is n^2 times the variance, never negative.
+        const uint64_t deviation = isqrt((n * frame_us2 - frame_us * frame_us) / (n * n));
+        xil_printf("%s, %s: %d.%d frames/s, frame time %d \u00b1 %d us", mode_names[mode], shade_names[shade],
+                   rate10 / 10, rate10 % 10, (int)(frame_us / n), (int)deviation);
+        if (mode == GPU_MODE_CP)
+            xil_printf(" (CP cycle counter: %d)", (int)(cp_cycles / n));
+        xil_printf("\r\n");
+        frames_drawn = frame_us = frame_us2 = cp_cycles = 0;
         period_start = now;
     }
 }
@@ -367,6 +399,9 @@ int main(void)
         return 1;
     }
     gpu_init(&gpu, GPU_BASEADDR);
+    for (UINTPTR block = (UINTPTR)&frame_memory; block < (UINTPTR)&frame_memory + sizeof frame_memory;
+         block += MMU_BLOCK)
+        Xil_SetTlbAttributes(block, NORM_NONCACHE); // also writes back what the cache held of it
 
     const int tiles = build_triangle(SHADE_COLOR);
     xil_printf("triangle: (%d, %d) blue, (%d, %d) red, (%d, %d) green; in %d of %d tiles\r\n", (int)corners[0].x,

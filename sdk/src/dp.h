@@ -15,14 +15,15 @@
 #define DP_HEIGHT 720
 
 // Sets up the DP subsystem for frame: DP_HEIGHT lines of DP_WIDTH 32-bit 0xAARRGGBB pixels (the
-// alpha is not used), stride bytes apart; the frame and the stride 256-byte aligned. Connects the
+// alpha is not used), stride bytes apart; the frame and the stride 256-byte aligned. The DPDMA
+// reads the frames behind the CPU's caches: memory the CPU does not cache (Xil_SetTlbAttributes
+// NORM_NONCACHE on its 2 MiB blocks), or flushed by the caller before dp_show. Connects the
 // DP and DPDMA interrupts to gic, which must be initialized; trains the link if a monitor is
 // already plugged in. Returns 0, or -1 on failure.
 int dp_init(XScuGic *gic, const uint32_t *frame, uint32_t stride);
 
-// Shows frame instead, laid out as the first one, from the next vertical sync on. Flushes it from
-// the data cache first, so what the CPU wrote is what is shown. One frame per vertical sync:
-// dp_wait_shown before the next.
+// Shows frame instead, laid out as the first one, from the next vertical sync on. One frame per
+// vertical sync: dp_wait_shown before the next.
 void dp_show(const uint32_t *frame);
 
 // Until the frame of the last dp_show is the one being read, so the one before is free to draw

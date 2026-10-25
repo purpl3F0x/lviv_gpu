@@ -151,8 +151,6 @@ int dp_init(XScuGic *gic, const uint32_t *frame, uint32_t stride)
 
 void dp_show(const uint32_t *frame)
 {
-    // What the CPU wrote, in memory for the DPDMA.
-    Xil_DCacheFlushRange((UINTPTR)frame, frame_buffer.Size);
     frame_buffer.Address = (u64)(uintptr_t)frame;
     // Before the channel's first trigger (at a vertical sync after the first stream starts) that
     // takes the frame buffer as it is then. After, its descriptor not in use is set up for frame, with

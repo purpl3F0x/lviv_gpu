@@ -13,6 +13,8 @@
 //   GPU_MODE_CP   the command processor: the driver writes the DMAs' frame registers and the frame
 //                 size, starts it, and waits for the tile DMA's frame_done (its interrupt, the only
 //                 one besides errors in this mode) or polls the command processor's BUSY.
+// The frame buffers' clear (and, by the command processor, the z-buffers') is set up once: a frame
+// that finished leaves them clear for the next, in the same mode with the same clear color.
 #pragma once
 
 #include <stdint.h>
@@ -38,6 +40,10 @@ typedef struct
     uintptr_t base;     // the control port (XPAR_GPU_TOP_BD_0_BASEADDR in xparameters.h)
     int use_interrupts; // wait for the DMAs' interrupts instead of polling them
     gpu_mode_t mode;    // gpu_set_mode
+    // The last frame finished in this mode: the frame buffers hold ready_color (each write-back leaves
+    // CLEAR_VALUE behind), and after a command processor frame the z-buffers are clear too.
+    int ready;
+    uint32_t ready_color;
     // Kept by the interrupt handlers, per gpu_irq_t:
     volatile uint32_t irq_count[GPU_IRQS];    // interrupts handled
     volatile uint32_t irq_events[GPU_IRQS];   // the last one's events (GPU_INT_DONE, GPU_INT_ERROR)
@@ -54,8 +60,10 @@ typedef enum
     GPU_BAD_SIZE = -5,       // width or height 0, or more than 64 tiles
 } gpu_status_t;
 
-// What a frame is drawn from, and where it goes. Every buffer must be in memory the GPU's masters
-// reach (PS DDR below 4 GiB) and flushed from the CPU's caches before use (gpu_frame does that).
+// What a frame is drawn from, and where it goes, in memory the GPU's masters reach (PS DDR below
+// 4 GiB). They do not see the CPU's caches: gpu_frame flushes the triangles and their visibility
+// words from them, and the frame must be memory the CPU does not cache (Xil_SetTlbAttributes
+// NORM_NONCACHE on its 2 MiB blocks), or kept out of its caches by the caller.
 typedef struct
 {
     const gpu_triangle_t *triangles; // GPU_TRIANGLE_BYTES each, 32-byte aligned
@@ -82,6 +90,9 @@ void gpu_set_mode(gpu_t *gpu, gpu_mode_t mode);
 // The command processor back to its reset state (MODE kept), e.g. after a frame that never ended.
 // The units are not reset.
 void gpu_cp_soft_reset(const gpu_t *gpu);
+
+// The command processor's clock cycles for its last frame (FRAME_CYCLES).
+uint32_t gpu_cp_frame_cycles(const gpu_t *gpu);
 
 // Interrupt handlers, for the interrupt controller to call with the gpu_t (XScuGic_Connect): each
 // takes its DMA's pending events, clears them, which drops the line, and counts the interrupt.
@@ -111,6 +122,6 @@ gpu_status_t gpu_stream_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_
 gpu_status_t gpu_write_back_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t tile);
 
 // The whole frame, by the tiles' runner of gpu->mode. On failure *failed_tile says where it stopped.
-gpu_status_t gpu_frame(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t *failed_tile);
+gpu_status_t gpu_frame(gpu_t *gpu, const gpu_frame_t *frame, uint32_t *failed_tile);
 
 const char *gpu_status_name(gpu_status_t status);

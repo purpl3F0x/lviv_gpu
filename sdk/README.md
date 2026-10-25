@@ -16,6 +16,8 @@ Bare-metal software for the GPU on the ZCU104 (A53, standalone BSP), for `bd/gpu
     command processor in gpu_top (the driver sets the frame up at tile 0 and starts it; its end
     is the tile DMA's frame_done).
     `gpu_set_texture` puts a texture in the texture table.
+  - `gpu_regs.h`: the driver's register accessors, one pair per block (`vis_dma_read_reg`,
+    `cp_write_reg`, ...), by the offsets of the block's own register map
   - `dp.c`, `dp.h`: the PS's DisplayPort output (DP TX, AV buffer, DPDMA). It shows a frame
     buffer at 1280 x 720, 60 Hz, and follows hot-plug interrupts: link trained when a monitor is
     plugged in, stream stopped when it is pulled.

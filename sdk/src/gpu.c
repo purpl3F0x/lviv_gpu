@@ -1,6 +1,7 @@
 #include "gpu.h"
 
 #include "gpu_map.h"
+#include "gpu_regs.h"
 #include "sleep.h"
 #include "xil_cache.h"
 #include "xil_io.h"
@@ -22,9 +23,6 @@ enum
     CP_CAUSE_SIZE = 4,
 };
 
-// Each DMA's register block, by gpu_irq_t.
-static const uint32_t irq_block[GPU_IRQS] = {GPU_VIS_DMA_OFFSET, GPU_TILE_DMA_OFFSET};
-
 void gpu_init(gpu_t *gpu, uintptr_t base)
 {
     *gpu = (gpu_t){.base = base};
@@ -44,15 +42,15 @@ void gpu_set_mode(gpu_t *gpu, gpu_mode_t mode)
 {
     const int cp = mode == GPU_MODE_CP;
     gpu->mode = mode;
-    gpu_write(gpu, GPU_CP_OFFSET + CP_REG_MODE, cp);
+    cp_write_reg(gpu, CP_REG_MODE, cp);
     // With the command processor the per-tile done events are its own.
-    gpu_write(gpu, GPU_VIS_DMA_OFFSET + GPU_INT_MASK, cp ? GPU_INT_DONE | GPU_INT_FRAME_DONE : 0);
-    gpu_write(gpu, GPU_TILE_DMA_OFFSET + GPU_INT_MASK, cp ? GPU_INT_DONE : 0);
+    vis_dma_write_reg(gpu, GPU_INT_MASK, cp ? GPU_INT_DONE | GPU_INT_FRAME_DONE : 0);
+    tile_dma_write_reg(gpu, GPU_INT_MASK, cp ? GPU_INT_DONE : 0);
 }
 
 void gpu_cp_soft_reset(const gpu_t *gpu)
 {
-    gpu_write(gpu, GPU_CP_OFFSET + CP_REG_CTRL, BIT(CP_REG_CTRL_SOFT_RESET_SHIFT));
+    cp_write_reg(gpu, CP_REG_CTRL, BIT(CP_REG_CTRL_SOFT_RESET_SHIFT));
 }
 
 uint32_t gpu_tiles_x(const gpu_frame_t *frame)
@@ -67,16 +65,15 @@ uint32_t gpu_tiles_y(const gpu_frame_t *frame)
 
 static void handle_irq(gpu_t *gpu, gpu_irq_t irq)
 {
-    const uint32_t block = irq_block[irq];
-    uint32_t pending = gpu_read(gpu, block + GPU_INT_STATUS);
+    uint32_t pending = dma_read_reg(gpu, irq, GPU_INT_STATUS);
     if (!pending)
     {
         gpu->irq_spurious[irq]++;
         return;
     }
-    gpu_write(gpu, block + GPU_INT_RAW, pending); // write 1 to clear
+    dma_write_reg(gpu, irq, GPU_INT_RAW, pending); // write 1 to clear
     // Read back, so the line is low before the interrupt controller ends the interrupt.
-    (void)gpu_read(gpu, block + GPU_INT_RAW);
+    (void)dma_read_reg(gpu, irq, GPU_INT_RAW);
     gpu->irq_events[irq] = pending;
     gpu->irq_count[irq]++;
 }
@@ -95,7 +92,6 @@ void gpu_tile_dma_isr(void *gpu)
 // its interrupt in interrupt mode, else INT_RAW polled and cleared, as the handler would.
 static gpu_status_t wait_dma(const gpu_t *gpu, gpu_irq_t irq, uint32_t irqs, uint32_t *events)
 {
-    const uint32_t block = irq_block[irq];
     if (gpu->use_interrupts)
     {
         for (uint32_t spins = 0; spins < GPU_SPIN_LIMIT; spins++)
@@ -110,10 +106,10 @@ static gpu_status_t wait_dma(const gpu_t *gpu, gpu_irq_t irq, uint32_t irqs, uin
     }
     for (uint32_t polls = 0; polls < GPU_POLL_LIMIT; polls++)
     {
-        uint32_t raw = gpu_read(gpu, block + GPU_INT_RAW);
+        uint32_t raw = dma_read_reg(gpu, irq, GPU_INT_RAW);
         if (raw & (GPU_INT_DONE | GPU_INT_ERROR))
         {
-            gpu_write(gpu, block + GPU_INT_RAW, raw); // write 1 to clear, which drops the line
+            dma_write_reg(gpu, irq, GPU_INT_RAW, raw); // write 1 to clear, which drops the line
             *events = raw;
             return GPU_OK;
         }
@@ -126,11 +122,11 @@ static int core_idle(const gpu_t *gpu)
     const uint32_t idle = APB_FRONT_END_FRONTEND_REG_STATUS_EMPTY_MASK |
                           APB_FRONT_END_FRONTEND_REG_STATUS_ORCHESTRATOR_EMPTY_MASK |
                           APB_FRONT_END_FRONTEND_REG_STATUS_INPUT_FIFO_IDLE_MASK;
-    uint32_t status = gpu_read(gpu, GPU_FRONTEND_OFFSET + APB_FRONT_END_FRONTEND_REG_STATUS);
+    uint32_t status = frontend_read_reg(gpu, APB_FRONT_END_FRONTEND_REG_STATUS);
     if ((status & idle) != idle)
         return 0;
     for (int n = 0; n < GPU_THREADS; n++)
-        if (gpu_read(gpu, GPU_THREAD_OFFSET(n) + THREAD_REG_STATUS) & THREAD_REG_STATUS_BUSY_MASK)
+        if (thread_read_reg(gpu, n, THREAD_REG_STATUS) & THREAD_REG_STATUS_BUSY_MASK)
             return 0;
     return 1;
 }
@@ -166,22 +162,22 @@ int gpu_set_texture(const gpu_t *gpu, uint32_t id, const uint32_t *texels, uint3
         return -1;
     // The texture caches read it behind the CPU's caches.
     Xil_DCacheFlushRange((UINTPTR)texels, (INTPTR)bytes);
-    gpu_write(gpu, GPU_LUT_BASE(id), (uint32_t)(offset / 4));
-    gpu_write(gpu, GPU_LUT_SIZE(id), log2_size);
+    lut_write_reg(gpu, GPU_LUT_BASE(id), (uint32_t)(offset / 4));
+    lut_write_reg(gpu, GPU_LUT_SIZE(id), log2_size);
     return 0;
 }
 
 gpu_status_t gpu_clear_zbuffers(const gpu_t *gpu)
 {
     for (int n = 0; n < GPU_THREADS; n++)
-        gpu_write(gpu, GPU_THREAD_OFFSET(n) + THREAD_REG_ZBUF, THREAD_REG_ZBUF_ZBUF_CLEAR_MASK);
+        thread_write_reg(gpu, n, THREAD_REG_ZBUF, THREAD_REG_ZBUF_ZBUF_CLEAR_MASK);
     // ZBUF_CLEAR reads 1 only once the clear has crossed into the thread clock and its busy back,
     // tens of nanoseconds; the clear itself takes a thread clock per entry (41 us at 100 MHz).
     usleep(1);
     for (int n = 0; n < GPU_THREADS; n++)
     {
         uint32_t polls = 0;
-        while (gpu_read(gpu, GPU_THREAD_OFFSET(n) + THREAD_REG_ZBUF) & THREAD_REG_ZBUF_ZBUF_CLEAR_MASK)
+        while (thread_read_reg(gpu, n, THREAD_REG_ZBUF) & THREAD_REG_ZBUF_ZBUF_CLEAR_MASK)
             if (++polls == GPU_POLL_LIMIT)
                 return GPU_TIMEOUT;
     }
@@ -197,35 +193,34 @@ static uint32_t box_end(uint32_t t, uint32_t size)
 
 void gpu_set_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t tile_x, uint32_t tile_y)
 {
-    gpu_write(gpu, GPU_FRONTEND_OFFSET + APB_FRONT_END_FRONTEND_REG_BB_MIN_X, tile_x * GPU_TILE_SIZE);
-    gpu_write(gpu, GPU_FRONTEND_OFFSET + APB_FRONT_END_FRONTEND_REG_BB_MIN_Y, tile_y * GPU_TILE_SIZE);
-    gpu_write(gpu, GPU_FRONTEND_OFFSET + APB_FRONT_END_FRONTEND_REG_BB_MAX_X, box_end(tile_x, frame->width));
-    gpu_write(gpu, GPU_FRONTEND_OFFSET + APB_FRONT_END_FRONTEND_REG_BB_MAX_Y, box_end(tile_y, frame->height));
+    frontend_write_reg(gpu, APB_FRONT_END_FRONTEND_REG_BB_MIN_X, tile_x * GPU_TILE_SIZE);
+    frontend_write_reg(gpu, APB_FRONT_END_FRONTEND_REG_BB_MIN_Y, tile_y * GPU_TILE_SIZE);
+    frontend_write_reg(gpu, APB_FRONT_END_FRONTEND_REG_BB_MAX_X, box_end(tile_x, frame->width));
+    frontend_write_reg(gpu, APB_FRONT_END_FRONTEND_REG_BB_MAX_Y, box_end(tile_y, frame->height));
 }
 
 gpu_status_t gpu_stream_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t tile)
 {
-    const uint32_t vis = GPU_VIS_DMA_OFFSET;
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_VB_LOW, (uint32_t)(uintptr_t)frame->visibility);
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_VB_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->visibility >> 32));
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_TRI_LOW, (uint32_t)(uintptr_t)frame->triangles);
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_TRI_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->triangles >> 32));
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_TRI_COUNT, frame->triangle_count);
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_TILE_IDX, tile & AXI_VISIBILITY_DMA_REG_TILE_IDX_TILE_INDEX_MASK);
-    gpu_write(gpu, vis + GPU_INT_RAW, GPU_INT_DONE); // one left behind, e.g. by the command processor
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_VB_LOW, (uint32_t)(uintptr_t)frame->visibility);
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_VB_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->visibility >> 32));
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_TRI_LOW, (uint32_t)(uintptr_t)frame->triangles);
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_TRI_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->triangles >> 32));
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_TRI_COUNT, frame->triangle_count);
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_TILE_IDX, tile & AXI_VISIBILITY_DMA_REG_TILE_IDX_TILE_INDEX_MASK);
+    vis_dma_write_reg(gpu, GPU_INT_RAW, GPU_INT_DONE); // one left behind, e.g. by the command processor
     const uint32_t irqs = gpu->irq_count[GPU_IRQ_VIS_DMA];
     // START alone: also clears IRQ_ENABLE and AUTO_ADV_EN, so the tile index is only the one written.
     // (IRQ_ENABLE only sets STATUS.IRQ_STATUS; the interrupt line comes from the INT_ registers.)
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_CTRL, BIT(AXI_VISIBILITY_DMA_REG_CTRL_START_SHIFT));
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_CTRL, BIT(AXI_VISIBILITY_DMA_REG_CTRL_START_SHIFT));
 
     uint32_t events;
     if (wait_dma(gpu, GPU_IRQ_VIS_DMA, irqs, &events) != GPU_OK)
         return GPU_TIMEOUT;
-    uint32_t status = gpu_read(gpu, vis + AXI_VISIBILITY_DMA_REG_STATUS);
+    uint32_t status = vis_dma_read_reg(gpu, AXI_VISIBILITY_DMA_REG_STATUS);
     // DONE, ERROR and FRAME_DONE are write-1-to-clear.
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_STATUS,
-              BIT(AXI_VISIBILITY_DMA_REG_STATUS_DONE_SHIFT) | BIT(AXI_VISIBILITY_DMA_REG_STATUS_ERROR_SHIFT) |
-                  BIT(AXI_VISIBILITY_DMA_REG_STATUS_FRAME_DONE_SHIFT));
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_STATUS,
+                      BIT(AXI_VISIBILITY_DMA_REG_STATUS_DONE_SHIFT) | BIT(AXI_VISIBILITY_DMA_REG_STATUS_ERROR_SHIFT) |
+                          BIT(AXI_VISIBILITY_DMA_REG_STATUS_FRAME_DONE_SHIFT));
     const uint32_t errors = BIT(AXI_VISIBILITY_DMA_REG_STATUS_ERROR_SHIFT) |
                             AXI_VISIBILITY_DMA_REG_STATUS_AXI_ERR_FLAG_MASK |
                             AXI_VISIBILITY_DMA_REG_STATUS_DM_ERR_FLAG_MASK;
@@ -234,35 +229,33 @@ gpu_status_t gpu_stream_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_
 
 gpu_status_t gpu_write_back_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t tile)
 {
-    const uint32_t dma = GPU_TILE_DMA_OFFSET;
     const uint32_t tile_x = tile % gpu_tiles_x(frame), tile_y = tile / gpu_tiles_x(frame);
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_BASE_LOW, (uint32_t)(uintptr_t)frame->frame);
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_BASE_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->frame >> 32));
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_STRIDE, frame->stride);
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_TILES_X, gpu_tiles_x(frame));
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_TILES_Y, gpu_tiles_y(frame));
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_CUR_POS,
-              (tile_y << AXI_TILE_DMA_REG_CUR_POS_CUR_TILE_Y_SHIFT) |
-                  (tile_x << AXI_TILE_DMA_REG_CUR_POS_CUR_TILE_X_SHIFT));
-    gpu_write(gpu, dma + GPU_INT_RAW, GPU_INT_DONE); // one left behind, e.g. by the command processor
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_BASE_LOW, (uint32_t)(uintptr_t)frame->frame);
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_BASE_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->frame >> 32));
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_STRIDE, frame->stride);
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_TILES_X, gpu_tiles_x(frame));
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_TILES_Y, gpu_tiles_y(frame));
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_CUR_POS,
+                       (tile_y << AXI_TILE_DMA_REG_CUR_POS_CUR_TILE_Y_SHIFT) |
+                           (tile_x << AXI_TILE_DMA_REG_CUR_POS_CUR_TILE_X_SHIFT));
+    tile_dma_write_reg(gpu, GPU_INT_RAW, GPU_INT_DONE); // one left behind, e.g. by the command processor
     const uint32_t irqs = gpu->irq_count[GPU_IRQ_TILE_DMA];
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_CTRL, BIT(AXI_TILE_DMA_REG_CTRL_START_SHIFT));
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_CTRL, BIT(AXI_TILE_DMA_REG_CTRL_START_SHIFT));
 
     uint32_t events;
     if (wait_dma(gpu, GPU_IRQ_TILE_DMA, irqs, &events) != GPU_OK)
         return GPU_TIMEOUT;
-    uint32_t status = gpu_read(gpu, dma + AXI_TILE_DMA_REG_STATUS);
+    uint32_t status = tile_dma_read_reg(gpu, AXI_TILE_DMA_REG_STATUS);
     int error = (events & GPU_INT_ERROR) || (status & AXI_TILE_DMA_REG_STATUS_LAST_BRESP_MASK);
     return error ? GPU_TILE_DMA_ERROR : GPU_OK;
 }
 
 gpu_status_t gpu_clear_frame_buffers(const gpu_t *gpu, uint32_t color)
 {
-    const uint32_t dma = GPU_TILE_DMA_OFFSET;
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_CLEAR_VALUE, color);
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_CTRL, BIT(AXI_TILE_DMA_REG_CTRL_CLEAR_SHIFT));
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_CLEAR_VALUE, color);
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_CTRL, BIT(AXI_TILE_DMA_REG_CTRL_CLEAR_SHIFT));
     for (uint32_t polls = 0; polls < GPU_POLL_LIMIT; polls++)
-        if (!(gpu_read(gpu, dma + AXI_TILE_DMA_REG_STATUS) & AXI_TILE_DMA_REG_STATUS_CLEAR_BUSY_MASK))
+        if (!(tile_dma_read_reg(gpu, AXI_TILE_DMA_REG_STATUS) & AXI_TILE_DMA_REG_STATUS_CLEAR_BUSY_MASK))
             return GPU_OK;
     return GPU_TIMEOUT;
 }
@@ -298,34 +291,33 @@ static gpu_status_t cpu_frame(const gpu_t *gpu, const gpu_frame_t *frame, uint32
 // (interrupts), or BUSY low.
 static gpu_status_t cp_frame(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t *failed_tile)
 {
-    const uint32_t vis = GPU_VIS_DMA_OFFSET, dma = GPU_TILE_DMA_OFFSET, cp = GPU_CP_OFFSET;
     const uint32_t events = GPU_INT_DONE | GPU_INT_ERROR | GPU_INT_FRAME_DONE;
-    gpu_write(gpu, vis + GPU_INT_RAW, events); // write 1 to clear: each comes as a new edge
-    gpu_write(gpu, dma + GPU_INT_RAW, events);
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_VB_LOW, (uint32_t)(uintptr_t)frame->visibility);
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_VB_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->visibility >> 32));
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_TRI_LOW, (uint32_t)(uintptr_t)frame->triangles);
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_TRI_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->triangles >> 32));
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_TRI_COUNT, frame->triangle_count);
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_TILE_IDX, 0);
+    vis_dma_write_reg(gpu, GPU_INT_RAW, events); // write 1 to clear: each comes as a new edge
+    tile_dma_write_reg(gpu, GPU_INT_RAW, events);
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_VB_LOW, (uint32_t)(uintptr_t)frame->visibility);
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_VB_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->visibility >> 32));
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_TRI_LOW, (uint32_t)(uintptr_t)frame->triangles);
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_TRI_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->triangles >> 32));
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_TRI_COUNT, frame->triangle_count);
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_TILE_IDX, 0);
     // The command processor starts it with AUTO_ADV_EN: it moves on by itself, back to 0 after these.
-    gpu_write(gpu, vis + AXI_VISIBILITY_DMA_REG_TILE_COUNT, gpu_tiles_x(frame) * gpu_tiles_y(frame));
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_BASE_LOW, (uint32_t)(uintptr_t)frame->frame);
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_BASE_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->frame >> 32));
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_STRIDE, frame->stride);
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_TILES_X, gpu_tiles_x(frame));
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_TILES_Y, gpu_tiles_y(frame));
-    gpu_write(gpu, dma + AXI_TILE_DMA_REG_CTRL, BIT(AXI_TILE_DMA_REG_CTRL_RESET_POS_SHIFT)); // tile (0, 0)
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_TILE_COUNT, gpu_tiles_x(frame) * gpu_tiles_y(frame));
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_BASE_LOW, (uint32_t)(uintptr_t)frame->frame);
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_BASE_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->frame >> 32));
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_STRIDE, frame->stride);
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_TILES_X, gpu_tiles_x(frame));
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_TILES_Y, gpu_tiles_y(frame));
+    tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_CTRL, BIT(AXI_TILE_DMA_REG_CTRL_RESET_POS_SHIFT)); // tile (0, 0)
     gpu_status_t cleared = gpu_clear_frame_buffers(gpu, frame->clear_color);
     if (cleared == GPU_OK)
         cleared = gpu_clear_zbuffers(gpu);
     if (cleared != GPU_OK)
         return cleared;
     gpu_set_tile(gpu, frame, 0, 0);
-    gpu_write(gpu, cp + CP_REG_SIZE, frame->height << CP_REG_SIZE_HEIGHT_SHIFT | frame->width);
+    cp_write_reg(gpu, CP_REG_SIZE, frame->height << CP_REG_SIZE_HEIGHT_SHIFT | frame->width);
 
     const uint32_t vis_irqs = gpu->irq_count[GPU_IRQ_VIS_DMA], tile_irqs = gpu->irq_count[GPU_IRQ_TILE_DMA];
-    gpu_write(gpu, cp + CP_REG_CTRL, BIT(CP_REG_CTRL_START_SHIFT));
+    cp_write_reg(gpu, CP_REG_CTRL, BIT(CP_REG_CTRL_START_SHIFT));
     if (gpu->use_interrupts)
     {
         for (uint32_t spins = 0; spins < GPU_SPIN_LIMIT; spins++)
@@ -335,7 +327,7 @@ static gpu_status_t cp_frame(const gpu_t *gpu, const gpu_frame_t *frame, uint32_
     // BUSY low follows the events at once; polled, it is the end.
     uint32_t status = CP_REG_STATUS_BUSY_MASK;
     for (uint32_t polls = 0; polls < GPU_POLL_LIMIT && (status & CP_REG_STATUS_BUSY_MASK); polls++)
-        status = gpu_read(gpu, cp + CP_REG_STATUS);
+        status = cp_read_reg(gpu, CP_REG_STATUS);
     *failed_tile = (status & CP_REG_STATUS_TILE_MASK) >> CP_REG_STATUS_TILE_SHIFT;
     if (status & CP_REG_STATUS_BUSY_MASK)
     {
@@ -343,7 +335,7 @@ static gpu_status_t cp_frame(const gpu_t *gpu, const gpu_frame_t *frame, uint32_
         return GPU_TIMEOUT;
     }
     if (!gpu->use_interrupts)
-        gpu_write(gpu, dma + GPU_INT_RAW, GPU_INT_FRAME_DONE); // the CPU's, as its handler would
+        tile_dma_write_reg(gpu, GPU_INT_RAW, GPU_INT_FRAME_DONE); // the CPU's, as its handler would
     if (status & BIT(CP_REG_STATUS_DONE_SHIFT))
         return GPU_OK;
     switch ((status & CP_REG_STATUS_CAUSE_MASK) >> CP_REG_STATUS_CAUSE_SHIFT)

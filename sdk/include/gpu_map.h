@@ -25,8 +25,8 @@
 
 // Block offsets from the control port's base address
 #define GPU_LUT_OFFSET 0x000 // texture table: 128 base words, then 128 size codes
-#define GPU_LUT_BASE(id) (GPU_LUT_OFFSET + 0x000 + 4 * (id))
-#define GPU_LUT_SIZE(id) (GPU_LUT_OFFSET + 0x200 + 4 * (id))
+#define GPU_LUT_BASE(id) (0x000 + 4 * (id)) // in the texture table
+#define GPU_LUT_SIZE(id) (0x200 + 4 * (id))
 #define GPU_CP_OFFSET 0x400 // command processor
 #define GPU_FRONTEND_OFFSET 0x800
 #define GPU_THREAD_OFFSET(n) (0x820 + 0x20 * (n))

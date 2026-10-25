@@ -66,25 +66,23 @@ module tb_gpu_top;
   // Clocks, resets, DUT
   // -------------------------------------------------------------------------
 
-  // Clock periods (ns), the design's: the control port and the command processor at 150 MHz, the
-  // AXI clock and the frontend at 300 MHz, the orchestrator and the threads at 500 MHz; or
-  // +CTRL_NS=, +ACLK_NS=, +FRONTEND_NS=, +THREAD_NS= (the board's today: all 10)
-  logic ctrl_clk = 0, aclk = 0, frontend_clk = 0, thread_clk = 0;
-  logic ctrl_rst_n = 0, aresetn = 0, frontend_rst_n = 0, thread_rst_n = 0;
-  real ctrl_ns = 6.667, aclk_ns = 3.334, frontend_ns = 3.334, thread_ns = 2;
+  // Clock periods (ns), the design's: lpd_clk (the control port, the command processor) at 100 MHz,
+  // mem_clk (the DMAs, the frontend) and core_clk (the orchestrator, the threads) at 300 MHz, the
+  // latter a hair faster so that their phases drift as two separate clocks' do; or +LPD_NS=,
+  // +MEM_NS=, +CORE_NS=
+  logic lpd_clk = 0, mem_clk = 0, core_clk = 0;
+  logic lpd_rst_n = 0, mem_rst_n = 0, core_rst_n = 0;
+  real lpd_ns = 10, mem_ns = 3.334, core_ns = 3.332;
   initial begin
-    void'($value$plusargs("CTRL_NS=%f", ctrl_ns));
-    void'($value$plusargs("ACLK_NS=%f", aclk_ns));
-    void'($value$plusargs("FRONTEND_NS=%f", frontend_ns));
-    void'($value$plusargs("THREAD_NS=%f", thread_ns));
-    $display("clocks (ns): ctrl %0.3f, aclk %0.3f, frontend %0.3f, thread %0.3f", ctrl_ns, aclk_ns,
-             frontend_ns, thread_ns);
+    void'($value$plusargs("LPD_NS=%f", lpd_ns));
+    void'($value$plusargs("MEM_NS=%f", mem_ns));
+    void'($value$plusargs("CORE_NS=%f", core_ns));
+    $display("clocks (ns): lpd %0.3f, mem %0.3f, core %0.3f", lpd_ns, mem_ns, core_ns);
     /* verilator lint_off ZERODLY */  // set at run time, never 0
     fork
-      forever #(ctrl_ns / 2) ctrl_clk = ~ctrl_clk;
-      forever #(aclk_ns / 2) aclk = ~aclk;
-      forever #(frontend_ns / 2) frontend_clk = ~frontend_clk;
-      forever #(thread_ns / 2) thread_clk = ~thread_clk;
+      forever #(lpd_ns / 2) lpd_clk = ~lpd_clk;
+      forever #(mem_ns / 2) mem_clk = ~mem_clk;
+      forever #(core_ns / 2) core_clk = ~core_clk;
     join_none
     /* verilator lint_on ZERODLY */
   end
@@ -120,14 +118,12 @@ module tb_gpu_top;
       .TRIANGLE_STRIDE(TriangleStride),
       .TEXTURE_WINDOW(TextureWindow)
   ) dut (
-      .ctrl_clk(ctrl_clk),
-      .ctrl_rst_n(ctrl_rst_n),
-      .aclk(aclk),
-      .aresetn(aresetn),
-      .frontend_clk(frontend_clk),
-      .frontend_rst_n(frontend_rst_n),
-      .thread_clk(thread_clk),
-      .thread_rst_n(thread_rst_n),
+      .lpd_clk(lpd_clk),
+      .lpd_rst_n(lpd_rst_n),
+      .mem_clk(mem_clk),
+      .mem_rst_n(mem_rst_n),
+      .core_clk(core_clk),
+      .core_rst_n(core_rst_n),
       .s_axi_ctrl_awaddr(awaddr),
       .s_axi_ctrl_awid('0),
       .s_axi_ctrl_awlen('0),
@@ -237,8 +233,8 @@ module tb_gpu_top;
       .ADDR_WIDTH(VbAddrW),
       .ID_WIDTH(4)
   ) u_vb_ram (
-      .clk(aclk),
-      .rst(!aresetn),
+      .clk(mem_clk),
+      .rst(!mem_rst_n),
       .s_axi_awid('0),
       .s_axi_awaddr('0),
       .s_axi_awlen('0),
@@ -282,8 +278,8 @@ module tb_gpu_top;
       .ADDR_WIDTH(TriAddrW),
       .ID_WIDTH(4)
   ) u_tri_ram (
-      .clk(aclk),
-      .rst(!aresetn),
+      .clk(mem_clk),
+      .rst(!mem_rst_n),
       .s_axi_awid('0),
       .s_axi_awaddr('0),
       .s_axi_awlen('0),
@@ -327,8 +323,8 @@ module tb_gpu_top;
       .ADDR_WIDTH(ImgAddrW),
       .ID_WIDTH(4)
   ) u_img_ram (
-      .clk(aclk),
-      .rst(!aresetn),
+      .clk(mem_clk),
+      .rst(!mem_rst_n),
       .s_axi_awid(tile_awid),
       .s_axi_awaddr(tile_awaddr[ImgAddrW-1:0]),
       .s_axi_awlen(tile_awlen),
@@ -391,7 +387,7 @@ module tb_gpu_top;
       assign tex_rdata[lane][32*w+:32] = tex_mem[{addr[TexAddrW-1:4], 2'(w)}];
     end
 
-    always @(posedge thread_clk) begin
+    always @(posedge core_clk) begin
       if (tex_arvalid[lane] && tex_arready[lane]) begin
         if (tex_araddr[lane][31:27] != TextureWindow[31:27])
           error($sformatf("thread %0d texture read at %08h, outside TEXTURE_WINDOW %08h", lane,
@@ -520,7 +516,7 @@ module tb_gpu_top;
   // Through the thread registers: ZBUF_CLEAR reads 1 until the clear is done.
   task automatic clear_zbuffers();
     for (int lane = 0; lane < NUM_OF_THREADS; lane++) axi_write(thread_reg(lane, 4), 32'h1);
-    repeat (8) @(posedge ctrl_clk);  // the clear pulse crosses into the thread clock
+    repeat (8) @(posedge lpd_clk);  // the clear pulse crosses into the thread clock
     for (int lane = 0; lane < NUM_OF_THREADS; lane++)
       wait_bits(thread_reg(lane, 4), 32'h1, 32'h0, $sformatf("thread %0d z-buffer clear", lane));
   endtask
@@ -549,8 +545,8 @@ module tb_gpu_top;
                       received, tile_order.size()));
   endfunction
 
-  always @(posedge frontend_clk) begin
-    if (monitor_on && frontend_rst_n && !dut.tri_cdc_empty && dut.core_tri_ready) begin
+  always @(posedge mem_clk) begin
+    if (monitor_on && mem_rst_n && dut.core_tri_valid && dut.core_tri_ready) begin
       if (cp_mode) begin
         int tile;
         tile = int'(dut.u_core.u_frontend.bb_min_y) / TILE_SIZE_Y * TilesX +
@@ -580,7 +576,7 @@ module tb_gpu_top;
   bit trace;
   initial trace = $test$plusargs("TRACE");
 
-  always @(posedge aclk) begin
+  always @(posedge mem_clk) begin
     if (trace && dut.vis_cmd_tvalid && dut.vis_cmd_tready)
       $display("[%0t] command: address %08h, %0d bytes (%0d triangles), EOF %0d, DRR %0d", $time,
                dut.vis_cmd_tdata[63:32], dut.vis_cmd_tdata[22:0],
@@ -594,7 +590,7 @@ module tb_gpu_top;
   // the next tile's start): every unit empty for some cycles, then one busy again is a triangle
   // between two units that no flag showed. The longest such run, against the CP's idle window.
   int cp_idle_run, cp_false_idle_max;
-  always @(posedge ctrl_clk) begin
+  always @(posedge lpd_clk) begin
     if (dut.u_cp.frame_sequencer_stateReg < 4'd4) cp_idle_run <= 0;  // up to visWait
     else if (dut.u_cp.frame_unitsIdle) cp_idle_run <= cp_idle_run + 1;
     else begin
@@ -609,7 +605,7 @@ module tb_gpu_top;
 
   task automatic axi_write(input logic [11:0] addr, input logic [31:0] data);
     bit aw_done, w_done;
-    @(posedge ctrl_clk);
+    @(posedge lpd_clk);
     awaddr <= addr;
     awvalid <= 1'b1;
     wdata <= data;
@@ -617,7 +613,7 @@ module tb_gpu_top;
     aw_done = 0;
     w_done = 0;
     while (!(aw_done && w_done)) begin
-      @(posedge ctrl_clk);
+      @(posedge lpd_clk);
       if (awvalid && awready) begin
         aw_done = 1;
         awvalid <= 1'b0;
@@ -628,19 +624,19 @@ module tb_gpu_top;
       end
     end
     bready <= 1'b1;
-    do @(posedge ctrl_clk); while (!bvalid);
+    do @(posedge lpd_clk); while (!bvalid);
     bready <= 1'b0;
     if (bresp != 2'b00) error($sformatf("write 0x%03h: BRESP %0d", addr, bresp));
   endtask
 
   task automatic axi_read(input logic [11:0] addr, output logic [31:0] data);
-    @(posedge ctrl_clk);
+    @(posedge lpd_clk);
     araddr  <= addr;
     arvalid <= 1'b1;
-    do @(posedge ctrl_clk); while (!arready);
+    do @(posedge lpd_clk); while (!arready);
     arvalid <= 1'b0;
     rready  <= 1'b1;
-    do @(posedge ctrl_clk); while (!rvalid);
+    do @(posedge lpd_clk); while (!rvalid);
     data = rdata;
     rready <= 1'b0;
     if (rresp != 2'b00) error($sformatf("read 0x%03h: RRESP %0d", addr, rresp));
@@ -848,7 +844,7 @@ module tb_gpu_top;
     // MODE 0: START does nothing
     axi_write(CpMode, 32'h0);
     axi_write(CpCtrl, 32'h1);
-    repeat (20) @(posedge ctrl_clk);
+    repeat (20) @(posedge lpd_clk);
     expect_cp(32'h7, 32'h0, "after START in MODE 0");
 
     // A size of 0: ERROR, CAUSE 4, at once
@@ -870,7 +866,7 @@ module tb_gpu_top;
     axi_write(CpMode, 32'h0);
     expect_read(CpMode, 32'h1, 32'h1, "command processor MODE written while busy");
     axi_write(CpCtrl, 32'h2);  // SOFT_RESET
-    repeat (10) @(posedge ctrl_clk);
+    repeat (10) @(posedge lpd_clk);
     expect_cp(32'h3F07, 32'h0, "after SOFT_RESET");
     // The units finish what they had
     wait_bits(VisStatus, 32'h1, 32'h0, "visibility DMA BUSY after SOFT_RESET");
@@ -949,12 +945,11 @@ module tb_gpu_top;
     #20;  // after axi_ram's own initial blocks
     build_scene(scene_path);
     if ($value$plusargs("TEXTURE=%s", texture_path)) load_texture(texture_path);
-    repeat (10) @(posedge ctrl_clk);
-    ctrl_rst_n = 1;
-    aresetn = 1;
-    frontend_rst_n = 1;
-    thread_rst_n = 1;
-    repeat (10) @(posedge ctrl_clk);
+    repeat (10) @(posedge lpd_clk);
+    lpd_rst_n = 1;
+    mem_rst_n = 1;
+    core_rst_n = 1;
+    repeat (10) @(posedge lpd_clk);
 
     register_access();
     if (tex_loaded) begin

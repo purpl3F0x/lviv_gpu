@@ -20,11 +20,10 @@ import spinal.lib.fsm._
 //     errors and frame_done are the CPU's
 //   - idle flags: the triangle path's, the frontend's empty, the orchestrator's and the threads'
 //     empty and each z-buffer's ready
-// It runs on the crossbar's clock. Everything it watches comes raw from another:
-// the DMAs and the triangle path run on aclk (the AXI clock, 300 MHz), the frontend and the threads
-// on their own. Each signal is captured here in a flop of its own clock, crosses
-// through two flops (BufferCC), and is combined after. Every one is a level that lasts many cycles
-// of this clock.
+// It runs on the crossbar's clock (lpd_clk). Everything it watches comes raw from another: the
+// DMAs, the triangle path and the frontend run on mem_clk, the orchestrator and the threads on
+// core_clk. Each signal is captured here in a flop of its own clock, crosses through two flops
+// (BufferCC), and is combined after. Every one is a level that lasts many cycles of this clock.
 //
 // Per tile:
 //   1. visibility DMA START, with AUTO_ADV_EN (it moves to the next tile itself, back to 0 after
@@ -101,26 +100,24 @@ class CommandProcessor(
     )
     val m_axi = master(Axi4(axiConfig)) // to the crossbar's m_axi_1
 
-    // Raw, each in its own clock. The DMAs' INT_RAW bits and the triangle path's idle: aclk
-    val dma_clk = in Bool ()
-    val dma_resetn = in Bool ()
+    // Raw, each in its own clock. mem_clk: the DMAs' INT_RAW bits, the triangle path's and the
+    // frontend's idle
+    val mem_clk = in Bool ()
+    val mem_resetn = in Bool ()
     val vis_irq_done = in Bool ()
     val vis_irq_error = in Bool ()
     val tile_irq_done = in Bool ()
     val tile_irq_error = in Bool ()
     val tile_irq_frame_done = in Bool ()
-    val tri_path_idle = in Bool () // DataMover stream, tri_cdc
+    val tri_path_idle = in Bool () // DataMover stream, the skid buffer into the core
+    val frontend_empty = in Bool ()
 
-    // Idle: nothing held anywhere in the unit
-    val frontend_clk = in Bool ()
-    val frontend_resetn = in Bool ()
-    val frontend_empty = in Bool () // frontend clock
-    val thread_clk = in Bool ()
-    val thread_resetn = in Bool ()
-    val orchestrator_empty = in Bool () // thread clock
-    val thread_empty = in Bits (config.threads bits) // thread clock
-    val zbuf_ready =
-      in Bits (config.threads bits) // thread clock: low while the z-buffer clears
+    // core_clk: the orchestrator's and the threads' idle, the z-buffers' ready
+    val core_clk = in Bool ()
+    val core_resetn = in Bool ()
+    val orchestrator_empty = in Bool ()
+    val thread_empty = in Bits (config.threads bits)
+    val zbuf_ready = in Bits (config.threads bits) // low while the z-buffer clears
   }
 
   noIoPrefix()
@@ -281,37 +278,31 @@ class CommandProcessor(
       config = ClockDomainConfig(resetActiveLevel = LOW, resetKind = SYNC)
     )
   def allReady = B((1 << config.threads) - 1, config.threads bits)
-  val dmaFlags = new ClockingArea(otherClock(io.dma_clk, io.dma_resetn)) {
+  val memFlags = new ClockingArea(otherClock(io.mem_clk, io.mem_resetn)) {
     val visIrqDone = RegNext(io.vis_irq_done) init (False)
     val visIrqError = RegNext(io.vis_irq_error) init (False)
     val tileIrqDone = RegNext(io.tile_irq_done) init (False)
     val tileIrqError = RegNext(io.tile_irq_error) init (False)
     val tileIrqFrameDone = RegNext(io.tile_irq_frame_done) init (False)
     val triPathIdle = RegNext(io.tri_path_idle) init (False)
+    val frontendEmpty = RegNext(io.frontend_empty) init (False)
   }
-  val frontendFlags = new ClockingArea(
-    otherClock(io.frontend_clk, io.frontend_resetn)
-  ) {
-    val empty = RegNext(io.frontend_empty) init (False)
-  }
-  val threadFlags = new ClockingArea(
-    otherClock(io.thread_clk, io.thread_resetn)
-  ) {
+  val coreFlags = new ClockingArea(otherClock(io.core_clk, io.core_resetn)) {
     val orchestratorEmpty = RegNext(io.orchestrator_empty) init (False)
     val threadEmpty = RegNext(io.thread_empty) init (0)
     val zbufReady = RegNext(io.zbuf_ready) init (allReady)
   }
-  val visIrqDone = BufferCC(dmaFlags.visIrqDone, init = False)
-  val visIrqError = BufferCC(dmaFlags.visIrqError, init = False)
-  val tileIrqDone = BufferCC(dmaFlags.tileIrqDone, init = False)
-  val tileIrqError = BufferCC(dmaFlags.tileIrqError, init = False)
-  val tileIrqFrameDone = BufferCC(dmaFlags.tileIrqFrameDone, init = False)
-  val triPathIdle = BufferCC(dmaFlags.triPathIdle, init = False)
-  val frontendIdle = BufferCC(frontendFlags.empty, init = False)
-  val orchestratorEmpty = BufferCC(threadFlags.orchestratorEmpty, init = False)
+  val visIrqDone = BufferCC(memFlags.visIrqDone, init = False)
+  val visIrqError = BufferCC(memFlags.visIrqError, init = False)
+  val tileIrqDone = BufferCC(memFlags.tileIrqDone, init = False)
+  val tileIrqError = BufferCC(memFlags.tileIrqError, init = False)
+  val tileIrqFrameDone = BufferCC(memFlags.tileIrqFrameDone, init = False)
+  val triPathIdle = BufferCC(memFlags.triPathIdle, init = False)
+  val frontendIdle = BufferCC(memFlags.frontendEmpty, init = False)
+  val orchestratorEmpty = BufferCC(coreFlags.orchestratorEmpty, init = False)
   val threadEmpty =
-    BufferCC(threadFlags.threadEmpty, init = B(0, config.threads bits))
-  val zbufReady = BufferCC(threadFlags.zbufReady, init = allReady)
+    BufferCC(coreFlags.threadEmpty, init = B(0, config.threads bits))
+  val zbufReady = BufferCC(coreFlags.zbufReady, init = allReady)
   val threadIdle = orchestratorEmpty && threadEmpty.andR
   val zbufBusy = ~zbufReady
 

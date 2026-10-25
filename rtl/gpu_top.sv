@@ -14,18 +14,20 @@
 //   triangle DMA (DataMover) ◄── m_axi_tri (PL DDR, 512-bit)
 //        │ 512-bit stream, TKEEP marking the halves that are data
 //        ▼
-//   triangle_stream_adapter ──► async FIFO (aclk → frontend_clk) ──► core
+//   triangle_stream_adapter ──► skid buffer ──► core (its input FIFO)
 //   core frame buffers ──► tile DMA ── m_axi_tile (PS DDR): the finished tile; the tile DMA writes
 //                          CLEAR_VALUE back over what it read, and fills them with it on CLEAR
-//   thread n's L1 texture cache ◄── m_axi_tex[n] (PS DDR, thread_clk): 256-byte lines
+//   thread n's L1 texture cache ◄── m_axi_tex[n] (PS DDR, core_clk): 256-byte lines
 //
 // Control map (4 KiB, from Axi4ToApbXbar): 0x000 texture LUT, 0x400 command processor, 0x800
 // frontend, 0x820 + 0x20 * n thread n, 0xF00 tile DMA, 0xF80 visibility DMA.
 //
-// Clocks: ctrl_clk (100 to 150 MHz) runs the control port, the crossbar, the command processor and
-// every APB slave's registers; aclk (the AXI clock, 300 MHz) the memory masters, both DMAs (their
-// registers too, behind an APB clock crossing each) and the DataMover; the core frontend_clk and
-// thread_clk. The tile DMA reads the frame buffers on thread_clk, and the texture masters run on it.
+// Clocks:
+//   lpd_clk   the control port, the crossbar, every APB slave's registers, the command processor
+//   mem_clk   the three DMAs (visibility, triangle, tile; their registers too, behind an APB clock
+//             crossing each), their memory masters, and the core's frontend
+//   core_clk  the core's orchestrator and threads with their caches and frame buffers (the tile DMA
+//             reads those on it), and the texture masters
 // The command processor synchronises what it watches from the other clocks itself.
 //
 // Texture addresses: a texture cache makes 27-bit byte addresses (the texture LUT holds word
@@ -44,16 +46,14 @@ module gpu_top #(
     parameter logic [31:0] TEXTURE_WINDOW = 32'h0000_0000
 ) (
     // * Clocks and resets * //
-    input logic ctrl_clk,
-    input logic ctrl_rst_n,
-    input logic aclk,
-    input logic aresetn,
-    input logic frontend_clk,
-    input logic frontend_rst_n,
-    input logic thread_clk,
-    input logic thread_rst_n,
+    input logic lpd_clk,
+    input logic lpd_rst_n,
+    input logic mem_clk,
+    input logic mem_rst_n,
+    input logic core_clk,
+    input logic core_rst_n,
 
-    // * CPU control port: AXI4, 32-bit, 4 KiB (ctrl_clk) * //
+    // * CPU control port: AXI4, 32-bit, 4 KiB (lpd_clk) * //
     input  logic [11:0] s_axi_ctrl_awaddr,
     input  logic [ 3:0] s_axi_ctrl_awid,
     input  logic [ 7:0] s_axi_ctrl_awlen,
@@ -144,7 +144,7 @@ module gpu_top #(
     input  logic         m_axi_tile_bvalid,
     output logic         m_axi_tile_bready,
 
-    // * Texture reads (PS DDR), 128-bit, one master per thread's L1 cache (thread_clk) * //
+    // * Texture reads (PS DDR), 128-bit, one master per thread's L1 cache (core_clk) * //
     output logic [NUM_OF_THREADS-1:0][ 31:0] m_axi_tex_araddr,
     output logic [NUM_OF_THREADS-1:0][  7:0] m_axi_tex_arlen,
     output logic [NUM_OF_THREADS-1:0][  2:0] m_axi_tex_arsize,
@@ -157,7 +157,7 @@ module gpu_top #(
     input  logic [NUM_OF_THREADS-1:0]        m_axi_tex_rvalid,
     output logic [NUM_OF_THREADS-1:0]        m_axi_tex_rready,
 
-    // * Interrupts (aclk) * //
+    // * Interrupts (mem_clk) * //
     output logic vis_dma_irq,
     output logic tile_dma_irq,
     output logic tri_dma_err
@@ -184,7 +184,8 @@ module gpu_top #(
   logic cp_awvalid, cp_awready, cp_wvalid, cp_wready, cp_wlast, cp_bvalid, cp_bready;
   logic cp_arvalid, cp_arready, cp_rvalid, cp_rready, cp_rlast;
 
-  // What the command processor watches: the DMAs' events (their INT_RAW bits, aclk) and idle flags
+  // What the command processor watches: the DMAs' events (their INT_RAW bits, mem_clk) and idle
+  // flags
   logic vis_irq_done, vis_irq_error, tile_irq_done, tile_irq_error, tile_irq_frame_done;
   logic tri_path_idle, core_frontend_empty, core_orchestrator_empty;
   logic [NUM_OF_THREADS-1:0] core_thread_empty, core_zbuf_ready;
@@ -199,8 +200,8 @@ module gpu_top #(
   logic [NUM_OF_THREADS-1:0][31:0] thread_PWDATA, thread_PRDATA;
 
   Axi4ToApbXbar u_xbar (
-      .clk(ctrl_clk),
-      .resetn(ctrl_rst_n),
+      .clk(lpd_clk),
+      .resetn(lpd_rst_n),
       // CPU
       .m_axi_0_awvalid(s_axi_ctrl_awvalid),
       .m_axi_0_awready(s_axi_ctrl_awready),
@@ -337,8 +338,8 @@ module gpu_top #(
   );
 
   //
-  // The DMAs' register ports: from the crossbar's clock into aclk, where their registers run with
-  // their engines
+  // The DMAs' register ports: from the crossbar's clock into mem_clk, where their registers run
+  // with their engines
   //
 
   logic [6:0] tile_dma_apb_PADDR, vis_dma_apb_PADDR;
@@ -348,8 +349,8 @@ module gpu_top #(
   logic [31:0] tile_dma_apb_PWDATA, tile_dma_apb_PRDATA, vis_dma_apb_PWDATA, vis_dma_apb_PRDATA;
 
   ApbClockCrossing u_vis_dma_cc (
-      .s_clk(ctrl_clk),
-      .s_resetn(ctrl_rst_n),
+      .s_clk(lpd_clk),
+      .s_resetn(lpd_rst_n),
       .s_apb_PADDR(vis_dma_PADDR),
       .s_apb_PSEL(vis_dma_PSEL),
       .s_apb_PENABLE(vis_dma_PENABLE),
@@ -358,8 +359,8 @@ module gpu_top #(
       .s_apb_PWDATA(vis_dma_PWDATA),
       .s_apb_PRDATA(vis_dma_PRDATA),
       .s_apb_PSLVERROR(vis_dma_PSLVERROR),
-      .m_clk(aclk),
-      .m_resetn(aresetn),
+      .m_clk(mem_clk),
+      .m_resetn(mem_rst_n),
       .m_apb_PADDR(vis_dma_apb_PADDR),
       .m_apb_PSEL(vis_dma_apb_PSEL),
       .m_apb_PENABLE(vis_dma_apb_PENABLE),
@@ -371,8 +372,8 @@ module gpu_top #(
   );
 
   ApbClockCrossing u_tile_dma_cc (
-      .s_clk(ctrl_clk),
-      .s_resetn(ctrl_rst_n),
+      .s_clk(lpd_clk),
+      .s_resetn(lpd_rst_n),
       .s_apb_PADDR(tile_dma_PADDR),
       .s_apb_PSEL(tile_dma_PSEL),
       .s_apb_PENABLE(tile_dma_PENABLE),
@@ -381,8 +382,8 @@ module gpu_top #(
       .s_apb_PWDATA(tile_dma_PWDATA),
       .s_apb_PRDATA(tile_dma_PRDATA),
       .s_apb_PSLVERROR(tile_dma_PSLVERROR),
-      .m_clk(aclk),
-      .m_resetn(aresetn),
+      .m_clk(mem_clk),
+      .m_resetn(mem_rst_n),
       .m_apb_PADDR(tile_dma_apb_PADDR),
       .m_apb_PSEL(tile_dma_apb_PSEL),
       .m_apb_PENABLE(tile_dma_apb_PENABLE),
@@ -406,8 +407,8 @@ module gpu_top #(
   logic tri_stream_tvalid, tri_stream_tready;
 
   AxiVisibilityDma u_vis_dma (
-      .aclk(aclk),
-      .aresetn(aresetn),
+      .aclk(mem_clk),
+      .aresetn(mem_rst_n),
       .s_apb_PADDR(vis_dma_apb_PADDR),
       .s_apb_PSEL(vis_dma_apb_PSEL),
       .s_apb_PENABLE(vis_dma_apb_PENABLE),
@@ -448,26 +449,25 @@ module gpu_top #(
   );
 
   frontend_data_in_t adapted_tri, core_tri;
-  logic adapted_tri_valid, tri_cdc_full, tri_cdc_empty, core_tri_ready;
-  logic [5:0] tri_cdc_fill;  // write side: counts a triangle until its pop has crossed back
+  logic adapted_tri_valid, adapted_tri_ready, core_tri_valid, core_tri_ready;
 
   triangle_stream_adapter #(
       .TRIANGLE_STRIDE(TRIANGLE_STRIDE)
   ) u_tri_adapter (
-      .aclk(aclk),
-      .aresetn(aresetn),
+      .aclk(mem_clk),
+      .aresetn(mem_rst_n),
       .s_axis_tdata(tri_stream_tdata),
       .s_axis_tkeep(tri_stream_tkeep),
       .s_axis_tvalid(tri_stream_tvalid),
       .s_axis_tready(tri_stream_tready),
       .m_tri_valid(adapted_tri_valid),
-      .m_tri_ready(!tri_cdc_full),
+      .m_tri_ready(adapted_tri_ready),
       .m_tri_data(adapted_tri)
   );
 
   triangle_datamover u_tri_dma (
-      .aclk(aclk),
-      .aresetn(aresetn),
+      .aclk(mem_clk),
+      .aresetn(mem_rst_n),
       .s_cmd_tvalid(vis_cmd_tvalid),
       .s_cmd_tready(vis_cmd_tready),
       .s_cmd_tdata(vis_cmd_tdata),
@@ -497,34 +497,30 @@ module gpu_top #(
       .mm2s_err(tri_dma_err)
   );
 
-  // Into the core's clock. The core's own input FIFO holds the depth; 32 entries fill the LUTRAM.
+  // Into the core, on the same clock as its frontend: a register slice. The core's own input FIFO
+  // (4096 entries) holds the depth.
   logic [$bits(frontend_data_in_t)-1:0] core_tri_bits;
 
-  async_fifo #(
-      .DATA_WIDTH($bits(frontend_data_in_t)),
-      .FIFO_DEPTH(32)
-  ) u_tri_cdc (
-      .clk(aclk),
-      .rst_n(aresetn),
-      .wr_en(adapted_tri_valid && !tri_cdc_full),
-      .data_i(adapted_tri),
-      .fifo_full(tri_cdc_full),
-      .fifo_almost_full(),
-      .fill_cnt(tri_cdc_fill),
-      .rd_clk(frontend_clk),
-      .rd_rst_n(frontend_rst_n),
-      .rd_en(core_tri_ready),
-      .data_o(core_tri_bits),
-      .rd_fill_cnt(),
-      .fifo_empty(tri_cdc_empty)
+  axis_skid_buffer #(
+      .WIDTH($bits(frontend_data_in_t))
+  ) u_tri_skid (
+      .aclk(mem_clk),
+      .aresetn(mem_rst_n),
+      .s_axis_tdata(adapted_tri),
+      .s_axis_tvalid(adapted_tri_valid),
+      .s_axis_tready(adapted_tri_ready),
+      .m_axis_tdata(core_tri_bits),
+      .m_axis_tvalid(core_tri_valid),
+      .m_axis_tready(core_tri_ready)
   );
 
   assign core_tri = frontend_data_in_t'(core_tri_bits);
 
-  // Nothing between the DataMover and the core: the stream and the clock crossing. The adapter
-  // holds a triangle for a few cycles, which the command processor's drain window covers (it holds
-  // one longer only while the crossing is full).
-  assign tri_path_idle = !tri_stream_tvalid && tri_cdc_fill == '0;
+  // Nothing between the DataMover and the core: the stream and the skid buffer (its valid is set
+  // while it holds either of its two). The adapter holds a triangle for a few cycles, and the core's
+  // input FIFO for a few more until the frontend takes it: the command processor's drain window
+  // covers both.
+  assign tri_path_idle = !tri_stream_tvalid && !core_tri_valid;
 
   //
   // Core
@@ -552,13 +548,13 @@ module gpu_top #(
   end
 
   raster_core u_core (
-      .frontend_clk(frontend_clk),
-      .frontend_rst_n(frontend_rst_n),
-      .thread_clk(thread_clk),
-      .thread_rst_n(thread_rst_n),
-      .apb_clk(ctrl_clk),
-      .apb_rst_n(ctrl_rst_n),
-      .valid_in(!tri_cdc_empty),
+      .frontend_clk(mem_clk),
+      .frontend_rst_n(mem_rst_n),
+      .thread_clk(core_clk),
+      .thread_rst_n(core_rst_n),
+      .apb_clk(lpd_clk),
+      .apb_rst_n(lpd_rst_n),
+      .valid_in(core_tri_valid),
       .ready_out(core_tri_ready),
       .in_data(core_tri),
       .s_apb_frontend_PADDR(5'(frontend_PADDR)),
@@ -609,17 +605,17 @@ module gpu_top #(
   );
 
   //
-  // Tile DMA: frame buffers (thread_clk) to PS DDR, and CLEAR_VALUE back into them
+  // Tile DMA: frame buffers (core_clk) to PS DDR, and CLEAR_VALUE back into them
   //
 
   // Byte addresses of 64-bit host words
   logic [NUM_OF_THREADS-1:0][13:0] tile_ram_addr, tile_ram_wr_addr;
 
   AxiTileDma u_tile_dma (
-      .aclk(aclk),
-      .aresetn(aresetn),
-      .ram_clk(thread_clk),
-      .ram_resetn(thread_rst_n),
+      .aclk(mem_clk),
+      .aresetn(mem_rst_n),
+      .ram_clk(core_clk),
+      .ram_resetn(core_rst_n),
       .s_apb_PADDR(tile_dma_apb_PADDR),
       .s_apb_PSEL(tile_dma_apb_PSEL),
       .s_apb_PENABLE(tile_dma_apb_PENABLE),
@@ -698,8 +694,8 @@ module gpu_top #(
   //
 
   CommandProcessor u_cp (
-      .clk(ctrl_clk),
-      .resetn(ctrl_rst_n),
+      .clk(lpd_clk),
+      .resetn(lpd_rst_n),
       .s_apb_PADDR(cp_PADDR),
       .s_apb_PSEL(cp_PSEL),
       .s_apb_PENABLE(cp_PENABLE),
@@ -737,19 +733,17 @@ module gpu_top #(
       .m_axi_rid(cp_rid),
       .m_axi_rresp(cp_rresp),
       .m_axi_rlast(cp_rlast),
-      .dma_clk(aclk),
-      .dma_resetn(aresetn),
+      .mem_clk(mem_clk),
+      .mem_resetn(mem_rst_n),
       .vis_irq_done(vis_irq_done),
       .vis_irq_error(vis_irq_error),
       .tile_irq_done(tile_irq_done),
       .tile_irq_error(tile_irq_error),
       .tile_irq_frame_done(tile_irq_frame_done),
       .tri_path_idle(tri_path_idle),
-      .frontend_clk(frontend_clk),
-      .frontend_resetn(frontend_rst_n),
       .frontend_empty(core_frontend_empty),
-      .thread_clk(thread_clk),
-      .thread_resetn(thread_rst_n),
+      .core_clk(core_clk),
+      .core_resetn(core_rst_n),
       .orchestrator_empty(core_orchestrator_empty),
       .thread_empty(core_thread_empty),
       .zbuf_ready(core_zbuf_ready)

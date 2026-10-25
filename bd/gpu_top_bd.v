@@ -7,22 +7,18 @@
 module gpu_top_bd #(
     parameter TEXTURE_WINDOW = 32'h00000000
 ) (
-    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 ctrl_clk CLK", X_INTERFACE_PARAMETER = "ASSOCIATED_BUSIF s_axi_ctrl, ASSOCIATED_RESET ctrl_rst_n" *)
-    input  wire         ctrl_clk,
-    (* X_INTERFACE_INFO = "xilinx.com:signal:reset:1.0 ctrl_rst_n RST", X_INTERFACE_PARAMETER = "POLARITY ACTIVE_LOW" *)
-    input  wire         ctrl_rst_n,
-    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 aclk CLK", X_INTERFACE_PARAMETER = "ASSOCIATED_BUSIF m_axi_vb:m_axi_tri:m_axi_tile, ASSOCIATED_RESET aresetn" *)
-    input  wire         aclk,
-    (* X_INTERFACE_INFO = "xilinx.com:signal:reset:1.0 aresetn RST", X_INTERFACE_PARAMETER = "POLARITY ACTIVE_LOW" *)
-    input  wire         aresetn,
-    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 frontend_clk CLK", X_INTERFACE_PARAMETER = "ASSOCIATED_RESET frontend_rst_n" *)
-    input  wire         frontend_clk,
-    (* X_INTERFACE_INFO = "xilinx.com:signal:reset:1.0 frontend_rst_n RST", X_INTERFACE_PARAMETER = "POLARITY ACTIVE_LOW" *)
-    input  wire         frontend_rst_n,
-    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 thread_clk CLK", X_INTERFACE_PARAMETER = "ASSOCIATED_BUSIF m_axi_tex0:m_axi_tex1:m_axi_tex2:m_axi_tex3, ASSOCIATED_RESET thread_rst_n" *)
-    input  wire         thread_clk,
-    (* X_INTERFACE_INFO = "xilinx.com:signal:reset:1.0 thread_rst_n RST", X_INTERFACE_PARAMETER = "POLARITY ACTIVE_LOW" *)
-    input  wire         thread_rst_n,
+    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 lpd_clk CLK", X_INTERFACE_PARAMETER = "ASSOCIATED_BUSIF s_axi_ctrl, ASSOCIATED_RESET lpd_rst_n" *)
+    input  wire         lpd_clk,
+    (* X_INTERFACE_INFO = "xilinx.com:signal:reset:1.0 lpd_rst_n RST", X_INTERFACE_PARAMETER = "POLARITY ACTIVE_LOW" *)
+    input  wire         lpd_rst_n,
+    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 mem_clk CLK", X_INTERFACE_PARAMETER = "ASSOCIATED_BUSIF m_axi_vb:m_axi_tri:m_axi_tile, ASSOCIATED_RESET mem_rst_n" *)
+    input  wire         mem_clk,
+    (* X_INTERFACE_INFO = "xilinx.com:signal:reset:1.0 mem_rst_n RST", X_INTERFACE_PARAMETER = "POLARITY ACTIVE_LOW" *)
+    input  wire         mem_rst_n,
+    (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 core_clk CLK", X_INTERFACE_PARAMETER = "ASSOCIATED_BUSIF m_axi_tex0:m_axi_tex1:m_axi_tex2:m_axi_tex3, ASSOCIATED_RESET core_rst_n" *)
+    input  wire         core_clk,
+    (* X_INTERFACE_INFO = "xilinx.com:signal:reset:1.0 core_rst_n RST", X_INTERFACE_PARAMETER = "POLARITY ACTIVE_LOW" *)
+    input  wire         core_rst_n,
 
     // CPU control port
     input  wire [ 11:0] s_axi_ctrl_awaddr,
@@ -177,14 +173,12 @@ module gpu_top_bd #(
   gpu_top #(
       .TEXTURE_WINDOW(TEXTURE_WINDOW)
   ) u_gpu_top (
-      .ctrl_clk(ctrl_clk),
-      .ctrl_rst_n(ctrl_rst_n),
-      .aclk(aclk),
-      .aresetn(aresetn),
-      .frontend_clk(frontend_clk),
-      .frontend_rst_n(frontend_rst_n),
-      .thread_clk(thread_clk),
-      .thread_rst_n(thread_rst_n),
+      .lpd_clk(lpd_clk),
+      .lpd_rst_n(lpd_rst_n),
+      .mem_clk(mem_clk),
+      .mem_rst_n(mem_rst_n),
+      .core_clk(core_clk),
+      .core_rst_n(core_rst_n),
       .s_axi_ctrl_awaddr(s_axi_ctrl_awaddr),
       .s_axi_ctrl_awid(s_axi_ctrl_awid),
       .s_axi_ctrl_awlen(s_axi_ctrl_awlen),

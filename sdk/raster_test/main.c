@@ -1,28 +1,30 @@
-// Tests of gpu_top's raster core on the ZCU104 (bd/gpu_test), on the A53 (standalone).
+// Demo of gpu_top's raster core on the ZCU104 (bd/gpu_test), on the A53 (standalone), driven from
+// the UART console.
 //
-// One triangle, made here (no scene data): blue at the top, red at the bottom left, green at the
-// bottom right, over a black clear color. It is drawn in two ways, each by the CPU tile by tile and
-// by the command processor in one START (gpu_set_mode), the same frame expected from both:
-//  1. Color: untextured, so each pixel gets the corners' colors by its barycentric weights.
-//  2. Texture: a 64 x 64 black and white checkerboard made here (8 x 8 squares of 8 texels),
-//     repeated twice across the triangle and modulating its colors: the colors show in the
-//     white squares, the black ones stay black. Every thread's texture cache reads it from PS DDR.
-// Each is a frame of 1280 x 720 in 10 x 6 tiles of 128 x 128 (each with its z-buffers cleared, the
-// triangle streamed into the core when its bounding box touches the tile, then written back),
-// checked pixel by pixel against the triangle worked out here in floating point. A pixel whose
-// centre is inside every edge by a pixel or more must be the expected color, within
-// COLOR_TOLERANCE in each channel; one outside an edge by a pixel or more the clear color. Those in
-// between are not checked, nor those on the border of a checkerboard square.
-// Then the DisplayPort output shows the last frame, the link brought up and down as a monitor is
-// plugged in and pulled, for as long as the board runs.
+// The DisplayPort output runs in the background from the start, 1280 x 720 at 60 Hz (dp.c). It
+// shows the test pattern first; then the triangle, drawn again for every frame, one a vertical sync
+// (60 frames a second while a frame takes less than 16.7 ms): into the frame buffer not on the
+// screen, shown from the next vertical sync on. Once a second, the frames drawn and their times.
+// Keys:
+//   1, 2     who draws it: 1 the CPU, tile by tile; 2 the command processor, in one START
+//   c, t, b  the triangle's color: c its corners' colors (untextured), t the texture alone, b the
+//            texture modulating the colors
+//   r        drawing again, after the test pattern or a frame that failed
+//   p        the test pattern: color ramps made here, a check of the display on its own
+//   ?        the keys
+// The triangle, made here: blue at the top, red at the bottom left, green at the bottom right, over
+// a black clear color. The texture: a 64 x 64 black and white checkerboard made here (8 x 8 squares
+// of 8 texels), repeated twice across the triangle, read from PS DDR by every thread's texture
+// cache. A frame is 1280 x 720 in 10 x 6 tiles of 128 x 128 (each with its z-buffers cleared, the
+// triangle streamed into the core when its bounding box touches the tile, then written back).
 //
 // Output goes to the PS UART.
 
 #include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "board.h"
+#include "bspconfig.h" // STDIN_BASEADDRESS
 #include "dp.h"
 #include "gpu.h"
 #include "gpu_map.h"
@@ -30,6 +32,7 @@
 #include "xiltimer.h" // XTime_GetTime, COUNTS_PER_SECOND
 #include "xparameters.h"
 #include "xscugic.h"
+#include "xuartps_hw.h"
 
 // gpu_0's control port, from the address map of the XSA the platform was made from.
 #ifndef GPU_BASEADDR
@@ -46,9 +49,6 @@
 #define FRAME_ROWS (TILES_Y * GPU_TILE_SIZE) // the tile DMA writes whole tiles
 #define STRIDE (WIDTH * 4)
 #define CLEAR_COLOR 0xFF000000u // opaque black
-// The largest difference from the color worked out here, per channel: the core interpolates in
-// fixed point (8 fractional bits on the weights) and truncates.
-#define COLOR_TOLERANCE 3
 
 // The checkerboard: TEX_SIZE texels square, squares of TEX_CHECK texels.
 #define TEX_ID 0
@@ -57,12 +57,24 @@
 #define TEX_CHECK 8
 #define TEX_WHITE 0xFFFFFFFFu
 #define TEX_BLACK 0xFF000000u
-// Pixels this close to the border of a square (in squares: 1.2 pixels here) are not checked.
-#define CHECK_MARGIN 0.02
+
+// The fragment shader's texture functions (fragment_op_t, gpu_types_pkg.sv)
+#define FRAGMENT_REPLACE 0
+#define FRAGMENT_MODULATE 1
+#define FRAGMENT_COLOR 5
 
 _Static_assert(WIDTH == DP_WIDTH && HEIGHT == DP_HEIGHT, "the frame is shown as it is");
 _Static_assert(TILES <= 64, "more tiles than bits in a visibility word");
-_Static_assert((TEX_SIZE / TEX_CHECK) % 2 == 0, "expected() takes an even number of squares across");
+
+typedef enum
+{
+    SHADE_COLOR,   // the corners' colors
+    SHADE_TEXTURE, // the texture alone
+    SHADE_BLEND,   // the texture modulating the colors
+} shade_t;
+
+static const char *const shade_names[] = {"color", "texture", "blend"};
+static const char *const mode_names[] = {[GPU_MODE_CPU] = "CPU", [GPU_MODE_CP] = "CP"};
 
 typedef struct
 {
@@ -82,15 +94,22 @@ static const corner_t corners[3] = {
 
 static gpu_triangle_t triangle __attribute__((aligned(64)));
 static uint64_t visibility __attribute__((aligned(64)));
-static uint32_t frame[FRAME_ROWS * WIDTH] __attribute__((aligned(4096)));
+// Two frame buffers: one on the screen, the other drawn into, then shown.
+static uint32_t frames[2][FRAME_ROWS * WIDTH] __attribute__((aligned(4096)));
 static uint32_t texture[TEX_SIZE * TEX_SIZE] __attribute__((aligned(4 * TEX_SIZE * TEX_SIZE)));
 
 static gpu_t gpu;
 static XScuGic gic; // static: the DP output's interrupt handlers hold on to it
 
-// From build_triangle, for expected().
-static double area;       // twice the triangle's, from edge()
-static double length2[3]; // the square of the length of the edge opposite each corner
+static int back;       // the frame buffer not on the screen
+static int texture_ok; // the texture is in the GPU's texture table
+static int drawing;    // a frame after another, not the test pattern
+static gpu_mode_t mode = GPU_MODE_CPU;
+static shade_t shade = SHADE_COLOR;
+
+// Since the last report: the frames drawn, their time all together and the longest, from when.
+static int frames_drawn;
+static XTime frames_time, longest, period_start;
 
 // raster_sw's edge function (rasterizer.h): c's distance from edge a -> b times the edge's length,
 // positive on the inside of a triangle counter-clockwise on the screen.
@@ -108,11 +127,6 @@ static float max_f(float a, float b)
 {
     return a > b ? a : b;
 }
-static double floor_d(double a)
-{
-    const double i = (double)(long long)a;
-    return i > a ? i - 1 : i;
-}
 
 // White squares where the square's x and y add up to an even number, black elsewhere.
 static void fill_checkerboard(void)
@@ -122,16 +136,80 @@ static void fill_checkerboard(void)
             texture[gpu_texel_index(x, y)] = (x / TEX_CHECK + y / TEX_CHECK) % 2 ? TEX_BLACK : TEX_WHITE;
 }
 
-// The record, untextured or with the checkerboard repeated, and its visibility word from its
-// bounding box (bit t set when the box overlaps tile t), as a binner would produce. Returns the
-// tiles it touches.
-static int build_triangle(int textured)
+static uint32_t rgb(uint32_t r, uint32_t g, uint32_t b)
+{
+    return 0xFF000000u | r << 16 | g << 8 | b;
+}
+
+// The hue wheel across the line, at full saturation: red, yellow, green, cyan, blue, magenta, red.
+static uint32_t hue(int x)
+{
+    const uint32_t h = (uint32_t)x * 6 * 256 / DP_WIDTH, f = h % 256;
+    switch (h / 256)
+    {
+    case 0:
+        return rgb(255, f, 0);
+    case 1:
+        return rgb(255 - f, 255, 0);
+    case 2:
+        return rgb(0, 255, f);
+    case 3:
+        return rgb(0, 255 - f, 255);
+    case 4:
+        return rgb(f, 0, 255);
+    default:
+        return rgb(255, 0, 255 - f);
+    }
+}
+
+// Eight bands of ramps from left to right: the hue wheel (two bands), grey, red, green, blue, and red
+// into blue with green rising downwards (two bands): the color order and the levels.
+static void fill_test_pattern(uint32_t *p)
+{
+    _Static_assert(DP_HEIGHT % 8 == 0, "the test pattern's bands want DP_HEIGHT a multiple of 8");
+    const int band_rows = DP_HEIGHT / 8;
+    for (int y = 0; y < DP_HEIGHT; y++)
+    {
+        const int band = y / band_rows;
+        for (int x = 0; x < DP_WIDTH; x++)
+        {
+            const uint32_t v = (uint32_t)x * 255 / (DP_WIDTH - 1);
+            uint32_t c;
+            switch (band)
+            {
+            case 0:
+            case 1:
+                c = hue(x);
+                break;
+            case 2:
+                c = rgb(v, v, v);
+                break;
+            case 3:
+                c = rgb(v, 0, 0);
+                break;
+            case 4:
+                c = rgb(0, v, 0);
+                break;
+            case 5:
+                c = rgb(0, 0, v);
+                break;
+            default:
+                c = rgb(v, (uint32_t)(y - 6 * band_rows) * 255 / (2 * band_rows - 1), 255 - v);
+                break;
+            }
+            p[y * WIDTH + x] = c;
+        }
+    }
+}
+
+// The record, colored as how says, and its visibility word from its bounding box (bit t set when
+// the box overlaps tile t), as a binner would produce. Returns the tiles it touches.
+static int build_triangle(shade_t how)
 {
     float x0 = corners[0].x, x1 = x0, y0 = corners[0].y, y1 = y0;
     memset(&triangle, 0, sizeof triangle);
     for (int v = 0; v < 3; v++)
     {
-        const corner_t *a = &corners[(v + 1) % 3], *b = &corners[(v + 2) % 3];
         triangle.v[v].x = corners[v].x;
         triangle.v[v].y = corners[v].y;
         triangle.v[v].z = 0.5f;
@@ -139,26 +217,24 @@ static int build_triangle(int textured)
         triangle.v[v].color = corners[v].color;
         triangle.v[v].u = corners[v].u;
         triangle.v[v].v = corners[v].v;
-        length2[v] = (double)(b->x - a->x) * (b->x - a->x) + (double)(b->y - a->y) * (b->y - a->y);
         x0 = min_f(x0, corners[v].x);
         x1 = max_f(x1, corners[v].x);
         y0 = min_f(y0, corners[v].y);
         y1 = max_f(y1, corners[v].y);
     }
-    if (textured)
+    if (how == SHADE_COLOR)
     {
-        triangle.tex_id = TEX_ID;
-        triangle.texture_mode = 1u << GPU_TEXTURE_MODE_U_SHIFT | 1u << GPU_TEXTURE_MODE_V_SHIFT; // tile
-        triangle.texture_function = 1;                                                           // MODULATE
+        triangle.tex_id = GPU_TEX_ID_NONE;
+        triangle.texture_function = FRAGMENT_COLOR;
     }
     else
     {
-        triangle.tex_id = GPU_TEX_ID_NONE;
-        triangle.texture_function = 5; // COLOR
+        triangle.tex_id = TEX_ID;
+        triangle.texture_mode = 1u << GPU_TEXTURE_MODE_U_SHIFT | 1u << GPU_TEXTURE_MODE_V_SHIFT; // tile
+        triangle.texture_function = how == SHADE_TEXTURE ? FRAGMENT_REPLACE : FRAGMENT_MODULATE;
     }
     triangle.blend = (1u << GPU_SFACTOR_OP_SHIFT) | (0u << GPU_DFACTOR_OP_SHIFT); // ONE, ZERO
     triangle.depth_func = 1;                                                      // LESS
-    area = edge(&corners[0], &corners[1], corners[2].x, corners[2].y);
 
     // Bounding box against the tiles, clipped to the screen.
     const int tx0 = (int)max_f(x0, 0) / GPU_TILE_SIZE, tx1 = (int)min_f(x1, WIDTH - 1) / GPU_TILE_SIZE;
@@ -176,122 +252,62 @@ static int build_triangle(int textured)
     return tiles;
 }
 
-// What the core should draw at (x, y), sampled at the pixel's centre as the core does: 1 inside
-// every edge by a pixel or more, *want the corners' colors by the barycentric weights (modulated
-// by the checkerboard when textured); 0 outside one by a pixel or more, *want the clear color;
-// -1 in between, or on the border of a square.
-static int expected(int x, int y, int textured, uint32_t *want)
+// The frame buffer drawn into on the screen from the next vertical sync on; the one before, once it
+// is no longer read, drawn into next. With no stream to follow, a frame time at 60 Hz instead.
+static void show_back(void)
 {
-    const double px = x + 0.5, py = y + 0.5;
-    double weight[3];
-    int near_edge = 0;
-    for (int v = 0; v < 3; v++)
+    static XTime last;
+    dp_show(frames[back]);
+    if (dp_wait_shown() != 0)
     {
-        const double e = edge(&corners[(v + 1) % 3], &corners[(v + 2) % 3], px, py);
-        const int far = e * e >= length2[v]; // a pixel or more from the edge
-        if (e < 0 && far)
-        {
-            *want = CLEAR_COLOR;
-            return 0;
-        }
-        near_edge |= !far;
-        weight[v] = e / area;
+        XTime now;
+        do
+            XTime_GetTime(&now);
+        while (now - last < COUNTS_PER_SECOND / 60);
     }
-    if (near_edge)
-        return -1;
-
-    uint32_t texel = TEX_WHITE;
-    if (textured)
-    {
-        // The square the texture coordinates fall in. Repeating the texture keeps a square's
-        // color: an even number of squares across.
-        double u = 0, v = 0;
-        for (int i = 0; i < 3; i++)
-        {
-            u += weight[i] * corners[i].u;
-            v += weight[i] * corners[i].v;
-        }
-        const double sx = floor_d(u * (TEX_SIZE / TEX_CHECK)), sy = floor_d(v * (TEX_SIZE / TEX_CHECK));
-        const double fx = u * (TEX_SIZE / TEX_CHECK) - sx, fy = v * (TEX_SIZE / TEX_CHECK) - sy;
-        if (fx < CHECK_MARGIN || fx > 1 - CHECK_MARGIN || fy < CHECK_MARGIN || fy > 1 - CHECK_MARGIN)
-            return -1;
-        texel = ((long long)sx + (long long)sy) % 2 ? TEX_BLACK : TEX_WHITE;
-    }
-
-    // The weights are positive and add up to 1: each channel stays in 0..255.
-    *want = 0;
-    for (int shift = 0; shift < 32; shift += 8)
-    {
-        double c = 0;
-        for (int v = 0; v < 3; v++)
-            c += weight[v] * (double)(corners[v].color >> shift & 0xFF);
-        uint32_t channel = (uint32_t)(c + 0.5);
-        if (textured) // MODULATE, as raster_sw and the fragment shader round it
-            channel = (channel * (texel >> shift & 0xFF) + 128) >> 8;
-        *want |= channel << shift;
-    }
-    return 1;
+    XTime_GetTime(&last);
+    back ^= 1;
 }
 
-// The largest difference between a and b in one channel.
-static int color_error(uint32_t a, uint32_t b)
+static void show_test_pattern(void)
 {
-    int error = 0;
-    for (int shift = 0; shift < 32; shift += 8)
-    {
-        const int d = abs((int)(a >> shift & 0xFF) - (int)(b >> shift & 0xFF));
-        if (d > error)
-            error = d;
-    }
-    return error;
+    drawing = 0;
+    fill_test_pattern(frames[back]);
+    show_back();
+    xil_printf("test pattern\r\n");
 }
 
-// Every pixel against expected(); returns the wrong ones.
-static int check_frame(const char *name, int textured)
+// The frames from now on drawn by mode, colored by shade.
+static void start_drawing(void)
 {
-    int pixels[2] = {0, 0}, wrong[2] = {0, 0}, unchecked = 0, worst = 0;
-    for (int y = 0; y < FRAME_ROWS; y++)
+    if (shade != SHADE_COLOR && !texture_ok)
     {
-        for (int x = 0; x < WIDTH; x++)
-        {
-            uint32_t want, got = frame[y * WIDTH + x];
-            const int inside = expected(x, y, textured, &want);
-            if (inside < 0)
-            {
-                unchecked++;
-                continue;
-            }
-            const int error = color_error(got, want);
-            pixels[inside]++;
-            if (inside && error > worst)
-                worst = error;
-            if (inside ? error > COLOR_TOLERANCE : got != want)
-            {
-                if (wrong[0] + wrong[1] < 8)
-                    xil_printf("  pixel (%d, %d): 0x%08x, expected 0x%08x\r\n", x, y, (int)got, (int)want);
-                wrong[inside]++;
-            }
-        }
+        xil_printf("%s: no texture\r\n", shade_names[shade]);
+        drawing = 0;
+        return;
     }
-    xil_printf("%s: inside %d pixels, %d wrong (largest channel error %d, up to %d allowed)\r\n", name, pixels[1],
-               wrong[1], worst, COLOR_TOLERANCE);
-    xil_printf("%s: outside %d pixels, %d not the clear color\r\n", name, pixels[0], wrong[0]);
-    xil_printf("%s: %d pixels near an edge%s, not checked\r\n", name, unchecked,
-               textured ? " or a square's border" : "");
-    return wrong[0] + wrong[1];
-}
-
-// The triangle drawn into frame by the CPU or the command processor, and checked; returns the
-// errors.
-static int render(const char *name, int textured, gpu_mode_t mode)
-{
-    build_triangle(textured);
+    build_triangle(shade);
     gpu_set_mode(&gpu, mode);
+    drawing = 1;
+    frames_drawn = 0;
+    frames_time = longest = 0;
+    XTime_GetTime(&period_start);
+    xil_printf("%s, %s\r\n", mode_names[mode], shade_names[shade]);
+}
+
+static int us(XTime t)
+{
+    return (int)(t / (COUNTS_PER_SECOND / 1000000));
+}
+
+// One frame, drawn and shown, and once a second a report; drawing stops at one that fails.
+static void draw_frame(void)
+{
     gpu_frame_t f = {
         .triangles = &triangle,
         .visibility = &visibility,
         .triangle_count = 1,
-        .frame = frame,
+        .frame = frames[back],
         .stride = STRIDE,
         .width = WIDTH,
         .height = HEIGHT,
@@ -299,29 +315,52 @@ static int render(const char *name, int textured, gpu_mode_t mode)
     };
     XTime start, end;
     uint32_t failed_tile = 0;
-    memset(frame, 0, sizeof frame); // not the clear color: a tile not written back shows
     XTime_GetTime(&start);
     gpu_status_t status = gpu_frame(&gpu, &f, &failed_tile);
     XTime_GetTime(&end);
     if (status != GPU_OK)
     {
-        xil_printf("%s: FAIL at tile %d: %s\r\n", name, (int)failed_tile, gpu_status_name(status));
-        return 1;
+        xil_printf("%s, %s: failed at tile %d: %s\r\n", mode_names[mode], shade_names[shade], (int)failed_tile,
+                   gpu_status_name(status));
+        drawing = 0;
+        return;
     }
-    xil_printf("%s: frame %d us\r\n", name, (int)((end - start) / (COUNTS_PER_SECOND / 1000000)));
-    return check_frame(name, textured);
+    show_back();
+
+    frames_drawn++;
+    frames_time += end - start;
+    if (end - start > longest)
+        longest = end - start;
+    XTime now;
+    XTime_GetTime(&now);
+    if (now - period_start >= COUNTS_PER_SECOND)
+    {
+        const int rate10 = (int)((XTime)frames_drawn * 10 * COUNTS_PER_SECOND / (now - period_start));
+        xil_printf("%s, %s: %d.%d frames/s, frame %d us on average, %d us the longest\r\n", mode_names[mode],
+                   shade_names[shade], rate10 / 10, rate10 % 10, us(frames_time / frames_drawn), us(longest));
+        frames_drawn = 0;
+        frames_time = longest = 0;
+        period_start = now;
+    }
 }
 
-static int run(const char *cpu_name, const char *cp_name, int textured)
+static void print_keys(void)
 {
-    return render(cpu_name, textured, GPU_MODE_CPU) + render(cp_name, textured, GPU_MODE_CP);
+    xil_printf("keys: 1 CPU, 2 command processor; c color, t texture, b blend; r draw again; p test pattern; "
+               "? keys\r\n");
+}
+
+// A key from the UART console, or -1 if there is none.
+static int read_key(void)
+{
+    if (!XUartPs_IsReceiveData(STDIN_BASEADDRESS))
+        return -1;
+    return (int)(XUartPs_ReadReg(STDIN_BASEADDRESS, XUARTPS_FIFO_OFFSET) & 0xFF);
 }
 
 int main(void)
 {
-    int errors = 0;
-
-    xil_printf("\r\nRaster test: gpu_top's raster core at 0x%x\r\n", (int)GPU_BASEADDR);
+    xil_printf("\r\nRaster demo: gpu_top's raster core at 0x%x\r\n", (int)GPU_BASEADDR);
     if (board_init(&gic) != 0)
     {
         xil_printf("interrupts: GIC setup failed\r\n");
@@ -329,38 +368,67 @@ int main(void)
     }
     gpu_init(&gpu, GPU_BASEADDR);
 
-    const int tiles = build_triangle(0);
+    const int tiles = build_triangle(SHADE_COLOR);
     xil_printf("triangle: (%d, %d) blue, (%d, %d) red, (%d, %d) green; in %d of %d tiles\r\n", (int)corners[0].x,
                (int)corners[0].y, (int)corners[1].x, (int)corners[1].y, (int)corners[2].x, (int)corners[2].y, tiles,
                TILES);
-    if (area <= 0)
-    {
-        xil_printf("triangle: clockwise or flat, the core would draw nothing\r\n");
-        return 1;
-    }
-
-    errors += run("color, CPU", "color, CP", 0);
+    if (edge(&corners[0], &corners[1], corners[2].x, corners[2].y) <= 0)
+        xil_printf("triangle: clockwise or flat, the core draws nothing\r\n");
 
     fill_checkerboard();
-    if (gpu_set_texture(&gpu, TEX_ID, texture, TEX_LOG2) == 0)
-    {
+    texture_ok = gpu_set_texture(&gpu, TEX_ID, texture, TEX_LOG2) == 0;
+    if (texture_ok)
         xil_printf("texture: %d x %d checkerboard at 0x%x\r\n", TEX_SIZE, TEX_SIZE, (int)(uintptr_t)texture);
-        errors += run("texture, CPU", "texture, CP", 1);
-    }
     else
-    {
-        xil_printf("texture: FAIL: at 0x%x, outside the GPU's texture window\r\n", (int)(uintptr_t)texture);
-        errors++;
-    }
-    xil_printf("%s\r\n", errors ? "FAIL" : "PASS");
+        xil_printf("texture: at 0x%x, outside the GPU's texture window\r\n", (int)(uintptr_t)texture);
 
-    // The last frame, whether or not it passed.
-    if (dp_init(&gic, frame, STRIDE) != 0)
+    fill_test_pattern(frames[back]);
+    if (dp_init(&gic, frames[back], STRIDE) != 0)
     {
         xil_printf("DisplayPort: setup failed\r\n");
-        return errors ? 1 : 0;
+        return 1;
     }
-    xil_printf("DisplayPort: showing the frame, %d x %d at 60 Hz; plug in or pull a monitor\r\n", DP_WIDTH, DP_HEIGHT);
+    back ^= 1;
+    xil_printf("DisplayPort: %d x %d at 60 Hz, the test pattern; plug in or pull a monitor\r\n", DP_WIDTH, DP_HEIGHT);
+    print_keys();
+
     for (;;)
-        dp_service();
+    {
+        switch (read_key())
+        {
+        case '1':
+            mode = GPU_MODE_CPU;
+            start_drawing();
+            break;
+        case '2':
+            mode = GPU_MODE_CP;
+            start_drawing();
+            break;
+        case 'c':
+            shade = SHADE_COLOR;
+            start_drawing();
+            break;
+        case 't':
+            shade = SHADE_TEXTURE;
+            start_drawing();
+            break;
+        case 'b':
+            shade = SHADE_BLEND;
+            start_drawing();
+            break;
+        case 'r':
+            start_drawing();
+            break;
+        case 'p':
+            show_test_pattern();
+            break;
+        case '?':
+            print_keys();
+            break;
+        default: // none, or not a key of ours
+            break;
+        }
+        if (drawing)
+            draw_frame();
+    }
 }

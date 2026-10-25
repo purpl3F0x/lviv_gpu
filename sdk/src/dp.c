@@ -8,8 +8,10 @@
 #include "xil_cache.h"
 #include "xil_mmu.h"
 #include "xil_printf.h"
+#include "xiltimer.h" // XTime_GetTime, COUNTS_PER_SECOND
 #include "xinterrupt_wrap.h"
 #include "xparameters.h"
+#include "xpseudo_asm.h" // dsb
 
 #define DP_BYTES_PER_PIXEL 4
 #define DP_TRAINING_ATTEMPTS 3
@@ -29,24 +31,38 @@ static union {
 } dpdma_block __attribute__((aligned(DP_MMU_BLOCK)));
 static XDpDma *const dpdma = &dpdma_block.instance;
 
-// Set by the hot-plug interrupt, taken by dp_service.
-static volatile int hpd_event; // a monitor was plugged in or pulled
-static volatile int hpd_pulse; // the monitor asks for attention (link lost, ...)
-
 static XVidC_VideoMode mode; // DP_WIDTH x DP_HEIGHT at 60 Hz
 static int dma_started;      // the DPDMA reads the frame from the first stream on, connected or not
-static int stream_on;
+static volatile int stream_on;
+static u16 frame_id; // the descriptor ID of the frame of the last dp_show
 
+static void start(void);
+static void stop(const char *why);
+
+// The hot-plug interrupt's: a monitor plugged in or pulled
 static void on_hpd_event(void *ref)
 {
     (void)ref;
-    hpd_event = 1;
+    if (XDpPsu_IsConnected(&dp_tx))
+    {
+        xil_printf("DisplayPort: monitor plugged in\r\n");
+        start();
+    }
+    else
+    {
+        stop("monitor pulled");
+    }
 }
 
+// ... and the monitor asking for attention: retrained if the link was lost
 static void on_hpd_pulse(void *ref)
 {
     (void)ref;
-    hpd_pulse = 1;
+    if (stream_on && XDpPsu_CheckLinkStatus(&dp_tx, dp_tx.LinkConfig.LaneCount) != XST_SUCCESS)
+    {
+        xil_printf("DisplayPort: link lost, retraining\r\n");
+        start();
+    }
 }
 
 // A PS block's interrupt on the application's GIC, from the block's SDT interrupt ID (bits [11:0]
@@ -120,11 +136,16 @@ int dp_init(XScuGic *gic, const uint32_t *frame, uint32_t stride)
     if (connect_interrupt(gic, dp_config->IntrId, (Xil_InterruptHandler)XDpPsu_HpdInterruptHandler, &dp_tx) != 0 ||
         connect_interrupt(gic, dma_config->IntrId, (Xil_InterruptHandler)XDpDma_InterruptHandler, dpdma) != 0)
         return -1;
-    XDpPsu_WriteReg(dp_config->BaseAddr, XDPPSU_INTR_EN, XDPPSU_INTR_HPD_IRQ_MASK | XDPPSU_INTR_HPD_EVENT_MASK);
     XDpDma_InterruptEnable(dpdma, XDPDMA_IEN_VSYNC_INT_MASK);
 
-    // A monitor plugged in before now raised no event: look on the first dp_service.
-    hpd_event = 1;
+    // A monitor plugged in before now raised no event. Trained before the hot-plug interrupt is on,
+    // so that it does not start again from inside.
+    if (XDpPsu_IsConnected(&dp_tx))
+    {
+        xil_printf("DisplayPort: monitor plugged in\r\n");
+        start();
+    }
+    XDpPsu_WriteReg(dp_config->BaseAddr, XDPPSU_INTR_EN, XDPPSU_INTR_HPD_IRQ_MASK | XDPPSU_INTR_HPD_EVENT_MASK);
     return 0;
 }
 
@@ -133,9 +154,33 @@ void dp_show(const uint32_t *frame)
     // What the CPU wrote, in memory for the DPDMA.
     Xil_DCacheFlushRange((UINTPTR)frame, frame_buffer.Size);
     frame_buffer.Address = (u64)(uintptr_t)frame;
-    // Taken at the next vertical sync; before the first stream, start() hands it over.
-    if (dma_started)
-        XDpDma_DisplayGfxFrameBuffer(dpdma, &frame_buffer);
+    // Before the channel's first trigger (at a vertical sync after the first stream starts) that
+    // takes the frame buffer as it is then. After, its descriptor not in use is set up for frame, with
+    // an ID of its own, and the DPDMA fetches it at the next vertical sync: here, not at the vertical
+    // sync interrupt as XDpDma_DisplayGfxFrameBuffer would, which would take one more frame.
+    if (dpdma->Gfx.Channel.Current != NULL && dpdma->Gfx.TriggerStatus == XDPDMA_TRIGGER_DONE)
+    {
+        XDpDma_SetupChannel(dpdma, GraphicsChan);
+        dpdma->Gfx.Channel.Current->DSCR_ID = ++frame_id;
+        dsb(); // the descriptor in memory before the DPDMA is told to fetch it
+        XDpDma_ReTrigger(dpdma, GraphicsChan);
+    }
+}
+
+int dp_wait_shown(void)
+{
+    if (dpdma->Gfx.Channel.Current == NULL)
+        return -1;
+    XTime start, now;
+    XTime_GetTime(&start);
+    // The ID of the descriptor the DPDMA is reading (Linux's ZynqMP DPDMA driver follows its flips so)
+    while ((XDpDma_ReadReg(dpdma->Config.BaseAddr, XDPDMA_CH3_DSCR_ID) & 0xFFFF) != frame_id)
+    {
+        XTime_GetTime(&now);
+        if (now - start > COUNTS_PER_SECOND / 30)
+            return -1;
+    }
+    return 0;
 }
 
 // The link at the most both the monitor and the board take (the mode needs less).
@@ -222,33 +267,6 @@ static void start(void)
     }
     xil_printf("DisplayPort: link training failed\r\n");
     stop("training failed");
-}
-
-void dp_service(void)
-{
-    if (hpd_event)
-    {
-        hpd_event = 0;
-        hpd_pulse = 0;
-        if (XDpPsu_IsConnected(&dp_tx))
-        {
-            xil_printf("DisplayPort: monitor plugged in\r\n");
-            start();
-        }
-        else
-        {
-            stop("monitor pulled");
-        }
-    }
-    else if (hpd_pulse)
-    {
-        hpd_pulse = 0;
-        if (stream_on && XDpPsu_CheckLinkStatus(&dp_tx, dp_tx.LinkConfig.LaneCount) != XST_SUCCESS)
-        {
-            xil_printf("DisplayPort: link lost, retraining\r\n");
-            start();
-        }
-    }
 }
 
 int dp_is_on(void)

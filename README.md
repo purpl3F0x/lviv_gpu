@@ -31,3 +31,7 @@ A work-in-progress FPGA GPU in SystemVerilog, with a C++ reference rasterizer.
  - Vivado (tested on2025.2)
  - Verilator 5
  - ImageMagick
+
+## Known issues
+
+See [KNOWN_ISSUES.md](KNOWN_ISSUES.md).

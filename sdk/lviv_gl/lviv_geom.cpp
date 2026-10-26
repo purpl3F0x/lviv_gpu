@@ -280,6 +280,28 @@ static float edge(float ax, float ay, float bx, float by, float cx, float cy)
     return (cx - ax) * (by - ay) - (cy - ay) * (bx - ax);
 }
 
+// !BUG
+// TODO: maybe fix on the frontend ? (both ?)
+// ?Explanation: 
+// The GPU frontend's bounding box, in pixels, of positions from min to max, as fp_to_fx14_10 and
+// tri_bb_aligned_boundries make it: in its fixed point (1/1024 of a pixel, rounded to nearest, ties
+// to even; a plain cast would truncate), floored, the minimum snapped to even and the maximum to
+// odd. Binned by its float positions instead, a triangle starting within 1/2048 of a pixel below a
+// tile boundary would go to the tile before, which this box misses: the frontend's box clamped to
+// that tile is then empty, its width in the tile wraps to the whole tile, and the triangle is drawn
+// there a tile to the side.
+static int frontend_min(const float min)
+{
+    const int32_t n = (int32_t)std::nearbyint(min * 1024.0f); // round to a multiple of 1/1024
+    return (n >> 10) & ~1;                                    // floor(n / 1024), clear bit 0
+}
+
+static int frontend_max(const float max)
+{
+    const int32_t n = (int32_t)std::nearbyint(max * 1024.0f); // round to a multiple of 1/1024
+    return (n >> 10) | 1;                                     // floor(n / 1024), set bit 0
+}
+
 // The tiles the triangle goes to, with the low-resolution z updated
 static uint64_t bin(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t *v)
 {
@@ -287,9 +309,8 @@ static uint64_t bin(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t
     const float raw_max_x = std::fmax(std::fmax(v[0].position.x, v[1].position.x), v[2].position.x);
     const float raw_min_y = std::fmin(std::fmin(v[0].position.y, v[1].position.y), v[2].position.y);
     const float raw_max_y = std::fmax(std::fmax(v[0].position.y, v[1].position.y), v[2].position.y);
-    const int min_x = std::max(0, (int)std::floor(raw_min_x)), max_x = std::min(g.width - 1, (int)std::ceil(raw_max_x));
-    const int min_y = std::max(0, (int)std::floor(raw_min_y)),
-              max_y = std::min(g.height - 1, (int)std::ceil(raw_max_y));
+    const int min_x = std::max(0, frontend_min(raw_min_x)), max_x = std::min(g.width - 1, frontend_max(raw_max_x));
+    const int min_y = std::max(0, frontend_min(raw_min_y)), max_y = std::min(g.height - 1, frontend_max(raw_max_y));
     if (min_x > max_x || min_y > max_y)
         return 0;
 

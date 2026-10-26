@@ -5,9 +5,10 @@
 // masks, low-resolution z) and record packing. C++ on GLM (lviv_geom.cpp, sdk/third_party/glm)
 // behind this C interface. It uses no BSP headers, so it builds on the host too.
 //
-// A triangle is binned as it comes: the tiles its bounding box (clamped to the frame) overlaps,
-// less those an earlier triangle covers wholly and in front of it (lrz). Only triangles in a tile
-// at all are kept, in the order they came.
+// A triangle is binned as it comes: the tiles its bounding box overlaps, the box as the GPU's
+// frontend makes it (in its fixed point) and clamped to the frame, less those an earlier triangle
+// covers wholly and in front of it (lrz). Only triangles in a tile at all are kept, in the order
+// they came.
 #pragma once
 
 #include <stdint.h>

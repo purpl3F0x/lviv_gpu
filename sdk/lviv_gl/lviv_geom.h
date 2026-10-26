@@ -21,6 +21,7 @@ extern "C"
 
 #define LVIV_TILE_SIZE 128
 #define LVIV_MAX_TILES 64 // bits in a tile mask
+#define LVIV_MAX_LIGHTS 8 // GL_LIGHT0 to GL_LIGHT7 (GL's GL_MAX_LIGHTS)
 
 // Vectors and matrices in C. Matrices are column-major, as OpenGL's (and GLM's).
 typedef struct
@@ -94,7 +95,8 @@ typedef struct
     lviv_mat4_t modelview, projection;
     int viewport_x, viewport_y, viewport_width, viewport_height; // glViewport's: from the bottom left
     int lighting;
-    lviv_light_t light0;
+    lviv_light_t lights[LVIV_MAX_LIGHTS]; // the lights that are on: light_count of them
+    int light_count;
     lviv_material_t material;
     lviv_vec3_t global_ambient;
     lviv_cull_t cull;

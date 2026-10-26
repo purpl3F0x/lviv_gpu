@@ -65,9 +65,10 @@ static struct
     lviv_mat4_t modelview[MODELVIEW_DEPTH], projection[PROJECTION_DEPTH];
     int modelview_top, projection_top;
 
-    int depth_test, cull_face, lighting, light0_on, blend, texture_2d, normalize;
+    int depth_test, cull_face, lighting, blend, texture_2d, normalize;
+    int light_on[LVIV_MAX_LIGHTS];
     GLenum cull_mode, front_face, depth_func, sfactor, dfactor, tex_env;
-    lviv_light_t light0;
+    lviv_light_t lights[LVIV_MAX_LIGHTS]; // GL_LIGHT0 + i, positions in eye space
     uint32_t clear_color, frame_clear_color;
 
     // The current vertex attributes
@@ -147,11 +148,10 @@ static void update_state(void)
 {
     lviv_state_t *s = &gl.state;
     s->lighting = gl.lighting;
-    s->light0 = gl.light0;
-    if (!gl.light0_on)
-    {
-        s->light0.ambient = s->light0.diffuse = s->light0.specular = (lviv_vec3_t){0, 0, 0};
-    }
+    s->light_count = 0;
+    for (int i = 0; i < LVIV_MAX_LIGHTS; i++)
+        if (gl.light_on[i])
+            s->lights[s->light_count++] = gl.lights[i];
     s->cull = !gl.cull_face                       ? LVIV_CULL_NONE
               : gl.cull_mode == GL_FRONT          ? LVIV_CULL_FRONT
               : gl.cull_mode == GL_FRONT_AND_BACK ? LVIV_CULL_FRONT_AND_BACK
@@ -217,7 +217,10 @@ int lviv_gl_init(gpu_t *gpu, int width, int height, void *frame_memory, size_t f
     gl.sfactor = GL_ONE;
     gl.dfactor = GL_ZERO;
     gl.tex_env = GL_MODULATE;
-    gl.light0 = (lviv_light_t){{0, 0, 1, 0}, {0, 0, 0}, {1, 1, 1}, {1, 1, 1}};
+    // Toward -z, black; GL_LIGHT0 white
+    for (int i = 0; i < LVIV_MAX_LIGHTS; i++)
+        gl.lights[i] = (lviv_light_t){{0, 0, 1, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    gl.lights[0].diffuse = gl.lights[0].specular = (lviv_vec3_t){1, 1, 1};
     gl.state.material = (lviv_material_t){{0.2f, 0.2f, 0.2f}, {0.8f, 0.8f, 0.8f}, {0, 0, 0}, {0, 0, 0}, 0.0f};
     gl.state.global_ambient = (lviv_vec3_t){0.2f, 0.2f, 0.2f};
     gl.normal = (lviv_vec3_t){0, 0, 1};
@@ -262,6 +265,8 @@ GLenum glGetError(void)
 
 static int *capability(GLenum cap)
 {
+    if (cap >= GL_LIGHT0 && cap < GL_LIGHT0 + LVIV_MAX_LIGHTS)
+        return &gl.light_on[cap - GL_LIGHT0];
     switch (cap)
     {
     case GL_DEPTH_TEST:
@@ -270,8 +275,6 @@ static int *capability(GLenum cap)
         return &gl.cull_face;
     case GL_LIGHTING:
         return &gl.lighting;
-    case GL_LIGHT0:
-        return &gl.light0_on;
     case GL_BLEND:
         return &gl.blend;
     case GL_TEXTURE_2D:
@@ -862,25 +865,26 @@ static lviv_vec3_t rgb(const GLfloat *p)
 
 void glLightfv(GLenum light, GLenum pname, const GLfloat *params)
 {
-    if (light != GL_LIGHT0)
+    if (light < GL_LIGHT0 || light >= GL_LIGHT0 + LVIV_MAX_LIGHTS)
     {
         set_error(GL_INVALID_ENUM);
         return;
     }
+    lviv_light_t *l = &gl.lights[light - GL_LIGHT0];
     switch (pname)
     {
     case GL_AMBIENT:
-        gl.light0.ambient = rgb(params);
+        l->ambient = rgb(params);
         break;
     case GL_DIFFUSE:
-        gl.light0.diffuse = rgb(params);
+        l->diffuse = rgb(params);
         break;
     case GL_SPECULAR:
-        gl.light0.specular = rgb(params);
+        l->specular = rgb(params);
         break;
     case GL_POSITION: // into eye space by the modelview of the moment, as GL does
-        gl.light0.position = lviv_mat4_transform(&gl.modelview[gl.modelview_top],
-                                                 (lviv_vec4_t){params[0], params[1], params[2], params[3]});
+        l->position = lviv_mat4_transform(&gl.modelview[gl.modelview_top],
+                                          (lviv_vec4_t){params[0], params[1], params[2], params[3]});
         break;
     default:
         set_error(GL_INVALID_ENUM);

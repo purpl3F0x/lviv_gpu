@@ -109,7 +109,8 @@ static int draw_geom(void)
     s.viewport_width = WIDTH;
     s.viewport_height = HEIGHT;
     s.lighting = 1;
-    s.light0 = (lviv_light_t){{1.0f, 1.0f, 1.0f, 0.0f}, {0.1f, 0.1f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}};
+    s.lights[0] = (lviv_light_t){{1.0f, 1.0f, 1.0f, 0.0f}, {0.1f, 0.1f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}};
+    s.light_count = 1;
     s.material = (lviv_material_t){{0.5f, 0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0, 0, 0}, 32.0f};
     s.global_ambient = (lviv_vec3_t){0.2f, 0.2f, 0.2f};
     s.cull = LVIV_CULL_NONE;

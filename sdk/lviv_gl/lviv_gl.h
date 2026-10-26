@@ -7,7 +7,8 @@
 // limits:
 //   - triangles only: GL_TRIANGLES, _STRIP, _FAN, GL_QUADS, GL_QUAD_STRIP, GL_POLYGON (no points,
 //     lines or polygon modes)
-//   - one light (GL_LIGHT0), fixed-function lighting per vertex; no GL_COLOR_MATERIAL
+//   - eight lights (GL_LIGHT0 to GL_LIGHT7), fixed-function lighting per vertex: their colors and
+//     positions, no attenuation or spotlights; no GL_COLOR_MATERIAL
 //   - textures square, a power of two up to 2048, GL_RGBA, GL_RGB or GL_BGRA of GL_UNSIGNED_BYTE;
 //     the filters are the GPU's (glTexParameter takes the wrap modes only)
 //   - no depth mask, stencil, scissor, alpha test or fog; one frame size, at most 64 tiles of 128
@@ -81,6 +82,13 @@ typedef void GLvoid;
 #define GL_BLEND 0x0BE2
 #define GL_TEXTURE_2D 0x0DE1
 #define GL_LIGHT0 0x4000
+#define GL_LIGHT1 0x4001
+#define GL_LIGHT2 0x4002
+#define GL_LIGHT3 0x4003
+#define GL_LIGHT4 0x4004
+#define GL_LIGHT5 0x4005
+#define GL_LIGHT6 0x4006
+#define GL_LIGHT7 0x4007
 
 // Faces
 #define GL_FRONT 0x0404

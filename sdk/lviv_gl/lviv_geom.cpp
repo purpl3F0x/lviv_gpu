@@ -166,30 +166,31 @@ static float clamp01(float x)
     return std::fmin(1.0f, std::fmax(0.0f, x));
 }
 
-// GL 1.x's fixed-function lighting of one vertex, light 0 only, in eye space
+// GL 1.x's fixed-function lighting of one vertex, in eye space: the emission and the global ambient,
+// then each light that is on adds its ambient, diffuse and specular terms
 static uint32_t light(const transforms_t &x, const lviv_state_t &s, const lviv_vertex_t &v)
 {
     const glm::vec3 eye(x.modelview * glm::vec4(to_glm(v.position), 1.0f));
     const glm::vec3 n = unit(x.normal * to_glm(v.normal));
-
-    const lviv_light_t &l = s.light0;
-    const lviv_material_t &m = s.material;
-    const glm::vec3 lpos(to_glm(l.position));
-    const glm::vec3 to_light = unit(l.position.w == 0.0f ? lpos : lpos - eye);
     const glm::vec3 to_eye = unit(-eye);
-    const glm::vec3 half = unit(to_light + to_eye);
 
-    const float n_dot_l = std::fmax(0.0f, glm::dot(n, to_light));
-    const float n_dot_h = std::fmax(0.0f, glm::dot(n, half));
+    const lviv_material_t &m = s.material;
+    glm::vec3 c = to_glm(m.emissive) + to_glm(m.ambient) * to_glm(s.global_ambient);
+    for (int i = 0; i < s.light_count; i++)
+    {
+        const lviv_light_t &l = s.lights[i];
+        const glm::vec3 lpos(to_glm(l.position));
+        const glm::vec3 to_light = unit(l.position.w == 0.0f ? lpos : lpos - eye);
+        const glm::vec3 half = unit(to_light + to_eye);
 
-    const glm::vec3 ambient = to_glm(m.ambient) * to_glm(l.ambient);
-    const glm::vec3 diffuse = to_glm(m.diffuse) * to_glm(l.diffuse) * n_dot_l;
-    glm::vec3 specular(0.0f);
-    if (n_dot_l > 0.0f && m.shininess > 0.0f)
-        specular = to_glm(m.specular) * to_glm(l.specular) * std::pow(n_dot_h, m.shininess);
-    const glm::vec3 global = to_glm(m.ambient) * to_glm(s.global_ambient);
+        const float n_dot_l = std::fmax(0.0f, glm::dot(n, to_light));
+        const float n_dot_h = std::fmax(0.0f, glm::dot(n, half));
 
-    const glm::vec3 c = to_glm(m.emissive) + global + ambient + diffuse + specular;
+        c += to_glm(m.ambient) * to_glm(l.ambient);
+        c += to_glm(m.diffuse) * to_glm(l.diffuse) * n_dot_l;
+        if (n_dot_l > 0.0f && m.shininess > 0.0f)
+            c += to_glm(m.specular) * to_glm(l.specular) * std::pow(n_dot_h, m.shininess);
+    }
     const uint32_t r = (uint8_t)(clamp01(c.x) * 255.0f);
     const uint32_t gr = (uint8_t)(clamp01(c.y) * 255.0f);
     const uint32_t b = (uint8_t)(clamp01(c.z) * 255.0f);

@@ -1,7 +1,12 @@
 # Vivado project flow for a block design under bd/<name>/, and the Vitis workspace of its software.
 #
 # Include from its Makefile after setting BD_NAME, PART, BOARD_PART, RTL, BD_TCL and XDC, and for
-# the Vitis targets VITIS_APP (name), VITIS_APP_SRC (its source directories) and VITIS_APP_INCLUDES.
+# the Vitis targets VITIS_APPS (the applications' names), for each application <app>
+# VITIS_APP_SRC_<app> (its source directories), VITIS_APP_INCLUDES_<app>,
+# VITIS_APP_EXTERNAL_INCLUDES_<app> (libraries' include directories, such as git submodules: not
+# listed) and VITIS_APP_LIBS_<app> (libraries it links, by name: m for libm), and for all of them
+# VITIS_APP_OPTIMIZATION (-O0 to -Os, -O2 if not set) and VITIS_APP_CFLAGS (other compiler flags,
+# for C and C++, which the link gets too).
 #
 #   project     create the project in build/bd/<name>/ (once: edits made in the GUI stay in it;
 #               `make clean project` rebuilds it from BD_TCL)
@@ -14,11 +19,16 @@
 #   clean       delete the project and the logs
 #   vitis       the Vitis workspace build/vitis/<name>/: a platform from the XSA (made first when
 #               missing, a red warning when out of date; given the new one after `make xsa`) and
-#               the application, which builds VITIS_APP_SRC where they are and lists their .c and
-#               .h files and the headers of VITIS_APP_INCLUDES (again when one is added or
-#               removed); its include path is both
+#               the applications. Each builds its VITIS_APP_SRC_<app> where they are and lists
+#               their .c, .cpp, .h and .hpp files and the headers of its VITIS_APP_INCLUDES_<app>
+#               (again when one is added or removed); its include path is those and its
+#               VITIS_APP_EXTERNAL_INCLUDES_<app> (an empty one stops it: a submodule not checked
+#               out), it links its VITIS_APP_LIBS_<app>, and it is compiled with
+#               VITIS_APP_OPTIMIZATION and VITIS_APP_CFLAGS, its C as C also next to C++ (all of it
+#               set again when the Makefile or vitis_workspace.py changes)
 #   vitis_gui   vitis, then open the workspace in the Vitis IDE
-#   vitis_build vitis, then build the application (<workspace>/<app>/build/<app>.elf)
+#   vitis_build vitis, then build the applications (<workspace>/<app>/build/<app>.elf);
+#               vitis_build_<app> one of them
 #   vitis_clean delete the workspace
 # synth, impl, bitstream and xsa skip runs that are complete and up to date. The SpinalHDL Verilog
 # in RTL is made first (scripts/spinal.mk); the project refers to it where it is, so it is not
@@ -91,13 +101,18 @@ VITIS_PLATFORM = $(BD_NAME)
 VITIS_DOMAIN = standalone
 VITIS_CPU ?= psu_cortexa53_0
 # Written by vitis_workspace.py when a stage succeeds: the workspace is set up for the XSA (so a
-# newer XSA updates the platform), the application lists its files, the application built.
+# newer XSA updates the platform); application $(1) lists its files, it built.
 VITIS_STAMP = $(VITIS_WS)/.$(BD_NAME)_xsa
-VITIS_SOURCES_STAMP = $(VITIS_WS)/.$(VITIS_APP)_sources
-VITIS_BUILT = $(VITIS_WS)/.$(VITIS_APP)_built
-# The directories the application's files are in, two levels down (include/generated/<Name>/): a
-# file added or removed in one makes it newer than the sources stamp.
-VITIS_SOURCE_DIRS = $(foreach d,$(abspath $(VITIS_APP_SRC) $(VITIS_APP_INCLUDES)),\
+vitis_sources_stamp = $(VITIS_WS)/.$(1)_sources
+vitis_built = $(VITIS_WS)/.$(1)_built
+VITIS_SOURCES_STAMPS = $(foreach a,$(VITIS_APPS),$(call vitis_sources_stamp,$(a)))
+VITIS_APP_OPTIMIZATION ?= -O2
+# The design's Makefile and the script, which set the applications up: a change to either sets them
+# up again.
+VITIS_APP_SETUP := $(abspath $(firstword $(MAKEFILE_LIST))) $(VIVADO_MK_DIR)/vitis_workspace.py
+# The directories application $(1)'s files are in, two levels down (include/generated/<Name>/): a
+# file added or removed in one makes it newer than its sources stamp.
+vitis_source_dirs = $(foreach d,$(abspath $(VITIS_APP_SRC_$(1)) $(VITIS_APP_INCLUDES_$(1))),\
                       $(d) $(patsubst %/,%,$(wildcard $(d)/*/ $(d)/*/*/)))
 VITIS_ARGS = $(REPO_ROOT)/build/vitis/$(BD_NAME)_args.json
 # The generated register map headers the application includes: made when missing (a fresh clone),
@@ -115,6 +130,14 @@ endif
 BD_COMMA := ,
 BD_SPACE := $(subst ,, )
 VITIS_JSON_PATHS = [$(subst $(BD_SPACE),$(BD_COMMA) ,$(patsubst %,"%",$(abspath $(1))))]
+VITIS_JSON_NAMES = [$(subst $(BD_SPACE),$(BD_COMMA) ,$(patsubst %,"%",$(1)))]
+# Application $(1), then all of them, comma-separated
+VITIS_APP_JSON = "$(1)": {"src": $(call VITIS_JSON_PATHS,$(VITIS_APP_SRC_$(1))), \
+  "includes": $(call VITIS_JSON_PATHS,$(VITIS_APP_INCLUDES_$(1))), \
+  "external_includes": $(call VITIS_JSON_PATHS,$(VITIS_APP_EXTERNAL_INCLUDES_$(1))), \
+  "libs": $(call VITIS_JSON_NAMES,$(VITIS_APP_LIBS_$(1))), \
+  "sources_stamp": "$(call vitis_sources_stamp,$(1))", "built": "$(call vitis_built,$(1))"}
+VITIS_APPS_JSON = $(call VITIS_APP_JSON,$(firstword $(VITIS_APPS)))$(foreach a,$(wordlist 2,$(words $(VITIS_APPS)),$(VITIS_APPS)),$(BD_COMMA) $(call VITIS_APP_JSON,$(a)))
 define VITIS_ARGS_JSON
 {
   "workspace": "$(VITIS_WS)",
@@ -122,18 +145,18 @@ define VITIS_ARGS_JSON
   "platform": "$(VITIS_PLATFORM)",
   "cpu": "$(VITIS_CPU)",
   "domain": "$(VITIS_DOMAIN)",
-  "app": "$(VITIS_APP)",
-  "app_src": $(call VITIS_JSON_PATHS,$(VITIS_APP_SRC)),
-  "app_includes": $(call VITIS_JSON_PATHS,$(VITIS_APP_INCLUDES)),
   "stamp": "$(VITIS_STAMP)",
-  "sources_stamp": "$(VITIS_SOURCES_STAMP)",
-  "built": "$(VITIS_BUILT)"
+  "optimization": "$(VITIS_APP_OPTIMIZATION)",
+  "cflags": "$(strip $(VITIS_APP_CFLAGS))",
+  "apps": {$(VITIS_APPS_JSON)}
 }
 endef
 
 VITIS_RUN = $(file >$(VITIS_ARGS),$(VITIS_ARGS_JSON))cd $(VITIS_WS) && $(VITIS) -s $(VIVADO_MK_DIR)/vitis_workspace.py $(VITIS_ARGS)
 
-.PHONY: vitis vitis_gui vitis_build vitis_clean
+.PHONY: vitis vitis_gui vitis_build vitis_clean $(VITIS_APPS:%=vitis_build_%)
+# One vitis run at a time: they share the workspace.
+.NOTPARALLEL: vitis vitis_gui vitis_build
 
 # Set for processes VS Code starts; it turns the Vitis IDE (Electron) into plain Node, which exits.
 unexport ELECTRON_RUN_AS_NODE
@@ -162,22 +185,28 @@ $(XSA): $(XSA_INPUTS)
 $(VITIS_WS):
 	$(call MKDIR,$@)
 
-vitis: $(VITIS_SOURCES_STAMP)
+vitis: $(VITIS_SOURCES_STAMPS)
 
 $(VITIS_STAMP): $(XSA) | $(VITIS_WS)
 	$(VITIS_RUN) workspace
 	$(call VITIS_CHECK,$@)
 
-# The generated headers first, so they are listed too.
-$(VITIS_SOURCES_STAMP): $(VITIS_STAMP) $(VITIS_SOURCE_DIRS) | $(VITIS_MISSING_HEADERS)
-	$(VITIS_RUN) sources
-	$(call VITIS_CHECK,$@)
+# Application $(1)'s files listed (the generated headers first, so they are listed too), and built.
+define VITIS_APP_RULES
+$(call vitis_sources_stamp,$(1)): $(VITIS_STAMP) $(VITIS_APP_SETUP) $(call vitis_source_dirs,$(1)) | $(VITIS_MISSING_HEADERS)
+	$$(foreach d,$$(VITIS_APP_EXTERNAL_INCLUDES_$(1)),$$(if $$(wildcard $$(d)/*),,$$(error $$(d) is empty: git submodule update --init)))
+	$$(VITIS_RUN) sources $(1)
+	$$(call VITIS_CHECK,$$@)
 
-vitis_build: $(VITIS_SOURCES_STAMP)
-	$(VITIS_RUN) build
-	$(call VITIS_CHECK,$(VITIS_BUILT))
+vitis_build_$(1): $(call vitis_sources_stamp,$(1))
+	$$(VITIS_RUN) build $(1)
+	$$(call VITIS_CHECK,$(call vitis_built,$(1)))
+endef
+$(foreach a,$(VITIS_APPS),$(eval $(call VITIS_APP_RULES,$(a))))
 
-vitis_gui: $(VITIS_SOURCES_STAMP)
+vitis_build: $(VITIS_APPS:%=vitis_build_%)
+
+vitis_gui: $(VITIS_SOURCES_STAMPS)
 	cd $(VITIS_WS) && $(VITIS) -w $(VITIS_WS)
 
 vitis_clean:

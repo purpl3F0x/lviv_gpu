@@ -86,7 +86,13 @@ inline Vertex_ClipSpace lerp(const Vertex_ClipSpace &a, const Vertex_ClipSpace &
     res.position = a.position + (b.position - a.position) * t;
     res.normal = a.normal + (b.normal - a.normal) * t;
     res.texcoord = a.texcoord + (b.texcoord - a.texcoord) * t;
-    res.color = a.color + (b.color - a.color) * t;
+    // ARGB, channel by channel (as sdk/lviv_gl/lviv_geom.c)
+    res.color = 0;
+    for (int shift = 0; shift < 32; shift += 8)
+    {
+        const float ca = float(a.color >> shift & 0xFF), cb = float(b.color >> shift & 0xFF);
+        res.color |= uint32_t(ca + (cb - ca) * t + 0.5f) << shift;
+    }
     return res;
 }
 

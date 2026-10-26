@@ -1,0 +1,4 @@
+# What make builds and writes
+lviv_gl_test
+*.hex
+*.o

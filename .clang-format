@@ -1,5 +1,7 @@
 BasedOnStyle: Microsoft
 ColumnLimit: 120
+# extern "C" { ... } around a whole header's declarations, not indented
+IndentExternBlock: NoIndent
 # PenaltyBreakAssignment: 1000
 # PenaltyBreakBeforeFirstCallParameter: 1000
 # PenaltyBreakFirstLessLess: 1000

@@ -21,6 +21,11 @@
 
 #include "gpu_triangle.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 // The DMAs' interrupts.
 typedef enum
 {
@@ -125,3 +130,7 @@ gpu_status_t gpu_write_back_tile(const gpu_t *gpu, const gpu_frame_t *frame, uin
 gpu_status_t gpu_frame(gpu_t *gpu, const gpu_frame_t *frame, uint32_t *failed_tile);
 
 const char *gpu_status_name(gpu_status_t status);
+
+#ifdef __cplusplus
+}
+#endif

@@ -10,6 +10,11 @@
 
 #include "xscugic.h"
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 // The output's size: any standard 60 Hz mode (1280 x 720, 1920 x 1080, ...); dp_init fails on another.
 #define DP_WIDTH 1280
 #define DP_HEIGHT 720
@@ -33,3 +38,7 @@ int dp_wait_shown(void);
 
 // The stream is running to a monitor.
 int dp_is_on(void);
+
+#ifdef __cplusplus
+}
+#endif

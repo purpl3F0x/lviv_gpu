@@ -197,11 +197,12 @@ static uint32_t light(const transforms_t &x, const lviv_state_t &s, const lviv_v
     return 0xFF000000u | r << 16 | gr << 8 | b;
 }
 
-static clip_vertex_t shade(const transforms_t &x, const lviv_state_t &s, const lviv_vertex_t &v)
+// The vertex in clip space, with its own color: lit later, if at all
+static clip_vertex_t transform_vertex(const transforms_t &x, const lviv_vertex_t &v)
 {
     clip_vertex_t o;
     o.position = x.mvp * glm::vec4(to_glm(v.position), 1.0f);
-    o.color = s.lighting ? light(x, s, v) : v.color;
+    o.color = v.color;
     o.texcoord = to_glm(v.texcoord);
     return o;
 }
@@ -274,10 +275,26 @@ static screen_vertex_t viewport(const lviv_geom_t &g, const lviv_state_t &s, con
     return o;
 }
 
-// Positive when a, b, c run counter-clockwise on the screen, as the core draws them
-static float edge(float ax, float ay, float bx, float by, float cx, float cy)
+// A screen position in the GPU frontend's fixed point, as fp_to_fx14_10 makes it: 1/1024 of a
+// pixel, rounded to nearest, ties to even
+static int32_t frontend_fixed(const float p)
 {
-    return (cx - ax) * (by - ay) - (cy - ay) * (bx - ax);
+    return (int32_t)std::nearbyint(p * 1024.0f); // round to a multiple of 1/1024
+}
+
+// A screen vertex's x and y in the frontend's fixed point
+struct fixed_xy_t
+{
+    int32_t x, y;
+};
+
+// As the GPU computes it, exactly: in its fixed point, the products in 2^-20 px^2. Positive when
+// a, b, c run counter-clockwise on the screen. The core draws a pixel whose center is at 0 or more
+// from all three edges (thread.sv), so nothing of a clockwise triangle: the three add up to its
+// area.
+static int64_t edge(fixed_xy_t a, fixed_xy_t b, fixed_xy_t c)
+{
+    return (int64_t)(c.x - a.x) * (b.y - a.y) - (int64_t)(c.y - a.y) * (b.x - a.x);
 }
 
 // !BUG
@@ -290,34 +307,29 @@ static float edge(float ax, float ay, float bx, float by, float cx, float cy)
 // tile boundary would go to the tile before, which this box misses: the frontend's box clamped to
 // that tile is then empty, its width in the tile wraps to the whole tile, and the triangle is drawn
 // there a tile to the side.
-static int frontend_min(const float min)
+static int frontend_min(const int32_t n)
 {
-    const int32_t n = (int32_t)std::nearbyint(min * 1024.0f); // round to a multiple of 1/1024
-    return (n >> 10) & ~1;                                    // floor(n / 1024), clear bit 0
+    return (n >> 10) & ~1; // floor(n / 1024), clear bit 0
 }
 
-static int frontend_max(const float max)
+static int frontend_max(const int32_t n)
 {
-    const int32_t n = (int32_t)std::nearbyint(max * 1024.0f); // round to a multiple of 1/1024
-    return (n >> 10) | 1;                                     // floor(n / 1024), set bit 0
+    return (n >> 10) | 1; // floor(n / 1024), set bit 0
 }
 
-// The tiles the triangle goes to, with the low-resolution z updated
-static uint64_t bin(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t *v)
+// The tiles the triangle goes to, with the low-resolution z updated; q: its x and y in the
+// frontend's fixed point
+static uint64_t bin(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t *v, const fixed_xy_t *q)
 {
-    const float raw_min_x = std::fmin(std::fmin(v[0].position.x, v[1].position.x), v[2].position.x);
-    const float raw_max_x = std::fmax(std::fmax(v[0].position.x, v[1].position.x), v[2].position.x);
-    const float raw_min_y = std::fmin(std::fmin(v[0].position.y, v[1].position.y), v[2].position.y);
-    const float raw_max_y = std::fmax(std::fmax(v[0].position.y, v[1].position.y), v[2].position.y);
-    const int min_x = std::max(0, frontend_min(raw_min_x)), max_x = std::min(g.width - 1, frontend_max(raw_max_x));
-    const int min_y = std::max(0, frontend_min(raw_min_y)), max_y = std::min(g.height - 1, frontend_max(raw_max_y));
+    const int min_x = std::max(0, frontend_min(std::min({q[0].x, q[1].x, q[2].x})));
+    const int max_x = std::min(g.width - 1, frontend_max(std::max({q[0].x, q[1].x, q[2].x})));
+    const int min_y = std::max(0, frontend_min(std::min({q[0].y, q[1].y, q[2].y})));
+    const int max_y = std::min(g.height - 1, frontend_max(std::max({q[0].y, q[1].y, q[2].y})));
     if (min_x > max_x || min_y > max_y)
         return 0;
 
     const float min_z = std::fmin(std::fmin(v[0].position.z, v[1].position.z), v[2].position.z);
     const float max_z = std::fmax(std::fmax(v[0].position.z, v[1].position.z), v[2].position.z);
-    const float x0 = v[0].position.x, y0 = v[0].position.y, x1 = v[1].position.x, y1 = v[1].position.y;
-    const float x2 = v[2].position.x, y2 = v[2].position.y;
 
     uint64_t mask = 0;
     for (int ty = min_y / LVIV_TILE_SIZE; ty <= max_y / LVIV_TILE_SIZE; ty++)
@@ -331,20 +343,15 @@ static uint64_t bin(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t
             if (!s.lrz)
                 continue;
 
-            // Covering the tile wholly: its four corners inside
-            const float inv_area = 1.0f / edge(x0, y0, x1, y1, x2, y2);
-            const float cx[4] = {(float)(tx * LVIV_TILE_SIZE), (float)((tx + 1) * LVIV_TILE_SIZE - 1),
-                                 (float)(tx * LVIV_TILE_SIZE), (float)((tx + 1) * LVIV_TILE_SIZE - 1)};
-            const float cy[4] = {(float)(ty * LVIV_TILE_SIZE), (float)(ty * LVIV_TILE_SIZE),
-                                 (float)((ty + 1) * LVIV_TILE_SIZE - 1), (float)((ty + 1) * LVIV_TILE_SIZE - 1)};
+            // Covering the tile wholly, the core drawing each of its pixels: its corner pixels'
+            // centers inside
+            const int32_t left = (tx * LVIV_TILE_SIZE << 10) + 512, right = left + ((LVIV_TILE_SIZE - 1) << 10);
+            const int32_t top = (ty * LVIV_TILE_SIZE << 10) + 512, bottom = top + ((LVIV_TILE_SIZE - 1) << 10);
+            const fixed_xy_t corners[4] = {{left, top}, {right, top}, {left, bottom}, {right, bottom}};
             bool covers = true;
             for (int c = 0; c < 4 && covers; c++)
-            {
-                const float w0 = edge(x1, y1, x2, y2, cx[c], cy[c]) * inv_area;
-                const float w1 = edge(x2, y2, x0, y0, cx[c], cy[c]) * inv_area;
-                const float w2 = edge(x0, y0, x1, y1, cx[c], cy[c]) * inv_area;
-                covers = !(w0 < 0 || w1 < 0 || w2 < 0);
-            }
+                covers = edge(q[1], q[2], corners[c]) >= 0 && edge(q[2], q[0], corners[c]) >= 0 &&
+                         edge(q[0], q[1], corners[c]) >= 0;
             if (covers)
                 g.lrz[tile] = std::fmin(g.lrz[tile], max_z);
         }
@@ -352,16 +359,36 @@ static uint64_t bin(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t
     return mask;
 }
 
-static void emit(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t *v)
+// The triangle on the screen as the GPU sees it, its x and y in the frontend's fixed point (q): its
+// area there, or 0 if degenerate or culled
+static int64_t screen_area(const lviv_state_t &s, const screen_vertex_t *v, fixed_xy_t *q)
 {
-    const uint64_t mask = bin(g, s, v);
-    if (!mask)
-        return;
-    if (g.count == g.capacity)
+    for (int k = 0; k < 3; k++)
+        q[k] = {frontend_fixed(v[k].position.x), frontend_fixed(v[k].position.y)};
+    const int64_t area = edge(q[0], q[1], q[2]);
+    if (area == 0)
+        return 0; // degenerate
+    const bool front = (area > 0) == (s.front_ccw != 0);
+    if ((front && (s.cull == LVIV_CULL_FRONT || s.cull == LVIV_CULL_FRONT_AND_BACK)) ||
+        (!front && (s.cull == LVIV_CULL_BACK || s.cull == LVIV_CULL_FRONT_AND_BACK)))
+        return 0;
+    return area;
+}
+
+// The tiles the triangle goes to, or none if it is in none or there is no room for it (dropped)
+static uint64_t place(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t *v, const fixed_xy_t *q)
+{
+    const uint64_t mask = bin(g, s, v, q);
+    if (mask && g.count == g.capacity)
     {
         g.dropped++;
-        return;
+        return 0;
     }
+    return mask;
+}
+
+static void record(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t *v, uint64_t mask)
+{
     gpu_triangle_t *t = &g.triangles[g.count];
     std::memset(t, 0, sizeof *t);
     for (int i = 0; i < 3; i++)
@@ -379,10 +406,46 @@ void lviv_geom_triangle(lviv_geom_t *g, const lviv_state_t *s, const lviv_vertex
                         const lviv_vertex_t *v2)
 {
     const transforms_t x = {to_glm(g->mvp), to_glm(s->modelview), glm::mat3(to_glm(g->normal_matrix))};
+    const lviv_vertex_t *v[3] = {v0, v1, v2};
     clip_vertex_t poly[2][CLIP_MAX];
-    poly[0][0] = shade(x, *s, *v0);
-    poly[0][1] = shade(x, *s, *v1);
-    poly[0][2] = shade(x, *s, *v2);
+    bool inside = true;
+    for (int k = 0; k < 3; k++)
+    {
+        poly[0][k] = transform_vertex(x, *v[k]);
+        for (int plane = 0; plane < 6; plane++)
+            inside = inside && plane_distance(poly[0][k].position, plane) >= 0.0f;
+    }
+
+    // Inside every clip plane, as clipping leaves it: culled and binned first, lit (most of the
+    // work) only if kept
+    if (inside)
+    {
+        screen_vertex_t sv[3] = {viewport(*g, *s, poly[0][0]), viewport(*g, *s, poly[0][1]),
+                                 viewport(*g, *s, poly[0][2])};
+        fixed_xy_t q[3];
+        const int64_t area = screen_area(*s, sv, q);
+        if (area == 0)
+            return;
+        if (area < 0 && s->flip_clockwise)
+        {
+            std::swap(sv[1], sv[2]);
+            std::swap(q[1], q[2]);
+            std::swap(v[1], v[2]);
+        }
+        const uint64_t mask = place(*g, *s, sv, q);
+        if (!mask)
+            return;
+        if (s->lighting)
+            for (int k = 0; k < 3; k++)
+                sv[k].color = light(x, *s, *v[k]);
+        record(*g, *s, sv, mask);
+        return;
+    }
+
+    // Across a plane: lit first, the colors clipped with the rest
+    if (s->lighting)
+        for (int k = 0; k < 3; k++)
+            poly[0][k].color = light(x, *s, *v[k]);
     int n = 3, cur = 0;
     for (int plane = 0; plane < 6; plane++)
     {
@@ -392,21 +455,22 @@ void lviv_geom_triangle(lviv_geom_t *g, const lviv_state_t *s, const lviv_vertex
             return;
     }
 
-    // A fan from the first corner
+    // A fan from the first corner, each triangle culled and binned as the GPU sees it
     for (int i = 2; i < n; i++)
     {
         screen_vertex_t sv[3] = {viewport(*g, *s, poly[cur][0]), viewport(*g, *s, poly[cur][i - 1]),
                                  viewport(*g, *s, poly[cur][i])};
-        const float area = edge(sv[0].position.x, sv[0].position.y, sv[1].position.x, sv[1].position.y,
-                                sv[2].position.x, sv[2].position.y);
-        if (std::fabs(area) < 1e-5f)
-            continue; // degenerate
-        const bool front = (area > 0) == (s->front_ccw != 0);
-        if ((front && (s->cull == LVIV_CULL_FRONT || s->cull == LVIV_CULL_FRONT_AND_BACK)) ||
-            (!front && (s->cull == LVIV_CULL_BACK || s->cull == LVIV_CULL_FRONT_AND_BACK)))
+        fixed_xy_t q[3];
+        const int64_t area = screen_area(*s, sv, q);
+        if (area == 0)
             continue;
         if (area < 0 && s->flip_clockwise)
+        {
             std::swap(sv[1], sv[2]);
-        emit(*g, *s, sv);
+            std::swap(q[1], q[2]);
+        }
+        const uint64_t mask = place(*g, *s, sv, q);
+        if (mask)
+            record(*g, *s, sv, mask);
     }
 }

@@ -137,7 +137,7 @@ VITIS_JSON_NAMES = [$(subst $(BD_SPACE),$(BD_COMMA) ,$(patsubst %,"%",$(1)))]
 VITIS_APP_JSON = "$(1)": {"src": $(call VITIS_JSON_PATHS,$(VITIS_APP_SRC_$(1))), \
   "includes": $(call VITIS_JSON_PATHS,$(VITIS_APP_INCLUDES_$(1))), \
   "external_includes": $(call VITIS_JSON_PATHS,$(VITIS_APP_EXTERNAL_INCLUDES_$(1))), \
-  "libs": $(call VITIS_JSON_NAMES,$(VITIS_APP_LIBS_$(1))), \
+  "libs": $(call VITIS_JSON_NAMES,$(VITIS_APP_LIBS_$(1))), "ldflags": "$(strip $(VITIS_APP_LDFLAGS_$(1)))", \
   "sources_stamp": "$(call vitis_sources_stamp,$(1))", "built": "$(call vitis_built,$(1))"}
 VITIS_APPS_JSON = $(call VITIS_APP_JSON,$(firstword $(VITIS_APPS)))$(foreach a,$(wordlist 2,$(words $(VITIS_APPS)),$(VITIS_APPS)),$(BD_COMMA) $(call VITIS_APP_JSON,$(a)))
 define VITIS_ARGS_JSON

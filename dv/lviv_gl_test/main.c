@@ -141,10 +141,11 @@ static int draw_gl(void)
 {
     static gpu_t gpu;
     static uint32_t frame[1];
+    static uint8_t frame_memory[4096 * LVIV_GL_TRIANGLE_BYTES] __attribute__((aligned(64)));
     lviv_vec3_t eye, center;
     camera(&eye, &center);
 
-    if (lviv_gl_init(&gpu, WIDTH, HEIGHT) != 0)
+    if (lviv_gl_init(&gpu, WIDTH, HEIGHT, frame_memory, sizeof frame_memory) != 0)
         return 1;
     glViewport(0, 0, WIDTH, HEIGHT);
     glMatrixMode(GL_PROJECTION);

@@ -14,10 +14,12 @@
 //     x 128 pixels (1280 x 720: 60)
 // A frame is everything drawn since the last glClear (which clears color and depth together, as
 // the GPU clears every tile) and is rendered by lviv_gl_frame, the platform's swap: the
-// application keeps the display (double buffering, the DisplayPort output). Unsupported names set
-// GL_INVALID_ENUM, as GL does, for glGetError.
+// application keeps the display (double buffering, the DisplayPort output). Its triangles go to
+// the frame memory the platform gives (lviv_gl_init); past what it holds, GL_OUT_OF_MEMORY, and
+// the rest are dropped. Unsupported names set GL_INVALID_ENUM, as GL does, for glGetError.
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "gpu.h"
@@ -156,9 +158,14 @@ typedef void GLvoid;
 #define GL_RGBA 0x1908
 #define GL_BGRA 0x80E1
 
-// The platform: a context for gpu, frames of width x height pixels. Returns 0, or -1 if the frame
-// has more than 64 tiles.
-int lviv_gl_init(gpu_t *gpu, int width, int height);
+// The frame memory a triangle takes: its record (gpu_triangle_t) and its tile mask
+#define LVIV_GL_TRIANGLE_BYTES (GPU_TRIANGLE_BYTES + 8)
+
+// The platform: a context for gpu, frames of width x height pixels, their triangles in frame_memory:
+// frame_bytes 64-byte aligned, in memory the GPU's masters reach (PS DDR below 4 GiB, for one),
+// frame_bytes / LVIV_GL_TRIANGLE_BYTES triangles a frame. Returns 0, or -1 if the frame has more
+// than 64 tiles or frame_memory is not 64-byte aligned or holds no triangle.
+int lviv_gl_init(gpu_t *gpu, int width, int height, void *frame_memory, size_t frame_bytes);
 // Renders everything drawn since the last glClear into target (stride bytes per row, rows to the
 // end of the last row of tiles, in memory the CPU does not cache: gpu_frame_t), and starts the next
 // frame. If it fails, the tile it stopped at goes to failed_tile (unless NULL).

@@ -54,6 +54,15 @@ static union {
 } frame_memory __attribute__((aligned(MMU_BLOCK)));
 static uint32_t (*const frames)[FRAME_WORDS] = frame_memory.frames;
 
+// lviv_gl's frame memory, where the GPU reads each frame's triangles from: a section of its own at a
+// fixed address (lviv_frame.ld)
+extern "C" uint8_t lviv_frame_start[], lviv_frame_end[];
+
+static size_t lviv_frame_bytes(void)
+{
+    return (uintptr_t)lviv_frame_end - (uintptr_t)lviv_frame_start;
+}
+
 static gpu_t gpu;
 static XScuGic gic; // static: the DP output's interrupt handlers hold on to it
 
@@ -109,7 +118,7 @@ static int setup_scene(void)
     center = (lo + hi) * 0.5f;
     eye = center + glm::vec3(0.0f, 0.0f, glm::max(size.x, glm::max(size.y, size.z)) * 1.5f);
 
-    if (lviv_gl_init(&gpu, WIDTH, HEIGHT) != 0)
+    if (lviv_gl_init(&gpu, WIDTH, HEIGHT, lviv_frame_start, lviv_frame_bytes()) != 0)
         return -1;
     glViewport(0, 0, WIDTH, HEIGHT);
     glMatrixMode(GL_PROJECTION);
@@ -243,6 +252,8 @@ int main(void)
         xil_printf("lviv_gl: setup failed\r\n");
         return 1;
     }
+    xil_printf("lviv_gl: frame memory at 0x%x, %d MiB: %d triangles a frame\r\n", (int)(uintptr_t)lviv_frame_start,
+               (int)(lviv_frame_bytes() >> 20), (int)(lviv_frame_bytes() / LVIV_GL_TRIANGLE_BYTES));
     xil_printf("model: suzanne, %d triangles\r\n", SUZANNE_VERTICES / 3);
 
     // Black (the frame buffers start zeroed) until the first frame is shown

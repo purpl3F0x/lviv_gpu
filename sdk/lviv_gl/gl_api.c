@@ -5,11 +5,9 @@
 
 #include "lviv_geom.h"
 
-// Capacities. The triangles a frame keeps (after clipping, culling and binning), the texture
-// memory, the matrix stacks (GL's minimums).
-#ifndef LVIV_GL_MAX_TRIANGLES
-#define LVIV_GL_MAX_TRIANGLES 16384
-#endif
+// Capacities: the texture memory, the matrix stacks (GL's minimums). The triangles a frame keeps
+// (after clipping, culling and binning) are as many as the platform's frame memory holds
+// (lviv_gl_init).
 #ifndef LVIV_GL_TEXTURE_BYTES
 #define LVIV_GL_TEXTURE_BYTES (4u << 20)
 #endif
@@ -43,9 +41,7 @@ typedef struct
     uint32_t *texels; // Morton order, in the pool
 } texture_t;
 
-// The frame's data, read by the GPU's masters
-static gpu_triangle_t triangles[LVIV_GL_MAX_TRIANGLES] __attribute__((aligned(64)));
-static uint64_t visibility[LVIV_GL_MAX_TRIANGLES] __attribute__((aligned(64)));
+// Read by the GPU's texture caches
 static uint32_t texture_pool[LVIV_GL_TEXTURE_BYTES / 4] __attribute__((aligned(4096)));
 
 static struct
@@ -54,6 +50,11 @@ static struct
     int width, height;
     GLenum error;
 
+    // The frame memory (lviv_gl_init), read by the GPU's masters: capacity triangles' records, then
+    // their tile masks
+    gpu_triangle_t *triangles;
+    uint64_t *visibility;
+    uint32_t capacity;
     lviv_geom_t geom;
     lviv_state_t state; // what lviv_geom draws with, kept up to date with the GL state
     int matrices_dirty;
@@ -180,18 +181,24 @@ static void update_state(void)
 
 static void begin_frame(void)
 {
-    lviv_geom_begin(&gl.geom, triangles, visibility, LVIV_GL_MAX_TRIANGLES, gl.width, gl.height);
+    lviv_geom_begin(&gl.geom, gl.triangles, gl.visibility, gl.capacity, gl.width, gl.height);
     gl.dropped = 0;
     gl.matrices_dirty = 1;
 }
 
-int lviv_gl_init(gpu_t *gpu, int width, int height)
+int lviv_gl_init(gpu_t *gpu, int width, int height, void *frame_memory, size_t frame_bytes)
 {
     memset(&gl, 0, sizeof gl);
+    if ((uintptr_t)frame_memory % 64 != 0)
+        return -1;
     gl.gpu = gpu;
     gl.width = width;
     gl.height = height;
-    if (lviv_geom_begin(&gl.geom, triangles, visibility, LVIV_GL_MAX_TRIANGLES, width, height) != 0)
+    const size_t n = frame_bytes / LVIV_GL_TRIANGLE_BYTES;
+    gl.capacity = n > UINT32_MAX ? UINT32_MAX : (uint32_t)n;
+    gl.triangles = frame_memory;
+    gl.visibility = (uint64_t *)(gl.triangles + gl.capacity);
+    if (gl.capacity == 0 || lviv_geom_begin(&gl.geom, gl.triangles, gl.visibility, gl.capacity, width, height) != 0)
         return -1;
 
     gl.matrix_mode = GL_MODELVIEW;
@@ -223,8 +230,8 @@ int lviv_gl_init(gpu_t *gpu, int width, int height)
 gpu_status_t lviv_gl_frame(uint32_t *target, uint32_t stride, uint32_t *failed_tile)
 {
     const gpu_frame_t f = {
-        .triangles = triangles,
-        .visibility = visibility,
+        .triangles = gl.triangles,
+        .visibility = gl.visibility,
         .triangle_count = gl.geom.count,
         .frame = target,
         .stride = stride,

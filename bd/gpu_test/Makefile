@@ -21,6 +21,8 @@ VITIS_APP_SRC_gl_test = ../../sdk/src ../../sdk/lviv_gl ../../sdk/gl_test
 VITIS_APP_INCLUDES_gl_test = ../../sdk/include
 VITIS_APP_EXTERNAL_INCLUDES_gl_test = ../../sdk/third_party/glm
 VITIS_APP_LIBS_gl_test = m
+# lviv_gl's frame memory: a section of its own, 256 MiB at a fixed address (lviv_frame.ld)
+VITIS_APP_LDFLAGS_gl_test = -Wl,-T,$(abspath ../../sdk/gl_test/lviv_frame.ld)
 # Their compiler flags (the link gets them too): -O2 with link-time optimization, tuned for the
 # A53, C++ without exceptions, and no assert() (GLM's index checks, which would bring in newlib's
 # printf; the BSP's driver asserts are in its libraries). The A53's FPU and NEON (AArch64's

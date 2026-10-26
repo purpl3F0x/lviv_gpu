@@ -113,7 +113,9 @@ plugged in at the start, otherwise whenever one is.)
 
 The control port's address comes from the platform's `xparameters.h` (`XPAR_GPU_TOP_BD_0_BASEADDR`,
 `0xA000_0000`); an application's two frame buffers (about 4 MB each), `raster_test`'s texture and
-triangle, and lviv_gl's frame data (up to 16384 triangles) and 4 MiB texture pool are static
-arrays in PS DDR, the textures in the first 128 MiB (the texture caches' window). The frame
-buffers are not cached (2 MiB blocks of their own): the GPU and the DPDMA see them as they are,
-with no cache maintenance.
+triangle, and lviv_gl's 4 MiB texture pool are static arrays in PS DDR, the textures in the first
+128 MiB (the texture caches' window). The frame buffers are not cached (2 MiB blocks of their
+own): the GPU and the DPDMA see them as they are, with no cache maintenance. `gl_test` gives
+lviv_gl its frame memory, where the GPU reads each frame's triangles from, as a section of its
+own: 256 MiB at `0x6000_0000`, about 2.58 million triangles (`gl_test/lviv_frame.ld`, a second
+linker script).

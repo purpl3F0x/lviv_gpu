@@ -4,7 +4,8 @@
 # the Vitis targets VITIS_APPS (the applications' names), for each application <app>
 # VITIS_APP_SRC_<app> (its source directories), VITIS_APP_INCLUDES_<app>,
 # VITIS_APP_EXTERNAL_INCLUDES_<app> (libraries' include directories, such as git submodules: not
-# listed) and VITIS_APP_LIBS_<app> (libraries it links, by name: m for libm), and for all of them
+# listed), VITIS_APP_LIBS_<app> (libraries it links, by name: m for libm) and VITIS_APP_LDFLAGS_<app>
+# (its linker flags, such as -Wl,--defsym,_HEAP_SIZE=<bytes> for its heap), and for all of them
 # VITIS_APP_OPTIMIZATION (-O0 to -Os, -O2 if not set) and VITIS_APP_CFLAGS (other compiler flags,
 # for C and C++, which the link gets too).
 #
@@ -23,7 +24,8 @@
 #               their .c, .cpp, .h and .hpp files and the headers of its VITIS_APP_INCLUDES_<app>
 #               (again when one is added or removed); its include path is those and its
 #               VITIS_APP_EXTERNAL_INCLUDES_<app> (an empty one stops it: a submodule not checked
-#               out), it links its VITIS_APP_LIBS_<app>, and it is compiled with
+#               out), it links its VITIS_APP_LIBS_<app> with its VITIS_APP_LDFLAGS_<app>, and it
+#               is compiled with
 #               VITIS_APP_OPTIMIZATION and VITIS_APP_CFLAGS, its C as C also next to C++ (all of it
 #               set again when the Makefile or vitis_workspace.py changes)
 #   vitis_gui   vitis, then open the workspace in the Vitis IDE

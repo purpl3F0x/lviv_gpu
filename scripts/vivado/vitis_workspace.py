@@ -9,13 +9,14 @@ Usage: vitis -s vitis_workspace.py <args.json> <stage> [<app>]
   sources <app>  create the application if it is missing; list in it every .c, .cpp, .h and .hpp of
                  its src directories and every .h of its includes, so the IDE shows them all, make
                  those and its external_includes (libraries, not listed) its include path, link its
-                 libs, and compile it with optimization and cflags, its C as C (bd.mk runs it when
-                 a file is added or removed there, or the design's Makefile or this script changes)
+                 libs with its ldflags, and compile it with optimization and cflags, its C as C
+                 (bd.mk runs it when a file is added or removed there, or the design's Makefile or
+                 this script changes)
   build <app>    build the application
 args.json (written by bd.mk): workspace, xsa, platform, cpu, domain, stamp (the file that says the
 workspace stage succeeded), the applications' optimization level and other compiler flags
-(optimization, cflags), and apps, by name: src, includes, external_includes, libs, and the files
-that say its stages succeeded, sources_stamp (sources) and built (build)
+(optimization, cflags), and apps, by name: src, includes, external_includes, libs, ldflags, and
+the files that say its stages succeeded, sources_stamp (sources) and built (build)
 """
 
 import glob
@@ -146,12 +147,14 @@ def sources(client):
     app.set_app_config(key="USER_COMPILE_SOURCES", values=listed)
     app.set_app_config(key="USER_INCLUDE_DIRECTORIES", values=includes)
     app.set_app_config(key="USER_LINK_LIBRARIES", values=app_args["libs"])
+    app.set_app_config(key="USER_LINK_OTHER_FLAGS", values=[app_args["ldflags"]])
     # In the compiler's flags, which the IDE's build gives the link too
     app.set_app_config(key="USER_COMPILE_OPTIMIZATION_LEVEL", values=[args["optimization"]])
     app.set_app_config(key="USER_COMPILE_OTHER_FLAGS", values=[args["cflags"]])
     print("Sources: " + " ".join(listed))
     print("Include directories: " + " ".join(includes))
     print("Libraries: " + " ".join(app_args["libs"]))
+    print("Linker flags: " + app_args["ldflags"])
     print("Compiler flags: " + " ".join(f for f in (args["optimization"], args["cflags"]) if f))
 
 

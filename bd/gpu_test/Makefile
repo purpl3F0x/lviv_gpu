@@ -42,7 +42,7 @@ VITIS_PATCHES = ../../sdk/third_party/fastgltf.patch ../../sdk/third_party/simdj
 # use. GLM's own NEON code is on too (plain C++ otherwise), its vectors aligned: vec3 padded to 16
 # bytes. Every file that includes GLM must see the same GLM settings, hence here.
 VITIS_APP_OPTIMIZATION = -O2
-VITIS_APP_CFLAGS = -flto -mcpu=cortex-a53 -fno-exceptions -DNDEBUG \
+VITIS_APP_CFLAGS = -flto=auto -mcpu=cortex-a53 -fno-exceptions -DNDEBUG \
                    -DGLM_FORCE_INTRINSICS -DGLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 
 .DEFAULT_GOAL := project

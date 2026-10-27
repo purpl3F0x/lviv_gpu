@@ -1,3 +1,9 @@
 [submodule "sdk/third_party/glm"]
 	path = sdk/third_party/glm
 	url = https://github.com/g-truc/glm.git
+[submodule "sdk/third_party/stb"]
+	path = sdk/third_party/stb
+	url = https://github.com/nothings/stb
+[submodule "dv/raster_sw/libs/xilinx_hls"]
+	path = dv/raster_sw/libs/xilinx_hls
+	url = https://github.com/Xilinx/HLS_arbitrary_Precision_Types.git

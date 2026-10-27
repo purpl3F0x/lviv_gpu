@@ -1,5 +1,8 @@
+# Its libraries, git submodules (git submodule update --init): Xilinx's arbitrary precision types
+# (ap_fixed, ap_int) in libs/xilinx_hls, and stb_image and stb_image_write in sdk/third_party/stb
 CXX = g++
-CXXFLAGS = -O3 -std=c++20 -march=native -Ilibs/xilinx_hls/include -I../../sdk/include -Wno-deprecated-enum-enum-conversion -MMD -MP -fopenmp
+CXXFLAGS = -O3 -std=c++20 -march=native -Ilibs/xilinx_hls/include -I../../sdk/third_party/stb -I../../sdk/include \
+           -Wno-deprecated-enum-enum-conversion -MMD -MP -fopenmp
 
 TARGET = build/rasterizer.exe
 SRCS = main.cpp rasterizer.cpp geometry_engine.cpp

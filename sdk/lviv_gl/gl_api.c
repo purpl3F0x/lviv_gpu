@@ -86,8 +86,7 @@ static struct
     array_t vertex_array, normal_array, color_array, texcoord_array;
 
     texture_t textures[TEXTURES];
-    GLuint bound;     // a GL name, 0 none
-    GLuint next_name; // glGenTextures
+    GLuint bound; // a GL name, 0 none
     uint8_t *pool_next;
 } gl;
 
@@ -1020,16 +1019,49 @@ void glGenTextures(GLsizei n, GLuint *textures)
     }
     for (GLsizei i = 0; i < n; i++)
     {
-        if (gl.next_name == TEXTURES)
+        GLuint name = 0; // the first not in use (glDeleteTextures gives them back)
+        for (GLuint t = 0; t < TEXTURES && !name; t++)
+            if (!gl.textures[t].generated)
+                name = t + 1;
+        textures[i] = name;
+        if (!name)
         {
             set_error(GL_OUT_OF_MEMORY);
-            textures[i] = 0;
             continue;
         }
-        gl.textures[gl.next_name].generated = 1;
-        gl.textures[gl.next_name].tile_s = gl.textures[gl.next_name].tile_t = 1; // GL_REPEAT
-        textures[i] = ++gl.next_name;
+        gl.textures[name - 1].generated = 1;
+        gl.textures[name - 1].tile_s = gl.textures[name - 1].tile_t = 1; // GL_REPEAT
     }
+}
+
+// The names back for glGenTextures, and the pool from the end of the last texture still in it on:
+// the pool fills in order, so a texture's memory comes back once those placed after it are deleted
+// too (all of a scene's, deleted together)
+void glDeleteTextures(GLsizei n, const GLuint *textures)
+{
+    if (n < 0)
+    {
+        set_error(GL_INVALID_VALUE);
+        return;
+    }
+    for (GLsizei i = 0; i < n; i++)
+    {
+        const GLuint name = textures[i];
+        if (name == 0 || name > TEXTURES) // as GL, nothing for 0 or a name not in use
+            continue;
+        if (gl.bound == name)
+            gl.bound = 0;
+        memset(&gl.textures[name - 1], 0, sizeof gl.textures[name - 1]);
+    }
+    gl.pool_next = (uint8_t *)texture_pool;
+    for (int t = 0; t < TEXTURES; t++)
+    {
+        const texture_t *texture = &gl.textures[t];
+        uint8_t *end = (uint8_t *)texture->texels + (4u << (2 * texture->log2_size));
+        if (texture->loaded && end > gl.pool_next)
+            gl.pool_next = end;
+    }
+    update_state();
 }
 
 void glBindTexture(GLenum target, GLuint texture)
@@ -1079,6 +1111,53 @@ void glTexParameteri(GLenum target, GLenum pname, GLint param)
     update_state();
 }
 
+// The bound texture, with memory for width x height texels (square, a power of two the GPU takes) in
+// the pool, at a multiple of its own size (gpu_set_texture); NULL, with GL's error, if it cannot be
+static texture_t *texture_memory(GLsizei width, GLsizei height, GLint border, const GLvoid *pixels, uint32_t *log2_size)
+{
+    *log2_size = 0;
+    while ((1 << *log2_size) < width)
+        (*log2_size)++;
+    if (width != height || width != (1 << *log2_size) || *log2_size > TEXTURE_MAX_LOG2 || border != 0 || !pixels)
+    {
+        set_error(GL_INVALID_VALUE);
+        return NULL;
+    }
+    if (!gl.bound)
+    {
+        set_error(GL_INVALID_OPERATION);
+        return NULL;
+    }
+    texture_t *t = &gl.textures[gl.bound - 1];
+    const uintptr_t bytes = 4u << (2 * *log2_size);
+    if (!t->loaded || t->log2_size != *log2_size)
+    {
+        const uintptr_t at = ((uintptr_t)gl.pool_next + bytes - 1) & ~(bytes - 1);
+        if (at + bytes > (uintptr_t)texture_pool + sizeof texture_pool)
+        {
+            set_error(GL_OUT_OF_MEMORY);
+            return NULL;
+        }
+        t->texels = (uint32_t *)at;
+        gl.pool_next = (uint8_t *)(at + bytes);
+    }
+    return t;
+}
+
+// The texture's texels, written, to the GPU
+static void texture_written(texture_t *t, uint32_t log2_size)
+{
+    if (gpu_set_texture(gl.gpu, gl.bound - 1, t->texels, log2_size) != 0)
+    {
+        set_error(GL_OUT_OF_MEMORY);
+        t->loaded = 0;
+        return;
+    }
+    t->loaded = 1;
+    t->log2_size = log2_size;
+    update_state();
+}
+
 // Level 0 only (the GPU has no mipmaps: other levels are taken and dropped), square, a power of two
 void glTexImage2D(GLenum target, GLint level, GLint internal_format, GLsizei width, GLsizei height, GLint border,
                   GLenum format, GLenum type, const GLvoid *pixels)
@@ -1092,35 +1171,10 @@ void glTexImage2D(GLenum target, GLint level, GLint internal_format, GLsizei wid
     }
     if (level != 0)
         return;
-    uint32_t log2_size = 0;
-    while ((1 << log2_size) < width)
-        log2_size++;
-    if (width != height || width != (1 << log2_size) || log2_size > TEXTURE_MAX_LOG2 || border != 0 || !pixels)
-    {
-        set_error(GL_INVALID_VALUE);
+    uint32_t log2_size;
+    texture_t *t = texture_memory(width, height, border, pixels, &log2_size);
+    if (!t)
         return;
-    }
-    if (!gl.bound)
-    {
-        set_error(GL_INVALID_OPERATION);
-        return;
-    }
-    texture_t *t = &gl.textures[gl.bound - 1];
-
-    // In the pool, at a multiple of its own size (gpu_set_texture)
-    const uintptr_t bytes = 4u << (2 * log2_size);
-    if (!t->loaded || t->log2_size != log2_size)
-    {
-        const uintptr_t at = ((uintptr_t)gl.pool_next + bytes - 1) & ~(bytes - 1);
-        if (at + bytes > (uintptr_t)texture_pool + sizeof texture_pool)
-        {
-            set_error(GL_OUT_OF_MEMORY);
-            return;
-        }
-        t->texels = (uint32_t *)at;
-        gl.pool_next = (uint8_t *)(at + bytes);
-    }
-
     const uint8_t *src = pixels;
     const int channels = format == GL_RGB ? 3 : 4;
     for (GLsizei y = 0; y < height; y++)
@@ -1132,13 +1186,15 @@ void glTexImage2D(GLenum target, GLint level, GLint internal_format, GLsizei wid
             t->texels[gpu_texel_index((uint32_t)x, (uint32_t)y)] = a << 24 | r << 16 | (uint32_t)src[1] << 8 | b;
         }
     }
-    if (gpu_set_texture(gl.gpu, gl.bound - 1, t->texels, log2_size) != 0)
-    {
-        set_error(GL_OUT_OF_MEMORY);
-        t->loaded = 0;
+    texture_written(t, log2_size);
+}
+
+void lviv_gl_tex_image(GLsizei size, const uint32_t *texels)
+{
+    uint32_t log2_size;
+    texture_t *t = texture_memory(size, size, 0, texels, &log2_size);
+    if (!t)
         return;
-    }
-    t->loaded = 1;
-    t->log2_size = log2_size;
-    update_state();
+    memcpy(t->texels, texels, (size_t)4 << (2 * log2_size));
+    texture_written(t, log2_size);
 }

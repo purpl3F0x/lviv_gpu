@@ -150,6 +150,36 @@ gpu_status_t gpu_wait_idle(const gpu_t *gpu)
     return GPU_TIMEOUT;
 }
 
+// No frame on its way: the command processor and both DMAs not busy, then the core idle
+static gpu_status_t wait_not_rendering(const gpu_t *gpu)
+{
+    const uint32_t tile_dma_busy = AXI_TILE_DMA_REG_STATUS_BUSY_MASK | AXI_TILE_DMA_REG_STATUS_CLEAR_BUSY_MASK;
+    for (uint32_t polls = 0; polls < GPU_POLL_LIMIT; polls++)
+        if (!(cp_read_reg(gpu, CP_REG_STATUS) & CP_REG_STATUS_BUSY_MASK) &&
+            !(vis_dma_read_reg(gpu, AXI_VISIBILITY_DMA_REG_STATUS) & AXI_VISIBILITY_DMA_REG_STATUS_BUSY_MASK) &&
+            !(tile_dma_read_reg(gpu, AXI_TILE_DMA_REG_STATUS) & tile_dma_busy))
+            return gpu_wait_idle(gpu);
+    return GPU_TIMEOUT;
+}
+
+// The GPU not rendering
+static void flush_texture_caches(const gpu_t *gpu)
+{
+    for (int n = 0; n < GPU_THREADS; n++)
+        thread_write_reg(gpu, n, THREAD_REG_CACHE, THREAD_REG_CACHE_CACHE_FLUSH_MASK);
+    // CACHE_FLUSH crosses into the thread clock as a pulse that resets the cache, its lines invalid
+    // at the next edge, with nothing to read back: a few thread clocks, well within this.
+    usleep(1);
+}
+
+gpu_status_t gpu_flush_texture_caches(const gpu_t *gpu)
+{
+    const gpu_status_t status = wait_not_rendering(gpu);
+    if (status == GPU_OK)
+        flush_texture_caches(gpu);
+    return status;
+}
+
 uint32_t gpu_texel_index(uint32_t x, uint32_t y)
 {
     uint32_t index = 0;
@@ -166,10 +196,16 @@ int gpu_set_texture(const gpu_t *gpu, uint32_t id, const uint32_t *texels, uint3
     if (id >= GPU_TEXTURES || log2_size > GPU_TEXTURE_MAX_LOG2 || offset % bytes != 0 ||
         offset + bytes > GPU_TEXTURE_WINDOW_BYTES)
         return -1;
-    // The texture caches read it behind the CPU's caches.
+    // Not under a frame, which reads the texture table and the texture caches
+    if (wait_not_rendering(gpu) != GPU_OK)
+        return -1;
+    // The texture caches read it behind the CPU's caches,
     Xil_DCacheFlushRange((UINTPTR)texels, (INTPTR)bytes);
     lut_write_reg(gpu, GPU_LUT_BASE(id), (uint32_t)(offset / 4));
     lut_write_reg(gpu, GPU_LUT_SIZE(id), log2_size);
+    // and may still hold lines of what was there before: another texture's, or this one's older
+    // texels
+    flush_texture_caches(gpu);
     return 0;
 }
 

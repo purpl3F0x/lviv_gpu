@@ -2,12 +2,13 @@
 #
 # Include from its Makefile after setting BD_NAME, PART, BOARD_PART, RTL, BD_TCL and XDC, and for
 # the Vitis targets VITIS_APPS (the applications' names), for each application <app>
-# VITIS_APP_SRC_<app> (its source directories), VITIS_APP_INCLUDES_<app>,
+# VITIS_APP_SRC_<app> (its source directories, or single files), VITIS_APP_INCLUDES_<app>,
 # VITIS_APP_EXTERNAL_INCLUDES_<app> (libraries' include directories, such as git submodules: not
 # listed), VITIS_APP_LIBS_<app> (libraries it links, by name: m for libm) and VITIS_APP_LDFLAGS_<app>
-# (its linker flags, such as -Wl,--defsym,_HEAP_SIZE=<bytes> for its heap), and for all of them
+# (its linker flags, such as -Wl,--defsym,_HEAP_SIZE=<bytes> for its heap), for all of them
 # VITIS_APP_OPTIMIZATION (-O0 to -Os, -O2 if not set) and VITIS_APP_CFLAGS (other compiler flags,
-# for C and C++, which the link gets too).
+# for C and C++, which the link gets too), and VITIS_PATCHES (patches to libraries in git
+# submodules: <dir>.patch, a git diff in the submodule <dir>).
 #
 #   project     create the project in build/bd/<name>/ (once: edits made in the GUI stay in it;
 #               `make clean project` rebuilds it from BD_TCL)
@@ -19,15 +20,16 @@
 #   export_bd   write the block design, as it is now in the project, back to BD_TCL
 #   clean       delete the project and the logs
 #   vitis       the Vitis workspace build/vitis/<name>/: a platform from the XSA (made first when
-#               missing, a red warning when out of date; given the new one after `make xsa`) and
-#               the applications. Each builds its VITIS_APP_SRC_<app> where they are and lists
-#               their .c, .cpp, .h and .hpp files and the headers of its VITIS_APP_INCLUDES_<app>
-#               (again when one is added or removed); its include path is those and its
-#               VITIS_APP_EXTERNAL_INCLUDES_<app> (an empty one stops it: a submodule not checked
-#               out), it links its VITIS_APP_LIBS_<app> with its VITIS_APP_LDFLAGS_<app>, and it
-#               is compiled with
-#               VITIS_APP_OPTIMIZATION and VITIS_APP_CFLAGS, its C as C also next to C++ (all of it
-#               set again when the Makefile or vitis_workspace.py changes)
+#               missing, a red warning when out of date; given the new one after `make xsa`, its
+#               BSP's libraries again when vitis_workspace.py changes) and the applications, after
+#               VITIS_PATCHES (each applied once: not when it reverses cleanly). Each builds its
+#               VITIS_APP_SRC_<app> where they are and lists their .c, .cpp, .h and .hpp files and
+#               the headers of its VITIS_APP_INCLUDES_<app> (again when one is added or removed);
+#               its include path is those and its VITIS_APP_EXTERNAL_INCLUDES_<app> (an empty one
+#               stops it: a submodule not checked out), it links its VITIS_APP_LIBS_<app> with its
+#               VITIS_APP_LDFLAGS_<app>, and it is compiled with VITIS_APP_OPTIMIZATION and
+#               VITIS_APP_CFLAGS, its C as C also next to C++ (all of it set again when the
+#               Makefile or vitis_workspace.py changes)
 #   vitis_gui   vitis, then open the workspace in the Vitis IDE
 #   vitis_build vitis, then build the applications (<workspace>/<app>/build/<app>.elf);
 #               vitis_build_<app> one of them
@@ -113,7 +115,7 @@ VITIS_APP_OPTIMIZATION ?= -O2
 # up again.
 VITIS_APP_SETUP := $(abspath $(firstword $(MAKEFILE_LIST))) $(VIVADO_MK_DIR)/vitis_workspace.py
 # The directories application $(1)'s files are in, two levels down (include/generated/<Name>/): a
-# file added or removed in one makes it newer than its sources stamp.
+# file added or removed in one makes it newer than its sources stamp. A single file is itself.
 vitis_source_dirs = $(foreach d,$(abspath $(VITIS_APP_SRC_$(1)) $(VITIS_APP_INCLUDES_$(1))),\
                       $(d) $(patsubst %/,%,$(wildcard $(d)/*/ $(d)/*/*/)))
 VITIS_ARGS = $(REPO_ROOT)/build/vitis/$(BD_NAME)_args.json
@@ -121,6 +123,15 @@ VITIS_ARGS = $(REPO_ROOT)/build/vitis/$(BD_NAME)_args.json
 # otherwise left as `make xsa` last made them, matching the XSA.
 VITIS_HEADERS = $(filter %.h,$(SPINAL_DOCS))
 VITIS_MISSING_HEADERS = $(filter-out $(wildcard $(VITIS_HEADERS)),$(VITIS_HEADERS))
+
+# Patch $(1), <dir>.patch, applied to the git submodule <dir> unless it is already (it reverses
+# cleanly). One that does neither, the submodule moved on or the patch changed since, stops make:
+# git checkout . in the submodule, then make again.
+define VITIS_APPLY_PATCH
+$(if $(wildcard $(basename $(1))/*),,$(error $(basename $(1)) is empty: git submodule update --init))
+git -C $(basename $(1)) apply --reverse --check --quiet $(1) || git -C $(basename $(1)) apply $(1)
+
+endef
 
 # vitis -s loses the script's exit code on Windows: fail when the stage's file is not there.
 ifeq ($(OS),Windows_NT)
@@ -156,7 +167,7 @@ endef
 
 VITIS_RUN = $(file >$(VITIS_ARGS),$(VITIS_ARGS_JSON))cd $(VITIS_WS) && $(VITIS) -s $(VIVADO_MK_DIR)/vitis_workspace.py $(VITIS_ARGS)
 
-.PHONY: vitis vitis_gui vitis_build vitis_clean $(VITIS_APPS:%=vitis_build_%)
+.PHONY: vitis vitis_gui vitis_build vitis_clean vitis_patches $(VITIS_APPS:%=vitis_build_%)
 # One vitis run at a time: they share the workspace.
 .NOTPARALLEL: vitis vitis_gui vitis_build
 
@@ -189,13 +200,18 @@ $(VITIS_WS):
 
 vitis: $(VITIS_SOURCES_STAMPS)
 
-$(VITIS_STAMP): $(XSA) | $(VITIS_WS)
+$(VITIS_STAMP): $(XSA) $(VIVADO_MK_DIR)/vitis_workspace.py | $(VITIS_WS)
 	$(VITIS_RUN) workspace
 	$(call VITIS_CHECK,$@)
 
-# Application $(1)'s files listed (the generated headers first, so they are listed too), and built.
+# Checked every time: quick, and it is the submodules that say whether they are patched.
+vitis_patches:
+	$(foreach p,$(abspath $(VITIS_PATCHES)),$(call VITIS_APPLY_PATCH,$(p)))
+
+# Application $(1)'s files listed (the generated headers first, so they are listed too, and its
+# libraries patched), and built.
 define VITIS_APP_RULES
-$(call vitis_sources_stamp,$(1)): $(VITIS_STAMP) $(VITIS_APP_SETUP) $(call vitis_source_dirs,$(1)) | $(VITIS_MISSING_HEADERS)
+$(call vitis_sources_stamp,$(1)): $(VITIS_STAMP) $(VITIS_APP_SETUP) $(call vitis_source_dirs,$(1)) | $(VITIS_MISSING_HEADERS) vitis_patches
 	$$(foreach d,$$(VITIS_APP_EXTERNAL_INCLUDES_$(1)),$$(if $$(wildcard $$(d)/*),,$$(error $$(d) is empty: git submodule update --init)))
 	$$(VITIS_RUN) sources $(1)
 	$$(call VITIS_CHECK,$$@)

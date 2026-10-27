@@ -1,6 +1,12 @@
 [submodule "sdk/third_party/glm"]
 	path = sdk/third_party/glm
 	url = https://github.com/g-truc/glm.git
+[submodule "sdk/third_party/fastgltf"]
+	path = sdk/third_party/fastgltf
+	url = https://github.com/spnda/fastgltf
+[submodule "sdk/third_party/simdjson"]
+	path = sdk/third_party/simdjson
+	url = https://github.com/simdjson/simdjson
 [submodule "sdk/third_party/stb"]
 	path = sdk/third_party/stb
 	url = https://github.com/nothings/stb

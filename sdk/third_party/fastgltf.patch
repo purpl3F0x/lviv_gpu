@@ -1,0 +1,239 @@
+fastgltf v0.9.1 for gl_test on the A53's standalone BSP (sdk/gltf), applied by make vitis
+(VITIS_PATCHES, bd/gpu_test/Makefile).
+
+FASTGLTF_HAS_FILE_SYSTEM, 0 on bare metal: no loading by path (GltfDataBuffer::FromPath,
+GltfFileStream), no external buffers or images (Error::MissingExternalBuffer), no FileExporter.
+Their std::filesystem operations and file streams need system calls the BSP does not have (stat,
+mkdir, getcwd, ...): the program would not link.
+
+base64.cpp: the NEON decoder's vector types converted explicitly (vreinterpretq), for GCC, which
+does not convert them implicitly without -flax-vector-conversions. The same code, less one
+redundant AND.
+
+diff --git a/include/fastgltf/core.hpp b/include/fastgltf/core.hpp
+index f10788a..b6f0649 100644
+--- a/include/fastgltf/core.hpp
++++ b/include/fastgltf/core.hpp
+@@ -35,6 +35,18 @@
+ 
+ #include <fastgltf/types.hpp>
+ 
++// Whether there are files: std::filesystem's operations and the file streams, for loading by path
++// (GltfDataBuffer::FromPath, GltfFileStream), external buffers and images (without files,
++// Options::LoadExternalBuffers and LoadExternalImages give Error::MissingExternalBuffer) and the
++// FileExporter. Not on bare metal, whose C library has no file system calls.
++#ifndef FASTGLTF_HAS_FILE_SYSTEM
++#if defined(_WIN32) || defined(__unix__) || defined(__APPLE__)
++#define FASTGLTF_HAS_FILE_SYSTEM 1
++#else
++#define FASTGLTF_HAS_FILE_SYSTEM 0
++#endif
++#endif
++
+ #ifdef _MSC_VER
+ #pragma warning(push)
+ #pragma warning(disable : 5030) // attribute 'x' is not recognized
+@@ -620,7 +632,9 @@ namespace fastgltf {
+ 
+ 		void allocateAndCopy(const std::byte* bytes) noexcept;
+ 
++#if FASTGLTF_HAS_FILE_SYSTEM
+ 		explicit GltfDataBuffer(const std::filesystem::path& path) noexcept;
++#endif
+ 		explicit GltfDataBuffer(const std::byte* bytes, std::size_t count) noexcept;
+ #if FASTGLTF_CPP_20
+ 		explicit GltfDataBuffer(std::span<std::byte> span) noexcept;
+@@ -634,6 +648,7 @@ namespace fastgltf {
+ 		GltfDataBuffer& operator=(GltfDataBuffer&& other) noexcept = default;
+ 		~GltfDataBuffer() noexcept override = default;
+ 
++#if FASTGLTF_HAS_FILE_SYSTEM
+ 		static Expected<GltfDataBuffer> FromPath(const std::filesystem::path& path) noexcept {
+ 			GltfDataBuffer buffer(path);
+ 			if (buffer.error != Error::None) {
+@@ -641,6 +656,7 @@ namespace fastgltf {
+ 			}
+ 			return buffer;
+ 		}
++#endif
+ 
+ 		static Expected<GltfDataBuffer> FromBytes(const std::byte* bytes, std::size_t count) noexcept {
+ 			GltfDataBuffer buffer(bytes, count);
+@@ -733,6 +749,7 @@ namespace fastgltf {
+ 	};
+ #endif
+ 
++#if FASTGLTF_HAS_FILE_SYSTEM
+ 	FASTGLTF_EXPORT class GltfFileStream : public GltfDataGetter {
+ 		std::ifstream fileStream;
+ 		std::vector<std::ifstream::char_type> buf;
+@@ -755,6 +772,7 @@ namespace fastgltf {
+ 
+ 		[[nodiscard]] std::size_t totalSize() override;
+ 	};
++#endif
+ 
+ 	#if defined(__ANDROID__)
+ 	FASTGLTF_EXPORT void setAndroidAssetManager(AAssetManager* assetManager) noexcept;
+@@ -1053,6 +1071,7 @@ namespace fastgltf {
+ 		Expected<ExportResult<std::vector<std::byte>>> writeGltfBinary(const Asset& asset, ExportOptions options = ExportOptions::None);
+ 	};
+ 
++#if FASTGLTF_HAS_FILE_SYSTEM
+ 	/**
+ 	 * A exporter for serializing one or more glTF files into JSON and GLB forms.
+ 	 * This exporter builds upon Exporter by writing all files automatically to the
+@@ -1082,6 +1101,7 @@ namespace fastgltf {
+ 		 */
+ 		Error writeGltfBinary(const Asset& asset, const std::filesystem::path& target, ExportOptions options = ExportOptions::None);
+ 	};
++#endif
+ } // namespace fastgltf
+ 
+ #ifdef _MSC_VER
+diff --git a/src/base64.cpp b/src/base64.cpp
+index f2179bf..37e6e84 100644
+--- a/src/base64.cpp
++++ b/src/base64.cpp
+@@ -277,27 +277,27 @@ FASTGLTF_FORCEINLINE int8x16_t neon_lookup_pshufb_bitmask(const uint8x16_t input
+ 	};
+ 	// clang-fomat on
+ 
+-	const uint64x2_t higher_nibble = vandq_s32(vshlq_u32(vreinterpretq_u32_u8(input), vdupq_n_s32(-4)), vdupq_n_s8(0x0f));
++	const uint8x16_t higher_nibble = vandq_u8(vreinterpretq_u8_u32(vshlq_u32(vreinterpretq_u32_u8(input), vdupq_n_s32(-4))), vdupq_n_u8(0x0f));
+ 
+ 	const int8x16_t shiftLUT = vld1q_s8(shiftLUTdata.data());
+ 
+ 	const int8x16_t sh = vqtbl1q_s8(shiftLUT, vandq_u8(higher_nibble, vdupq_n_u8(0x8F)));
+-	const uint8x16_t eq_2f = vceqq_s8(input, vdupq_n_s8(0x2F));
+-	const uint8x16_t shift = vbslq_u8(vshrq_n_s8(eq_2f, 7), vdupq_n_s8(16), sh);
++	const uint8x16_t eq_2f = vceqq_u8(input, vdupq_n_u8(0x2F));
++	const uint8x16_t shift = vbslq_u8(eq_2f, vdupq_n_u8(16), vreinterpretq_u8_s8(sh));
+ 
+-	return vaddq_s8(input, shift);
++	return vreinterpretq_s8_u8(vaddq_u8(input, shift));
+ }
+ 
+-FASTGLTF_FORCEINLINE int16x8_t neon_pack_ints(const int8x16_t input) {
+-	const uint32x4_t mask = vdupq_n_u32(0x01400140);
++FASTGLTF_FORCEINLINE int32x4_t neon_pack_ints(const int8x16_t input) {
++	const int8x16_t mask = vreinterpretq_s8_u32(vdupq_n_u32(0x01400140));
+ 
+-	const int16x8_t tl = vmulq_s16(vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(input))), vmovl_s8(vget_low_s8(mask)));
+-	const int16x8_t th = vmulq_s16(vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(input))), vmovl_s8(vget_high_s8(mask)));
++	const int16x8_t tl = vmulq_s16(vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(vreinterpretq_u8_s8(input)))), vmovl_s8(vget_low_s8(mask)));
++	const int16x8_t th = vmulq_s16(vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(vreinterpretq_u8_s8(input)))), vmovl_s8(vget_high_s8(mask)));
+ 	const int16x8_t merge = vqaddq_s16(vuzp1q_s16(tl, th), vuzp2q_s16(tl, th));
+ 
+ 	// Multiply the 8 signed 16-bit integers from a and b and add the n and n + 1 results together,
+ 	// resulting in 4 32-bit integers.
+-	const uint32x4_t mergeMask = vdupq_n_u32(0x00011000);
++	const int16x8_t mergeMask = vreinterpretq_s16_u32(vdupq_n_u32(0x00011000));
+ 	const int32x4_t pl = vmull_s16(vget_low_s16(merge), vget_low_s16(mergeMask));
+ 	const int32x4_t ph = vmull_high_s16(merge, mergeMask);
+ 	return vpaddq_s32(pl, ph);
+@@ -339,7 +339,7 @@ void fg::base64::neon_decode_inplace(std::string_view encoded, std::uint8_t* out
+ 		const auto merged = neon_pack_ints(values);
+ 
+ 		const auto masked = vandq_u8(shuffle, vdupq_n_u8(0x8F));
+-		const auto shuffled = vqtbl1q_s8(merged, masked);
++		const auto shuffled = vqtbl1q_u8(vreinterpretq_u8_s32(merged), masked);
+ 
+ 		// Store 16 8-bit values into output pointer
+ 		vst1q_u8(out, shuffled);
+diff --git a/src/fastgltf.cpp b/src/fastgltf.cpp
+index 7e22331..962b35c 100644
+--- a/src/fastgltf.cpp
++++ b/src/fastgltf.cpp
+@@ -4943,7 +4943,7 @@ fg::Expected<fg::Asset> fg::Parser::loadGltfJson(GltfDataGetter& data, fs::path
+ 	options = _options;
+ 	directory = std::move(_directory);
+ 
+-#if !defined(__ANDROID__)
++#if !defined(__ANDROID__) && FASTGLTF_HAS_FILE_SYSTEM
+ 	// If we never have to load the files ourselves, we're fine with the directory being invalid/blank.
+ 	if (std::error_code ec; hasBit(_options, Options::LoadExternalBuffers) && (!fs::is_directory(directory, ec) || ec)) {
+ 		return Error::InvalidPath;
+@@ -4969,10 +4969,12 @@ fg::Expected<fg::Asset> fg::Parser::loadGltfBinary(GltfDataGetter& data, fs::pat
+ 	options = _options;
+ 	directory = std::move(_directory);
+ 
++#if FASTGLTF_HAS_FILE_SYSTEM
+ 	// If we never have to load the files ourselves, we're fine with the directory being invalid/blank.
+ 	if (std::error_code ec; hasBit(options, Options::LoadExternalBuffers) && (!fs::is_directory(directory, ec) || ec)) {
+ 		return Error::InvalidPath;
+ 	}
++#endif
+ 
+ 	data.reset();
+ 
+@@ -7305,6 +7307,7 @@ fg::Expected<fg::ExportResult<std::vector<std::byte>>> fg::Exporter::writeGltfBi
+ 	return result;
+ }
+ 
++#if FASTGLTF_HAS_FILE_SYSTEM
+ namespace fastgltf {
+ 	std::error_code prepareDir(const fs::path& directory) {
+ 		std::error_code ec;
+@@ -7427,6 +7430,7 @@ fg::Error fg::FileExporter::writeGltfBinary(const Asset& asset, const fs::path&
+ 	}
+ 	return Error::None;
+ }
++#endif
+ #pragma endregion
+ 
+ #ifdef _MSC_VER
+diff --git a/src/io.cpp b/src/io.cpp
+index 40a7eb1..efbd06b 100644
+--- a/src/io.cpp
++++ b/src/io.cpp
+@@ -42,6 +42,7 @@ namespace fs = std::filesystem;
+ namespace fg = fastgltf;
+ 
+ #pragma region glTF file loading
++#if FASTGLTF_HAS_FILE_SYSTEM
+ fg::GltfDataBuffer::GltfDataBuffer(const fs::path& path) noexcept {
+ 	std::error_code ec;
+ 	dataSize = static_cast<std::streamsize>(fs::file_size(path, ec));
+@@ -68,6 +69,7 @@ fg::GltfDataBuffer::GltfDataBuffer(const fs::path& path) noexcept {
+ 		error = Error::FileBufferAllocationFailed;
+ 	}
+ }
++#endif
+ 
+ fg::GltfDataBuffer::GltfDataBuffer(const std::byte *bytes, const std::size_t count) noexcept {
+ 	assert(bytes != nullptr && "Passing nullptr is not allowed.");
+@@ -118,6 +120,7 @@ std::size_t fg::GltfDataBuffer::totalSize() {
+ 	return dataSize;
+ }
+ 
++#if FASTGLTF_HAS_FILE_SYSTEM
+ fg::GltfFileStream::GltfFileStream(const fs::path& path) : fileStream(path, std::ios::binary) {
+ 	fileSize = fs::file_size(path);
+ }
+@@ -154,6 +157,7 @@ std::size_t fg::GltfFileStream::bytesRead() {
+ std::size_t fg::GltfFileStream::totalSize() {
+ 	return fileSize;
+ }
++#endif
+ 
+ #if defined(FASTGLTF_HAS_MEMORY_MAPPED_FILE)
+ #if defined(_WIN32)
+@@ -405,6 +409,10 @@ fg::Expected<fg::DataSource> fg::Parser::loadFileFromApk(const fs::path& path) c
+ #endif
+ 
+ fg::Expected<fg::DataSource> fg::Parser::loadFileFromUri(URIView& uri) const noexcept {
++#if !FASTGLTF_HAS_FILE_SYSTEM
++	(void)uri;
++	return Error::MissingExternalBuffer; // No files to load it from
++#else
+ 	URI decodedUri(uri.path()); // Re-allocate so we can decode potential characters.
+ 	// JSON strings are always in UTF-8, so we can safely always use u8path here.
+ 	// Since u8path is deprecated with C++20 and newer, u8path is deprecated.
+@@ -465,5 +473,6 @@ fg::Expected<fg::DataSource> fg::Parser::loadFileFromUri(URIView& uri) const noe
+ 		std::move(data),
+ 	};
+ 	return { std::move(arraySource) };
++#endif
+ }
+ #pragma endregion

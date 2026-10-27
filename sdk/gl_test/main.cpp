@@ -1,26 +1,33 @@
 // Demo of lviv_gl (sdk/lviv_gl) on gpu_top's raster core on the ZCU104 (bd/gpu_test), on the A53
-// (standalone), driven from the UART console: a model drawn with OpenGL 1.x calls.
+// (standalone), driven from the UART console: a model from a glTF file on the SD card (sdk/gltf),
+// with its camera and lights, drawn with OpenGL 1.x calls. At start-up, suzanne.gltf (sdk/sdcard),
+// if the card has it.
 //
 // Keys:
 //   1, 2  who draws it: 1 the CPU, tile by tile; 2 the command processor, in one START
 //   s     the model turning, or still again
 //   r     drawing again, after a frame that failed
+//   l     the glTF models (.gltf, .glb) on the SD card, numbered
+//   o     another model: its number in l's list, then Enter
 //   ?     the keys
 //
 // Output goes to the PS UART.
 
 #include <cmath>
 #include <cstdint>
-
-#include <glm/glm.hpp>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <strings.h> // strcasecmp
 
 #include "board.h"
 #include "bspconfig.h" // STDIN_BASEADDRESS
 #include "dp.h"
+#include "gltf_scene.h"
 #include "gpu.h"
 #include "gpu_map.h"
 #include "lviv_gl.h"
-#include "models/suzanne.h"
+#include "sd.h"
 #include "xil_mmu.h"
 #include "xil_printf.h"
 #include "xiltimer.h" // XTime_GetTime, COUNTS_PER_SECOND
@@ -70,11 +77,15 @@ static int back;     // the frame buffer not on the screen
 static bool drawing; // a frame after another
 static gpu_mode_t mode = GPU_MODE_CPU;
 
-// The camera (raster_sw's: the model's bounding box, looked at from 1.5 spans along +z), the
-// model's turn (degrees) and whether it turns
-static glm::vec3 center, eye;
+// The model, from the SD card (none: nothing drawn), its file's name; its turn (degrees) and
+// whether it turns
+static gltf_scene_t *scene;
+static char scene_name[64];
 static float angle;
 static bool turning;
+
+// The model drawn from the start, if the card has it (none otherwise, until o opens one)
+static const char start_model[] = "0:/suzanne.gltf";
 
 // Since the last report, from period_start: the frames drawn, the sum of their times (us) and of
 // their squares, of the front end's times (us) and of the command processor's cycle counts.
@@ -103,78 +114,27 @@ static void show_back(void)
     back ^= 1;
 }
 
-// lviv_gl's state, once: the camera's projection, the light (in eye space: set with the identity
-// modelview), the material, the depth test, back faces culled, the model's arrays.
-static int setup_scene(void)
-{
-    glm::vec3 lo(1e9f), hi(-1e9f);
-    for (int i = 0; i < SUZANNE_VERTICES; i++)
-    {
-        const glm::vec3 p(suzanne_positions[i][0], suzanne_positions[i][1], suzanne_positions[i][2]);
-        lo = glm::min(lo, p);
-        hi = glm::max(hi, p);
-    }
-    const glm::vec3 size = hi - lo;
-    center = (lo + hi) * 0.5f;
-    eye = center + glm::vec3(0.0f, 0.0f, glm::max(size.x, glm::max(size.y, size.z)) * 1.5f);
-
-    if (lviv_gl_init(&gpu, WIDTH, HEIGHT, lviv_frame_start, lviv_frame_bytes()) != 0)
-        return -1;
-    glViewport(0, 0, WIDTH, HEIGHT);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(45.0, (double)WIDTH / HEIGHT, 0.1, 1000.0);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    const GLfloat light_position[] = {1, 1, 1, 0}, light_ambient[] = {0.1f, 0.1f, 0.1f, 1}, white[] = {1, 1, 1, 1};
-    const GLfloat material_ambient[] = {0.5f, 0.5f, 0.5f, 1};
-    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
-    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, white);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, white);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, material_ambient);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, white);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
-    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 32.0f);
-    glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    glEnable(GL_CULL_FACE);
-    glClearColor(0x63 / 255.0f, 0x63 / 255.0f, 0x63 / 255.0f, 1.0f); // raster_sw's
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glEnableClientState(GL_NORMAL_ARRAY);
-    glEnableClientState(GL_COLOR_ARRAY);
-    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-    glVertexPointer(3, GL_FLOAT, 0, suzanne_positions);
-    glNormalPointer(GL_FLOAT, 0, suzanne_normals);
-    glColorPointer(4, GL_UNSIGNED_BYTE, 0, suzanne_colors);
-    glTexCoordPointer(2, GL_FLOAT, 0, suzanne_texcoords);
-    return glGetError() == GL_NO_ERROR ? 0 : -1;
-}
-
 // A frame of the model, turned by angle about its vertical axis, for lviv_gl_frame
 static void draw_scene(void)
 {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glLoadIdentity();
-    gluLookAt(eye.x, eye.y, eye.z, center.x, center.y, center.z, 0, 1, 0);
-    glTranslatef(center.x, center.y, center.z);
-    glRotatef(angle, 0, 1, 0);
-    glTranslatef(-center.x, -center.y, -center.z);
-    glDrawArrays(GL_TRIANGLES, 0, SUZANNE_VERTICES);
+    gltf_scene_draw(scene, angle);
     if (turning)
         angle = angle >= 359.0f ? 0.0f : angle + 1.0f;
 }
 
-// The frames from now on drawn by mode.
+// The frames from now on drawn by mode, once there is a model.
 static void start_drawing(void)
 {
+    if (!scene)
+    {
+        xil_printf("no model: l lists the SD card's, o opens one\r\n");
+        return;
+    }
     gpu_set_mode(&gpu, mode);
     drawing = true;
     frames_drawn = frame_us = frame_us2 = front_us = cp_cycles = 0;
     XTime_GetTime(&period_start);
-    xil_printf("%s, suzanne\r\n", mode_name());
+    xil_printf("%s, %s\r\n", mode_name(), scene_name);
 }
 
 // One frame, drawn and shown, and once a second a report; drawing stops at one that fails.
@@ -189,7 +149,8 @@ static void draw_frame(void)
     XTime_GetTime(&end);
     if (status != GPU_OK)
     {
-        xil_printf("%s, suzanne: failed at tile %d: %s\r\n", mode_name(), (int)failed_tile, gpu_status_name(status));
+        xil_printf("%s, %s: failed at tile %d: %s\r\n", mode_name(), scene_name, (int)failed_tile,
+                   gpu_status_name(status));
         drawing = false;
         return;
     }
@@ -210,8 +171,8 @@ static void draw_frame(void)
         const int rate10 = (int)(n * 10 * COUNTS_PER_SECOND / (now - period_start));
         // n * (sum of squares) - sum^2 is n^2 times the variance, never negative.
         const double deviation = std::sqrt((double)(n * frame_us2 - frame_us * frame_us)) / (double)n;
-        xil_printf("%s, suzanne: %d.%d frames/s, frame time %d \u00b1 %d us, front end %d us, %d triangles",
-                   mode_name(), rate10 / 10, rate10 % 10, (int)(frame_us / n), (int)deviation, (int)(front_us / n),
+        xil_printf("%s, %s: %d.%d frames/s, frame time %d \u00b1 %d us, front end %d us, %d triangles", mode_name(),
+                   scene_name, rate10 / 10, rate10 % 10, (int)(frame_us / n), (int)deviation, (int)(front_us / n),
                    (int)lviv_gl_triangles());
         if (mode == GPU_MODE_CP)
             xil_printf(" (CP cycle counter: %d)", (int)(cp_cycles / n));
@@ -223,7 +184,8 @@ static void draw_frame(void)
 
 static void print_keys(void)
 {
-    xil_printf("keys: 1 CPU, 2 command processor; s turn the model or stop it; r draw again; ? keys\r\n");
+    xil_printf("keys: 1 CPU, 2 command processor; s turn the model or stop it; r draw again; l SD card; "
+               "o open a model; ? keys\r\n");
 }
 
 // A key from the UART console, or -1 if there is none.
@@ -232,6 +194,111 @@ static int read_key(void)
     if (!XUartPs_IsReceiveData(STDIN_BASEADDRESS))
         return -1;
     return (int)(XUartPs_ReadReg(STDIN_BASEADDRESS, XUARTPS_FIFO_OFFSET) & 0xFF);
+}
+
+// A number typed at the console, echoed, up to Enter; -1 for none, or Esc
+static int read_number(void)
+{
+    int n = -1;
+    for (;;)
+    {
+        const int key = read_key();
+        if (key >= '0' && key <= '9' && n < 100000)
+        {
+            n = (n < 0 ? 0 : n * 10) + (key - '0');
+            xil_printf("%c", key);
+        }
+        else if ((key == '\b' || key == 0x7f) && n >= 0)
+        {
+            n = n >= 10 ? n / 10 : -1;
+            xil_printf("\b \b");
+        }
+        else if (key == '\r' || key == '\n' || key == 0x1b)
+        {
+            xil_printf("\r\n");
+            return key == 0x1b ? -1 : n;
+        }
+    }
+}
+
+// The glTF files (.gltf, .glb) in the SD card's root, numbered from 1 in the directory's order, for
+// l (wanted 0: printed) and o (the path of the one wanted, in path; none found, empty)
+struct sd_listing
+{
+    int wanted;
+    int models; // the glTF files so far
+    char path[300];
+};
+
+static void list_entry(const sd_entry_t *entry, void *user)
+{
+    sd_listing &l = *static_cast<sd_listing *>(user);
+    const char *dot = std::strrchr(entry->name, '.');
+    if (entry->directory || !dot || (strcasecmp(dot, ".gltf") != 0 && strcasecmp(dot, ".glb") != 0))
+        return;
+    l.models++;
+    if (l.wanted == 0)
+        xil_printf("  %4d  %s  %u bytes\r\n", l.models, entry->name, (unsigned)entry->size);
+    else if (l.models == l.wanted)
+        std::snprintf(l.path, sizeof l.path, "0:/%s", entry->name);
+}
+
+// The SD card's glTF file at path ("0:/...") drawn from then on, from the front, by mode. The model
+// so far stays if it does not load; with missing_ok, quietly when there is no such file.
+static void load_model(const char *path, bool missing_ok)
+{
+    XTime start, read, parsed;
+    XTime_GetTime(&start);
+    void *data;
+    size_t size;
+    const int error = sd_read(path, &data, &size, GLTF_SCENE_PADDING);
+    if (error != 0)
+    {
+        if (!missing_ok || error != SD_NO_FILE)
+            xil_printf("%s: %s\r\n", path, sd_error_name(error));
+        return;
+    }
+    XTime_GetTime(&read);
+    char message[128];
+    gltf_scene_t *loaded = gltf_scene_load(data, size, message, sizeof message);
+    free(data);
+    XTime_GetTime(&parsed);
+    if (!loaded)
+    {
+        xil_printf("%s: %s\r\n", path, message);
+        return;
+    }
+    gltf_scene_free(scene);
+    scene = loaded;
+    std::snprintf(scene_name, sizeof scene_name, "%s", path + 3);
+    gltf_scene_setup(scene, WIDTH, HEIGHT);
+    xil_printf("model: %s, %d triangles, %d texture%s, %d light%s, %s camera; %u bytes read in %d ms, parsed in %d "
+               "ms\r\n",
+               scene_name, gltf_scene_triangles(scene), gltf_scene_textures(scene),
+               gltf_scene_textures(scene) == 1 ? "" : "s", gltf_scene_lights(scene),
+               gltf_scene_lights(scene) == 1 ? "" : "s", gltf_scene_has_camera(scene) ? "its" : "the default",
+               (unsigned)size, (int)((read - start) / (COUNTS_PER_SECOND / 1000)),
+               (int)((parsed - read) / (COUNTS_PER_SECOND / 1000)));
+    angle = 0;
+    start_drawing();
+}
+
+// The SD card's glTF file n (l's numbers), as load_model
+static void open_model(int n)
+{
+    sd_listing l = {n, 0, ""};
+    const int error = sd_scan("0:/", list_entry, &l);
+    if (error != 0)
+    {
+        xil_printf("SD card: %s\r\n", sd_error_name(error));
+        return;
+    }
+    if (l.path[0] == '\0')
+    {
+        xil_printf("model: no glTF file %d on the SD card, of %d\r\n", n, l.models);
+        return;
+    }
+    load_model(l.path, false);
 }
 
 int main(void)
@@ -247,14 +314,14 @@ int main(void)
          block += MMU_BLOCK)
         Xil_SetTlbAttributes(block, NORM_NONCACHE); // also writes back what the cache held of it
 
-    if (setup_scene() != 0)
+    if (lviv_gl_init(&gpu, WIDTH, HEIGHT, lviv_frame_start, lviv_frame_bytes()) != 0)
     {
         xil_printf("lviv_gl: setup failed\r\n");
         return 1;
     }
+    glClearColor(0x63 / 255.0f, 0x63 / 255.0f, 0x63 / 255.0f, 1.0f); // raster_sw's
     xil_printf("lviv_gl: frame memory at 0x%x, %d MiB: %d triangles a frame\r\n", (int)(uintptr_t)lviv_frame_start,
                (int)(lviv_frame_bytes() >> 20), (int)(lviv_frame_bytes() / LVIV_GL_TRIANGLE_BYTES));
-    xil_printf("model: suzanne, %d triangles\r\n", SUZANNE_VERTICES / 3);
 
     // Black (the frame buffers start zeroed) until the first frame is shown
     if (dp_init(&gic, frames[back], STRIDE) != 0)
@@ -265,7 +332,7 @@ int main(void)
     back ^= 1;
     xil_printf("DisplayPort: %d x %d at 60 Hz; plug in or pull a monitor\r\n", DP_WIDTH, DP_HEIGHT);
     print_keys();
-    start_drawing();
+    load_model(start_model, true);
 
     for (;;)
     {
@@ -286,6 +353,23 @@ int main(void)
         case 'r':
             start_drawing();
             break;
+        case 'l': {
+            xil_printf("glTF files on the SD card, 0:/ (o and a number to draw one)\r\n");
+            sd_listing l = {0, 0, ""};
+            const int error = sd_scan("0:/", list_entry, &l);
+            if (error != 0)
+                xil_printf("SD card: %s\r\n", sd_error_name(error));
+            else if (l.models == 0)
+                xil_printf("  none\r\n");
+            break;
+        }
+        case 'o': {
+            xil_printf("model (its number in l's list, Enter): ");
+            const int n = read_number();
+            if (n >= 0)
+                open_model(n);
+            break;
+        }
         case '?':
             print_keys();
             break;

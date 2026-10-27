@@ -10,7 +10,8 @@
 //   - eight lights (GL_LIGHT0 to GL_LIGHT7), fixed-function lighting per vertex: their colors and
 //     positions, no attenuation or spotlights; no GL_COLOR_MATERIAL
 //   - textures square, a power of two up to 2048, GL_RGBA, GL_RGB or GL_BGRA of GL_UNSIGNED_BYTE;
-//     the filters are the GPU's (glTexParameter takes the wrap modes only)
+//     the filters are the GPU's (glTexParameter takes the wrap modes only); 128 of them, one after
+//     another in 4 MiB (LVIV_GL_TEXTURE_BYTES), which glDeleteTextures gives back from the end
 //   - no depth mask, stencil, scissor, alpha test or fog; one frame size, at most 64 tiles of 128
 //     x 128 pixels (1280 x 720: 60)
 // A frame is everything drawn since the last glClear (which clears color and depth together, as
@@ -180,6 +181,10 @@ int lviv_gl_init(gpu_t *gpu, int width, int height, void *frame_memory, size_t f
 gpu_status_t lviv_gl_frame(uint32_t *target, uint32_t stride, uint32_t *failed_tile);
 // The triangles the last frame sent to the GPU (after clipping, culling and binning).
 uint32_t lviv_gl_triangles(void);
+// glTexImage2D for the bound texture with the GPU's own texels, copied as they are: size x size
+// words a << 24 | r << 16 | g << 8 | b, in Morton order (gpu_texel_index), row 0 at t = 0; size a
+// power of two up to 2048. The errors are glTexImage2D's.
+void lviv_gl_tex_image(GLsizei size, const uint32_t *texels);
 
 GLenum glGetError(void);
 void glEnable(GLenum cap);
@@ -241,6 +246,7 @@ void glBlendFunc(GLenum sfactor, GLenum dfactor);
 void glTexEnvi(GLenum target, GLenum pname, GLint param);
 
 void glGenTextures(GLsizei n, GLuint *textures);
+void glDeleteTextures(GLsizei n, const GLuint *textures);
 void glBindTexture(GLenum target, GLuint texture);
 void glTexParameteri(GLenum target, GLenum pname, GLint param);
 void glTexImage2D(GLenum target, GLint level, GLint internal_format, GLsizei width, GLsizei height, GLint border,

@@ -113,10 +113,17 @@ gpu_status_t gpu_clear_frame_buffers(const gpu_t *gpu, uint32_t color);
 
 // Texture id (a triangle's tex_id): 1 << log2_size texels square, ARGB, in Morton order (bit 2i of
 // a texel's index is bit i of its x, bit 2i + 1 bit i of its y: gpu_texel_index), at a multiple of
-// their own size in bytes, inside the texture window (gpu_map.h). Flushes them from the data
-// cache. Returns 0, or -1 if the GPU cannot use them where they are.
+// their own size in bytes, inside the texture window (gpu_map.h). Waits until the GPU is not
+// rendering a frame, then flushes the texels from the data cache and the texture caches
+// (gpu_flush_texture_caches). Returns 0, or -1 if the GPU cannot use them where they are or does
+// not stop rendering.
 int gpu_set_texture(const gpu_t *gpu, uint32_t id, const uint32_t *texels, uint32_t log2_size);
 uint32_t gpu_texel_index(uint32_t x, uint32_t y);
+// Every thread's texture cache flushed (THREAD_REG_CACHE's CACHE_FLUSH), so that it holds no texels
+// from before, once no frame is on its way: the command processor and both DMAs not busy, the core
+// idle (gpu_wait_idle). The flush resets the cache, which would break a line fill under way.
+// GPU_TIMEOUT if the GPU stays busy.
+gpu_status_t gpu_flush_texture_caches(const gpu_t *gpu);
 
 // One tile, each step on its own (GPU_MODE_CPU).
 gpu_status_t gpu_clear_zbuffers(const gpu_t *gpu); // every thread's back to 1.0, the far plane

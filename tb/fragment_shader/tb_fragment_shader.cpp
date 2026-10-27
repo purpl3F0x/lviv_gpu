@@ -1,4 +1,4 @@
-#include "../common/raster_types.h"
+#include "../../dv/common/raster_types.h"
 #include <algorithm>
 #include <iostream>
 

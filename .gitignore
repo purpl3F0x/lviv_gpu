@@ -1,4 +1,5 @@
 *.vcd
+*.surf.ron
 tb_sim*
 *.d
 *.o

@@ -33,8 +33,7 @@ Bare-metal software for the GPU on the ZCU104 (A53, standalone BSP), for `bd/gpu
   (C++ on GLM, behind the C interface of `lviv_geom.h`) the matrices of GL's matrix calls and
   the vertex transform, lighting, clipping and tile binning, ported from `dv/raster_sw`, into
   the driver's frame data. A frame is what is drawn after `glClear`; `lviv_gl_frame` renders it
-  (the application keeps the display). `dv/lviv_gl_test` checks it on the host against
-  raster_sw.
+  (the application keeps the display).
 - `gltf/`: glTF 2.0 scenes for lviv_gl (`gltf_scene.h`, C++ on fastgltf behind a C interface),
   from a `.glb` or a `.gltf` with its buffers embedded, in memory: the triangle meshes, their
   metallic-roughness materials as GL's fixed-function ones with their base color textures
@@ -43,7 +42,8 @@ Bare-metal software for the GPU on the ZCU104 (A53, standalone BSP), for `bd/gpu
   texels (ARGB in Morton order), copied from the file where `scripts/gltf_swizzle.py` put them,
   else its PNG or JPEG (in the file, not one of its own) decoded by stb_image (`stb_image.c`,
   NEON on the A53), at most 512 x 512, and swizzled; the largest are halved until all fit
-  lviv_gl's 4 MiB. `dv/lviv_gl_test` draws a scene on the host as `gl_test` does.
+  lviv_gl's 4 MiB. `dv/lviv_gl_test` draws a scene on the host as `gl_test` does, its frames
+  drawn and timed by the CPU (`sw_raster.c`: AVX2, or NEON on the A53) to compare with the GPU.
 - `third_party/`: git submodules (after a clone, `git submodule update --init`, or clone with
   `--recursive`): GLM 1.0.3; fastgltf v0.9.1 and simdjson v4.6.11, its JSON parser, which
   `fastgltf.patch` and `simdjson.patch` make build for the standalone BSP (no file system there;

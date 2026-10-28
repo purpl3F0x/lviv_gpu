@@ -7,11 +7,11 @@
 // limits:
 //   - triangles only: GL_TRIANGLES, _STRIP, _FAN, GL_QUADS, GL_QUAD_STRIP, GL_POLYGON (no points,
 //     lines or polygon modes)
-//   - eight lights (GL_LIGHT0 to GL_LIGHT7), fixed-function lighting per vertex: their colors and
-//     positions, no attenuation or spotlights; no GL_COLOR_MATERIAL
+//   - eight lights (GL_LIGHT0 to GL_LIGHT7), fixed-function lighting per vertex: their colors,
+//     positions, attenuation and spotlights; no GL_COLOR_MATERIAL
 //   - textures square, a power of two up to 2048, GL_RGBA, GL_RGB or GL_BGRA of GL_UNSIGNED_BYTE;
 //     the filters are the GPU's (glTexParameter takes the wrap modes only); 128 of them, one after
-//     another in 4 MiB (LVIV_GL_TEXTURE_BYTES), which glDeleteTextures gives back from the end
+//     another in 32 MiB (LVIV_GL_TEXTURE_BYTES), which glDeleteTextures gives back from the end
 //   - no depth mask, stencil, scissor, alpha test or fog; one frame size, at most 64 tiles of 128
 //     x 128 pixels (1280 x 720: 60)
 // A frame is everything drawn since the last glClear (which clears color and depth together, as
@@ -125,6 +125,12 @@ typedef void GLvoid;
 #define GL_DIFFUSE 0x1201
 #define GL_SPECULAR 0x1202
 #define GL_POSITION 0x1203
+#define GL_SPOT_DIRECTION 0x1204
+#define GL_SPOT_EXPONENT 0x1205
+#define GL_SPOT_CUTOFF 0x1206
+#define GL_CONSTANT_ATTENUATION 0x1207
+#define GL_LINEAR_ATTENUATION 0x1208
+#define GL_QUADRATIC_ATTENUATION 0x1209
 #define GL_EMISSION 0x1600
 #define GL_SHININESS 0x1601
 #define GL_AMBIENT_AND_DIFFUSE 0x1602
@@ -234,6 +240,7 @@ void glTexCoordPointer(GLint size, GLenum type, GLsizei stride, const GLvoid *po
 void glDrawArrays(GLenum mode, GLint first, GLsizei count);
 void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices);
 
+void glLightf(GLenum light, GLenum pname, GLfloat param);
 void glLightfv(GLenum light, GLenum pname, const GLfloat *params);
 void glLightModelfv(GLenum pname, const GLfloat *params);
 void glMaterialfv(GLenum face, GLenum pname, const GLfloat *params);

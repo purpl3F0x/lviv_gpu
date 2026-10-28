@@ -167,7 +167,8 @@ static float clamp01(float x)
 }
 
 // GL 1.x's fixed-function lighting of one vertex, in eye space: the emission and the global ambient,
-// then each light that is on adds its ambient, diffuse and specular terms
+// then each light that is on adds its ambient, diffuse and specular terms, a positional light's
+// scaled by its attenuation and its spotlight
 static uint32_t light(const transforms_t &x, const lviv_state_t &s, const lviv_vertex_t &v)
 {
     const glm::vec3 eye(x.modelview * glm::vec4(to_glm(v.position), 1.0f));
@@ -180,16 +181,31 @@ static uint32_t light(const transforms_t &x, const lviv_state_t &s, const lviv_v
     {
         const lviv_light_t &l = s.lights[i];
         const glm::vec3 lpos(to_glm(l.position));
-        const glm::vec3 to_light = unit(l.position.w == 0.0f ? lpos : lpos - eye);
+        const bool positional = l.position.w != 0.0f;
+        const glm::vec3 to_light = unit(positional ? lpos - eye : lpos);
         const glm::vec3 half = unit(to_light + to_eye);
+
+        // By the distance, and outside its spotlight's cone none: (cos of the angle from its
+        // direction)^exponent inside
+        float scale = 1.0f;
+        if (positional)
+        {
+            const float d = glm::length(lpos - eye);
+            scale = 1.0f / (l.constant_attenuation + l.linear_attenuation * d + l.quadratic_attenuation * d * d);
+            if (l.spot_cutoff != 180.0f)
+            {
+                const float spot = glm::dot(-to_light, to_glm(l.spot_direction));
+                scale *= spot < l.spot_cos_cutoff ? 0.0f : std::pow(spot, l.spot_exponent);
+            }
+        }
 
         const float n_dot_l = std::fmax(0.0f, glm::dot(n, to_light));
         const float n_dot_h = std::fmax(0.0f, glm::dot(n, half));
 
-        c += to_glm(m.ambient) * to_glm(l.ambient);
-        c += to_glm(m.diffuse) * to_glm(l.diffuse) * n_dot_l;
+        glm::vec3 lit = to_glm(m.ambient) * to_glm(l.ambient) + to_glm(m.diffuse) * to_glm(l.diffuse) * n_dot_l;
         if (n_dot_l > 0.0f && m.shininess > 0.0f)
-            c += to_glm(m.specular) * to_glm(l.specular) * std::pow(n_dot_h, m.shininess);
+            lit += to_glm(m.specular) * to_glm(l.specular) * std::pow(n_dot_h, m.shininess);
+        c += scale * lit;
     }
     const uint32_t r = (uint8_t)(clamp01(c.x) * 255.0f);
     const uint32_t gr = (uint8_t)(clamp01(c.y) * 255.0f);

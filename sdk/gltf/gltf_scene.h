@@ -5,11 +5,14 @@
 // copied as they are; else the PNG or JPEG in the file, decoded by sdk/third_party/stb's stb_image
 // and swizzled; with KHR_texture_transform: GL_MODULATE, the lit color times the texture); the
 // scene's first camera;
-// its KHR_lights_punctual lights, up to GL's eight (spot lights as point lights, and no light's
-// range: lviv_gl has neither spots nor attenuation). No other textures, nor images in files of
-// their own, skins or morph targets. C++ behind a C interface. On the standalone BSP, the two
-// libraries as sdk/third_party/fastgltf.patch and simdjson.patch have them, without a file system:
-// files come from the SD card (sd.h), whole, and are parsed in memory.
+// its KHR_lights_punctual lights, up to GL's eight, as GL's: point and spot lights falling off with
+// the square of the distance as glTF has them (not a light's range), or by the GL attenuation the
+// file's extras give (gl_attenuation_constant_linear_quadratic), spot lights' cones as GL's
+// spotlights; GL's global ambient, or the file's (its scene's extras: gl_light_model_ambient). No
+// other textures, nor images in files of their own, skins or morph targets. C++ behind a C
+// interface. On the standalone BSP, the two libraries as sdk/third_party/fastgltf.patch and
+// simdjson.patch have them, without a file system: files come from the SD card (sd.h), whole, and
+// are parsed in memory.
 #pragma once
 
 #include <stddef.h>

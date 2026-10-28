@@ -30,10 +30,9 @@ VITIS_APP_EXTERNAL_INCLUDES_gl_test = ../../sdk/third_party/glm ../../sdk/third_
                                       ../../sdk/third_party/simdjson/singleheader ../../sdk/third_party/stb
 VITIS_APP_LIBS_gl_test = m xilffs stdc++
 # lviv_gl's frame memory: a section of its own, 256 MiB at a fixed address (lviv_frame.ld); the
-# heap, for the glTF files and what is made of them, 64 MiB; the stack, for the parsers, 1 MiB (the
-# BSP's are 8 KiB)
+# heap, for the glTF files and what is made of them, 256 MiB; the stack, for the parsers, 1 MiB (the BSP's are 8 KiB)
 VITIS_APP_LDFLAGS_gl_test = -Wl,-T,$(abspath ../../sdk/gl_test/lviv_frame.ld) \
-                            -Wl,--defsym,_HEAP_SIZE=0x4000000 -Wl,--defsym,_STACK_SIZE=0x100000
+                            -Wl,--defsym,_HEAP_SIZE=0x10000000 -Wl,--defsym,_STACK_SIZE=0x100000
 VITIS_PATCHES = ../../sdk/third_party/fastgltf.patch ../../sdk/third_party/simdjson.patch
 # Their compiler flags (the link gets them too): -O2 with link-time optimization, tuned for the
 # A53, C++ without exceptions, and no assert() (GLM's index checks, which would bring in newlib's

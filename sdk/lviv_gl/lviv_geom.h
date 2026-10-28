@@ -72,8 +72,14 @@ typedef struct
 
 typedef struct
 {
-    lviv_vec4_t position; // eye space; w 0: a direction
+    lviv_vec4_t position; // eye space; w 0: a direction, else 1
     lviv_vec3_t ambient, diffuse, specular;
+    // A positional light's spotlight: its direction (eye space, of length 1), exponent and cutoff
+    // (degrees: 180 for none, else 0 to 90; and its cosine); and its attenuation by the distance d,
+    // 1 / (constant + linear d + quadratic d^2)
+    lviv_vec3_t spot_direction;
+    float spot_exponent, spot_cutoff, spot_cos_cutoff;
+    float constant_attenuation, linear_attenuation, quadratic_attenuation;
 } lviv_light_t;
 
 typedef struct

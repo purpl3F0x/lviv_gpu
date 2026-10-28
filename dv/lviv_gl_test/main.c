@@ -168,7 +168,8 @@ static int run(void)
 int main(int argc, char **argv)
 {
     static gpu_t gpu;
-    static uint8_t frame_memory[65536 * LVIV_GL_TRIANGLE_BYTES] __attribute__((aligned(64)));
+    // gl_test's (lviv_frame.ld): 256 MiB, about 2.58 million triangles a frame
+    static uint8_t frame_memory[256u << 20] __attribute__((aligned(64)));
     if (argc == 4)
         frames = atoi(argv[3]);
     if ((argc != 3 && argc != 4) || frames < 1)

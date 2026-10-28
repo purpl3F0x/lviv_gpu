@@ -93,8 +93,8 @@ def main():
     parser.add_argument(
         "--size",
         type=int,
-        default=512,
-        help="texels across, at most: a power of two up to 2048 (default 512, the loader's)",
+        default=GPU_TEXTURE_MAX,
+        help="texels across, at most: a power of two up to 2048 (default 2048, the loader's)",
     )
     args = parser.parse_args()
     if not 1 <= args.size <= GPU_TEXTURE_MAX or args.size & (args.size - 1):

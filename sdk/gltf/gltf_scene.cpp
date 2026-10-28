@@ -36,8 +36,8 @@ static_assert(sizeof(fm::fvec2) == 2 * sizeof(float) && sizeof(fm::fvec3) == 3 *
 
 static const std::size_t max_lights = GL_LIGHT7 - GL_LIGHT0 + 1; // GL's GL_MAX_LIGHTS
 
-// A texture's texels across, at most: 1 MiB of lviv_gl's 4
-static const int max_texture = 512;
+// A texture's texels across, at most: the GPU's largest (16 MiB, half of lviv_gl's 32)
+static const int max_texture = 2048;
 
 struct gltf_scene
 {
@@ -67,12 +67,16 @@ struct gltf_scene
     {
         fm::fvec4 position; // in world space, or in eye space if eye; w 0: the direction to it
         fm::fvec4 ambient, color;
+        fm::fvec4 spot_direction = fm::fvec4(0, 0, -1, 0); // where a spot light shines, as position
+        float attenuation[3] = {1, 0, 0};                  // GL's: constant, linear, quadratic
+        float spot_exponent = 0, spot_cutoff = 180;        // GL's: the cutoff in degrees, 180 none
         bool eye;
     };
 
     std::vector<primitive> primitives;
     std::vector<texture> textures;
     std::vector<light> lights;
+    fm::fvec4 ambient = fm::fvec4(0.2f, 0.2f, 0.2f, 1.0f); // GL_LIGHT_MODEL_AMBIENT: GL's, or the file's
     int triangles = 0;
     bool own_camera = false, orthographic = false;
     fm::fmat4x4 view; // world to eye
@@ -271,6 +275,79 @@ void read_extras(simdjson::dom::object *extras, std::size_t index, fastgltf::Cat
     images[index] = s;
 }
 
+
+struct gl_attenuation
+{
+    bool given = false;
+    float k[3];
+};
+
+struct gl_extras
+{
+    bool has_ambient = false;
+    fm::fvec4 ambient;
+    std::vector<gl_attenuation> lights; // by the light's index
+};
+
+// The numbers of a JSON array of min to max of them, into out: how many; 0 if it is not one
+std::size_t read_numbers(simdjson::simdjson_result<simdjson::dom::element> value, float *out, std::size_t min,
+                         std::size_t max)
+{
+    simdjson::dom::array array;
+    if (value.get_array().get(array) || array.size() < min || array.size() > max)
+        return 0;
+    std::size_t n = 0;
+    for (simdjson::dom::element e : array)
+    {
+        double number;
+        if (e.get_double().get(number))
+            return 0;
+        out[n++] = (float)number;
+    }
+    return n;
+}
+
+gl_extras read_gl_extras(const void *data, std::size_t size)
+{
+    gl_extras out;
+    const char *json = static_cast<const char *>(data);
+    std::size_t length = size;
+    std::uint32_t glb[5]; // magic, version, length; the first chunk's length and type
+    if (size >= sizeof glb && std::memcmp(data, "glTF", 4) == 0)
+    {
+        std::memcpy(glb, data, sizeof glb);
+        if (glb[4] != 0x4E4F534Au || glb[3] > size - sizeof glb) // "JSON"
+            return out;
+        json += sizeof glb;
+        length = glb[3];
+    }
+    simdjson::dom::parser parser;
+    simdjson::dom::element root;
+    if (std::string_view(json, length).find("\"gl_") == std::string_view::npos ||
+        parser.parse(json, length, false).get(root))
+        return out;
+
+    std::uint64_t scene = 0, index;
+    if (!root["scene"].get_uint64().get(index))
+        scene = index; // as fastgltf's defaultScene, else 0
+    float ambient[4] = {0, 0, 0, 1};
+    if (read_numbers(root["scenes"].at(scene)["extras"]["gl_light_model_ambient"], ambient, 3, 4))
+    {
+        out.has_ambient = true;
+        out.ambient = fm::fvec4(ambient[0], ambient[1], ambient[2], ambient[3]);
+    }
+    simdjson::dom::array lights;
+    if (!root["extensions"]["KHR_lights_punctual"]["lights"].get_array().get(lights))
+        for (simdjson::dom::element light : lights)
+        {
+            gl_attenuation a;
+            a.given = read_numbers(light["extras"]["gl_attenuation_constant_linear_quadratic"], a.k, 3, 3) &&
+                      a.k[0] >= 0.0f && a.k[1] >= 0.0f && a.k[2] >= 0.0f;
+            out.lights.push_back(a);
+        }
+    return out;
+}
+
 GLint gl_wrap(fastgltf::Wrap wrap)
 {
     return wrap == fastgltf::Wrap::ClampToEdge ? GL_CLAMP_TO_EDGE : GL_REPEAT; // mirrored: repeated
@@ -404,9 +481,7 @@ void add_mesh(gltf_scene &scene, const fastgltf::Asset &asset, const fastgltf::M
     }
 }
 
-// A KHR_lights_punctual light at its node's world matrix m: its color times its intensity, for
-// diffuse and specular; no ambient (glTF has none)
-gltf_scene::light make_light(const fastgltf::Light &l, const fm::fmat4x4 &m)
+gltf_scene::light make_light(const fastgltf::Light &l, const fm::fmat4x4 &m, const float *gl_attenuation)
 {
     gltf_scene::light out;
     if (l.type == fastgltf::LightType::Directional)
@@ -416,7 +491,24 @@ gltf_scene::light make_light(const fastgltf::Light &l, const fm::fmat4x4 &m)
         out.position = fm::fvec4(x / length, y / length, z / length, 0.0f);
     }
     else
+    {
         out.position = fm::fvec4(m[3][0], m[3][1], m[3][2], 1.0f);
+        const float inverse_square[3] = {0, 0, 1};
+        std::memcpy(out.attenuation, gl_attenuation ? gl_attenuation : inverse_square, sizeof out.attenuation);
+    }
+    if (l.type == fastgltf::LightType::Spot)
+    {
+        out.spot_direction = fm::fvec4(-m[2][0], -m[2][1], -m[2][2], 0.0f); // its node's -z
+        const float inner = l.innerConeAngle ? (float)*l.innerConeAngle : 0.0f;
+        const float outer = l.outerConeAngle ? (float)*l.outerConeAngle : (float)(M_PI / 4);
+        out.spot_cutoff = std::min(outer * (float)(180.0 / M_PI), 90.0f);
+        // glTF's ((cos a - cos outer) / (cos inner - cos outer))^2 and GL's cos a ^ exponent, equal
+        // at the angle halfway; 0 (none but the cutoff) for a cone without a falloff
+        const float halfway = std::cos(0.5f * (inner + outer));
+        const float t = (halfway - std::cos(outer)) / (std::cos(inner) - std::cos(outer));
+        if (t > 0.0f && t < 1.0f && halfway < 1.0f)
+            out.spot_exponent = std::clamp(std::log(t * t) / std::log(halfway), 0.0f, 128.0f);
+    }
     out.ambient = fm::fvec4(0, 0, 0, 1);
     out.color = fm::fvec4(l.color[0] * l.intensity, l.color[1] * l.intensity, l.color[2] * l.intensity, 1);
     out.eye = false;
@@ -433,6 +525,8 @@ gltf_scene_t *fail(char *error, std::size_t error_size, std::string_view message
 
 gltf_scene_t *gltf_scene_load(const void *data, size_t size, char *error, size_t error_size)
 {
+    // Before fastgltf's parse: the two parsers' memory, one after the other
+    const gl_extras extras = read_gl_extras(data, size);
     memory_getter file(static_cast<const std::byte *>(data), size);
     fastgltf::Parser parser(fastgltf::Extensions::KHR_lights_punctual | fastgltf::Extensions::KHR_mesh_quantization |
                             fastgltf::Extensions::KHR_materials_emissive_strength |
@@ -482,8 +576,14 @@ gltf_scene_t *gltf_scene_load(const void *data, size_t size, char *error, size_t
                 }
             }
             if (node.lightIndex && scene->lights.size() < max_lights)
-                scene->lights.push_back(make_light(asset->lights[*node.lightIndex], m));
+            {
+                const std::size_t i = *node.lightIndex;
+                const bool given = i < extras.lights.size() && extras.lights[i].given;
+                scene->lights.push_back(make_light(asset->lights[i], m, given ? extras.lights[i].k : nullptr));
+            }
         });
+    if (extras.has_ambient)
+        scene->ambient = extras.ambient;
     if (scene->primitives.empty())
     {
         delete scene;
@@ -638,13 +738,18 @@ void gltf_scene_setup(gltf_scene_t *scene, int width, int height)
             glDisable(id);
             continue;
         }
-        glLightfv(id, GL_AMBIENT, scene->lights[i].ambient.data());
-        glLightfv(id, GL_DIFFUSE, scene->lights[i].color.data());
-        glLightfv(id, GL_SPECULAR, scene->lights[i].color.data());
+        const gltf_scene::light &l = scene->lights[i];
+        glLightfv(id, GL_AMBIENT, l.ambient.data());
+        glLightfv(id, GL_DIFFUSE, l.color.data());
+        glLightfv(id, GL_SPECULAR, l.color.data());
+        glLightf(id, GL_CONSTANT_ATTENUATION, l.attenuation[0]);
+        glLightf(id, GL_LINEAR_ATTENUATION, l.attenuation[1]);
+        glLightf(id, GL_QUADRATIC_ATTENUATION, l.attenuation[2]);
+        glLightf(id, GL_SPOT_EXPONENT, l.spot_exponent);
+        glLightf(id, GL_SPOT_CUTOFF, l.spot_cutoff);
         glEnable(id);
     }
-    const GLfloat ambient[] = {0.2f, 0.2f, 0.2f, 1.0f}; // GL's default
-    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambient);
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, scene->ambient.data());
     glEnable(GL_LIGHTING);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
@@ -659,15 +764,22 @@ void gltf_scene_draw(const gltf_scene_t *scene, float angle)
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
-    // Each light's position through the modelview at the call, as GL has it: eye space, then world
+    // Each light's position and spot direction through the modelview at the call, as GL has them:
+    // eye space, then world
     glLoadIdentity();
     for (std::size_t i = 0; i < scene->lights.size(); i++)
         if (scene->lights[i].eye)
+        {
             glLightfv(GL_LIGHT0 + (GLenum)i, GL_POSITION, scene->lights[i].position.data());
+            glLightfv(GL_LIGHT0 + (GLenum)i, GL_SPOT_DIRECTION, scene->lights[i].spot_direction.data());
+        }
     glLoadMatrixf(scene->view.data());
     for (std::size_t i = 0; i < scene->lights.size(); i++)
         if (!scene->lights[i].eye)
+        {
             glLightfv(GL_LIGHT0 + (GLenum)i, GL_POSITION, scene->lights[i].position.data());
+            glLightfv(GL_LIGHT0 + (GLenum)i, GL_SPOT_DIRECTION, scene->lights[i].spot_direction.data());
+        }
     glTranslatef(scene->center[0], scene->center[1], scene->center[2]);
     glRotatef(angle, 0, 1, 0);
     glTranslatef(-scene->center[0], -scene->center[1], -scene->center[2]);

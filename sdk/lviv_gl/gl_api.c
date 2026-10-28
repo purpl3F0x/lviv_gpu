@@ -9,7 +9,7 @@
 // (after clipping, culling and binning) are as many as the platform's frame memory holds
 // (lviv_gl_init).
 #ifndef LVIV_GL_TEXTURE_BYTES
-#define LVIV_GL_TEXTURE_BYTES (4u << 20)
+#define LVIV_GL_TEXTURE_BYTES (32u << 20)
 #endif
 #define MODELVIEW_DEPTH 32
 #define PROJECTION_DEPTH 2
@@ -216,9 +216,13 @@ int lviv_gl_init(gpu_t *gpu, int width, int height, void *frame_memory, size_t f
     gl.sfactor = GL_ONE;
     gl.dfactor = GL_ZERO;
     gl.tex_env = GL_MODULATE;
-    // Toward -z, black; GL_LIGHT0 white
+    // Toward -z, black, no spotlight (cutoff 180, toward -z) and no attenuation; GL_LIGHT0 white
     for (int i = 0; i < LVIV_MAX_LIGHTS; i++)
-        gl.lights[i] = (lviv_light_t){{0, 0, 1, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+        gl.lights[i] = (lviv_light_t){.position = {0, 0, 1, 0},
+                                      .spot_direction = {0, 0, -1},
+                                      .spot_cutoff = 180.0f,
+                                      .spot_cos_cutoff = -1.0f,
+                                      .constant_attenuation = 1.0f};
     gl.lights[0].diffuse = gl.lights[0].specular = (lviv_vec3_t){1, 1, 1};
     gl.state.material = (lviv_material_t){{0.2f, 0.2f, 0.2f}, {0.8f, 0.8f, 0.8f}, {0, 0, 0}, {0, 0, 0}, 0.0f};
     gl.state.global_ambient = (lviv_vec3_t){0.2f, 0.2f, 0.2f};
@@ -881,15 +885,71 @@ void glLightfv(GLenum light, GLenum pname, const GLfloat *params)
     case GL_SPECULAR:
         l->specular = rgb(params);
         break;
-    case GL_POSITION: // into eye space by the modelview of the moment, as GL does
+    case GL_POSITION: // into eye space by the modelview of the moment, as GL does; w 1 unless 0
         l->position = lviv_mat4_transform(&gl.modelview[gl.modelview_top],
                                           (lviv_vec4_t){params[0], params[1], params[2], params[3]});
+        if (l->position.w != 0.0f)
+            l->position = (lviv_vec4_t){l->position.x / l->position.w, l->position.y / l->position.w,
+                                        l->position.z / l->position.w, 1.0f};
+        break;
+    case GL_SPOT_DIRECTION: // by the modelview's upper 3 x 3 of the moment
+    {
+        const lviv_vec4_t d = lviv_mat4_transform(&gl.modelview[gl.modelview_top],
+                                                  (lviv_vec4_t){params[0], params[1], params[2], 0.0f});
+        const float length = sqrtf(d.x * d.x + d.y * d.y + d.z * d.z);
+        l->spot_direction = length > 0.0f ? (lviv_vec3_t){d.x / length, d.y / length, d.z / length}
+                                          : (lviv_vec3_t){d.x, d.y, d.z};
+        break;
+    }
+    case GL_SPOT_EXPONENT:
+        if (params[0] < 0.0f || params[0] > 128.0f)
+        {
+            set_error(GL_INVALID_VALUE);
+            return;
+        }
+        l->spot_exponent = params[0];
+        break;
+    case GL_SPOT_CUTOFF:
+        if ((params[0] < 0.0f || params[0] > 90.0f) && params[0] != 180.0f)
+        {
+            set_error(GL_INVALID_VALUE);
+            return;
+        }
+        l->spot_cutoff = params[0];
+        l->spot_cos_cutoff = cosf(params[0] * (float)(PI / 180.0));
+        break;
+    case GL_CONSTANT_ATTENUATION:
+    case GL_LINEAR_ATTENUATION:
+    case GL_QUADRATIC_ATTENUATION:
+        if (params[0] < 0.0f)
+        {
+            set_error(GL_INVALID_VALUE);
+            return;
+        }
+        if (pname == GL_CONSTANT_ATTENUATION)
+            l->constant_attenuation = params[0];
+        else if (pname == GL_LINEAR_ATTENUATION)
+            l->linear_attenuation = params[0];
+        else
+            l->quadratic_attenuation = params[0];
         break;
     default:
         set_error(GL_INVALID_ENUM);
         return;
     }
     update_state();
+}
+
+
+void glLightf(GLenum light, GLenum pname, GLfloat param)
+{
+    if (pname != GL_SPOT_EXPONENT && pname != GL_SPOT_CUTOFF && pname != GL_CONSTANT_ATTENUATION &&
+        pname != GL_LINEAR_ATTENUATION && pname != GL_QUADRATIC_ATTENUATION)
+    {
+        set_error(GL_INVALID_ENUM);
+        return;
+    }
+    glLightfv(light, pname, &param);
 }
 
 void glLightModelfv(GLenum pname, const GLfloat *params)

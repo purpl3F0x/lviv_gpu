@@ -39,7 +39,7 @@ module tb_gpu_top;
   // Memory map of the three behavioural memories (byte addresses, inside each RAM).
   localparam logic [31:0] VbBase = 32'h0000_1000;
   localparam logic [31:0] TriBase = 32'h0000_8000;
-  localparam logic [31:0] ImgBase = 32'h0001_0000;
+  localparam logic [31:0] ImgBase = 32'h0002_0000;  // 128 KiB aligned, as the tile DMA takes BASE
   localparam int VbAddrW = 16, TriAddrW = 18, ImgAddrW = 22, TexAddrW = 16;
   localparam logic [31:0] TextureWindow = 32'h3800_0000;  // gpu_top's TEXTURE_WINDOW
   localparam int MaxTriangles = ((1 << TriAddrW) - int'(TriBase)) / TriangleStride;
@@ -770,6 +770,32 @@ module tb_gpu_top;
              $time, bad, TILE_SIZE_X * TILE_SIZE_Y);
   endtask
 
+  // A write-back of tile (tx, ty) out of order (the tile DMA next at (1, 0)), with nothing rendered
+  // since: the tile DMA takes its address from CUR_POS, so that tile alone takes the clear value, and
+  // every other pixel stays as it was
+  task automatic check_tile_alone(input int tx, input int ty);
+    int bad, changed;
+    logic [31:0] expected;
+    for (int y = 0; y < Height; y++)
+      for (int x = 0; x < Width; x++) cpu_image[y][x] = image_pixel(x, y);
+    write_back_tile(tx, ty);
+    bad = 0;
+    changed = 0;
+    for (int y = 0; y < Height; y++)
+      for (int x = 0; x < Width; x++) begin
+        expected = x / TILE_SIZE_X == tx && y / TILE_SIZE_Y == ty ? ClearColor : cpu_image[y][x];
+        if (image_pixel(x, y) !== cpu_image[y][x]) changed++;
+        if (image_pixel(x, y) !== expected) begin
+          if (bad < 8)
+            error($sformatf("after tile (%0d, %0d)'s write-back, pixel (%0d, %0d): %08h, %s %08h",
+                            tx, ty, x, y, image_pixel(x, y), "expected", expected));
+          bad++;
+        end
+      end
+    $display("[%0t] tile (%0d, %0d) written back out of order: %0d pixels changed, %0d wrong",
+             $time, tx, ty, changed, bad);
+  endtask
+
   function automatic logic [31:0] image_pixel(input int x, input int y);
     logic [31:0] addr;
     addr = ImgBase + 32'(y * RowBytes + x * 4);
@@ -964,6 +990,7 @@ module tb_gpu_top;
     $display("[%0t] image not checked here (make compares it with raster_sw's)", $time);
     write_tga(out_path);
     check_cleared();
+    check_tile_alone(4, 2);
     if (tri_err) error("triangle DMA reported an error");
 
     if (errors == 0) $display("PASS: %0d tiles, %0d triangles, wrote %s", TilesX * TilesY,

@@ -32,17 +32,20 @@ case class TileRamPort(addrWidth: Int, dataWidth: Int) extends Bundle with IMast
 // Configuration Bundle for AxiTileDma
 // =============================================================================
 case class AxiTileDmaConfig(
-    addressWidth: Int = 32,
+    addressWidth: Int = 32, // the AXI address and BASE: 17 to 64 bits
     pixelsPerClock: Int = 4, // Number of 32-bit pixels per AXI beat (2, 4, 8, 16); each quad thread port supplies half
     tileWidth: Int = 128, // Tile width in pixels (compile-time constant, e.g. 128)
     tileHeight: Int = 128, // Tile height in rows (compile-time constant, e.g. 128)
     maxBurstLength: Int = 256, // Max AXI burst beats (AXI4 max = 256)
     maxOutstanding: Int = 8, // Max outstanding AXI write transactions
     idWidth: Int = 4, // AXI Master transaction ID width
-    cdcDepth: Int = 16, // Depth of async dual-clock CDC FIFO between RAM clock and AXI clock
+    cdcDepth: Int = 32, // Depth of async dual-clock CDC FIFO between RAM clock and AXI clock (LUTRAM is 32 deep)
     useAutoAdvance: Boolean = true, // Compile-time option: enable 2D raster tile coordinate advancing
+    tileIndexWidth: Int = 8, // TILES_X, TILES_Y and CUR_POS (4096 x 4096 is 32 x 32 tiles)
     bramReadLatency: Int = 1 // Read latency in clock cycles (1 for primitive output reg, 2 for optional pipeline reg)
 ) {
+  require(tileIndexWidth >= 1 && tileIndexWidth <= 16, "tileIndexWidth must be 1 to 16 (CUR_POS's Y is at bit 16)")
+  require(addressWidth > 16 && addressWidth <= 64, "addressWidth must be 17 to 64 bits")
   require(pixelsPerClock >= 2 && isPow2(pixelsPerClock), "pixelsPerClock must be a power of 2 >= 2 (2, 4, 8, 16...)")
   require(tileWidth > 0 && tileHeight > 0, "tile dimensions must be positive")
   require(tileWidth % pixelsPerClock == 0, "tileWidth must be an integer multiple of pixelsPerClock")
@@ -54,10 +57,6 @@ case class AxiTileDmaConfig(
 
   // BRAM read latency + 1 register stage for the quad interleave mux
   val readPipeLatency: Int = bramReadLatency + 1
-  require(
-    cdcDepth >= (readPipeLatency + 4),
-    s"cdcDepth ($cdcDepth) must be >= bramReadLatency + 5 (${readPipeLatency + 4})"
-  )
 
   val pixelBits: Int = 32
   val pixelBytes: Int = 4
@@ -77,6 +76,8 @@ case class AxiTileDmaConfig(
   // boundary and fits in one 4KB page, so all AXI bursts have the same length and never cross 4KB
   require(isPow2(bytesPerRow) && bytesPerRow <= 4096, "tile row bytes must be a power of 2 <= 4KB")
   val strideAlignShift: Int = log2Up(bytesPerRow) // STRIDE must be a multiple of bytesPerRow (512 B)
+  val baseAlignShift: Int = strideAlignShift + tileIndexWidth // BASE's alignment: 17 bits, 128 KiB
+  require(baseAlignShift >= 12 && baseAlignShift <= 32, "BASE's alignment must be 4KB to 4GB")
   val burstBeats: Int = beatsPerRow min maxBurstLength
   require(beatsPerRow % burstBeats == 0, "beatsPerRow must be a multiple of maxBurstLength when longer")
   val burstsPerRow: Int = beatsPerRow / burstBeats
@@ -254,23 +255,31 @@ class AxiTileDma(
   val clearBusy = RegInit(False)
   CLEAR_BUSY := clearBusy
 
-  // 0x08: BASE_ADDR_LOW (RW)
+  // 0x08: BASE_ADDR_LOW (RW) - bits below baseAlignShift reserved: BASE is that aligned
   val REG_BASE_LOW = busif.newRegAt(address = 0x08, doc = "DRAM Frame Base Address (Lower 32 bits)")
-  val BASE_ADDR_LOW = REG_BASE_LOW.field(
-    UInt(32 bits),
+  val BASE_ADDR_LOW = REG_BASE_LOW.fieldAt(
+    pos = config.baseAlignShift,
+    UInt(32 - config.baseAlignShift bits),
     RW,
     resetValue = 0,
-    doc = "Lower 32 bits of Frame Destination Base Address (4KB aligned: bits 11..0 ignored)"
+    doc = s"Bits 31..${config.baseAlignShift} of Frame Destination Base Address " +
+      s"(${(1 << config.baseAlignShift) >> 10} KiB aligned)"
   )
 
-  // 0x0C: BASE_ADDR_HIGH (RW)
-  val REG_BASE_HIGH = busif.newRegAt(address = 0x0c, doc = "DRAM Frame Base Address (Upper 32 bits)")
-  val BASE_ADDR_HIGH = REG_BASE_HIGH.field(
-    UInt(32 bits),
-    RW,
-    resetValue = 0,
-    doc = "Upper 32 bits of Frame Base Address (64-bit DRAM space)"
-  )
+  // 0x0C: BASE_ADDR_HIGH (RW), all reserved with 32-bit addresses
+  val REG_BASE_HIGH = busif.newRegAt(address = 0x0c, doc = "DRAM Frame Base Address (Upper bits)")
+  val BASE_ADDR_HIGH =
+    if (config.addressWidth > 32)
+      REG_BASE_HIGH.field(
+        UInt(config.addressWidth - 32 bits),
+        RW,
+        resetValue = 0,
+        doc = s"Bits ${config.addressWidth - 1}..32 of Frame Base Address (${config.addressWidth}-bit DRAM space)"
+      )
+    else {
+      REG_BASE_HIGH.reserved(32 bits)
+      null
+    }
 
   // 0x10: STRIDE (RW)
   val REG_STRIDE = busif.newRegAt(address = 0x10, doc = "DRAM Frame Row Byte Stride")
@@ -286,7 +295,12 @@ class AxiTileDma(
   val REG_TILES_X = if (config.useAutoAdvance) busif.newRegAt(address = 0x14, doc = "Horizontal Tiles Count") else null
   val TILES_X =
     if (config.useAutoAdvance)
-      REG_TILES_X.field(UInt(16 bits), RW, resetValue = 1, doc = "Total number of horizontal tiles per frame row")
+      REG_TILES_X.field(
+        UInt(config.tileIndexWidth bits),
+        RW,
+        resetValue = 1,
+        doc = "Total number of horizontal tiles per frame row"
+      )
     else null
 
   // 0x18: TILES_Y
@@ -294,18 +308,34 @@ class AxiTileDma(
     if (config.useAutoAdvance) busif.newRegAt(address = 0x18, doc = "Vertical Tile Rows Count") else null
   val TILES_Y =
     if (config.useAutoAdvance)
-      REG_TILES_Y.field(UInt(16 bits), RW, resetValue = 1, doc = "Total number of vertical tile rows per frame")
+      REG_TILES_Y.field(
+        UInt(config.tileIndexWidth bits),
+        RW,
+        resetValue = 1,
+        doc = "Total number of vertical tile rows per frame"
+      )
     else null
 
-  // 0x1C: CUR_POS (RW) - Bits 15..0 = curTileX, bits 31..16 = curTileY
+  // 0x1C: CUR_POS (RW) - Bits 7..0 = curTileX, bits 23..16 = curTileY: the tile START writes
   val REG_CUR_POS = if (config.useAutoAdvance) busif.newRegAt(address = 0x1c, doc = "Current Tile Position") else null
   val CUR_TILE_X =
     if (config.useAutoAdvance)
-      REG_CUR_POS.field(UInt(16 bits), RW, resetValue = 0, doc = "Current horizontal tile index (0..TILES_X-1)")
+      REG_CUR_POS.field(
+        UInt(config.tileIndexWidth bits),
+        RW,
+        resetValue = 0,
+        doc = "Current horizontal tile index (0..TILES_X-1)"
+      )
     else null
   val CUR_TILE_Y =
     if (config.useAutoAdvance)
-      REG_CUR_POS.field(UInt(16 bits), RW, resetValue = 0, doc = "Current vertical tile row index (0..TILES_Y-1)")
+      REG_CUR_POS.fieldAt(
+        pos = 16,
+        UInt(config.tileIndexWidth bits),
+        RW,
+        resetValue = 0,
+        doc = "Current vertical tile row index (0..TILES_Y-1)"
+      )
     else null
 
   // 0x20: CURRENT_LINE (RO)
@@ -366,31 +396,46 @@ class AxiTileDma(
   busif.accept(CHeaderGenerator("axi_tile_dma_regmap", "AXI_TILE_DMA"))
   busif.accept(JsonGenerator("axi_tile_dma_regmap"))
 
-  // Full 64-bit / 32-bit combined frame base address (4KB aligned: bits 11..0 are 0)
+  // Frame base address (bits below baseAlignShift are 0)
   val fullBaseAddr = UInt(config.addressWidth bits)
   if (config.addressWidth > 32) {
-    fullBaseAddr := (BASE_ADDR_HIGH @@ BASE_ADDR_LOW(31 downto 12) @@ U(0, 12 bits)).resized
+    fullBaseAddr := BASE_ADDR_HIGH @@ BASE_ADDR_LOW @@ U(0, config.baseAlignShift bits)
   } else {
-    fullBaseAddr := (BASE_ADDR_LOW(31 downto 12) @@ U(0, 12 bits)).resized
+    fullBaseAddr := (BASE_ADDR_LOW @@ U(0, config.baseAlignShift bits)).resized
   }
 
   // ---------------------------------------------------------------------------
-  // 2D Raster Tile Stepping Coordinates & Origin Tracking
+  // 2D Raster Tile Position & Origin
   // ---------------------------------------------------------------------------
-  val tileOriginAddr = Reg(UInt(config.addressWidth bits)) init (0)
-  val rowStartTileAddr = Reg(UInt(config.addressWidth bits)) init (0)
+  // Tile origin = BASE + X * 512 + Y * STRIDE * 128 (X, Y = CUR_TILE_X, CUR_TILE_Y), on one DSP:
+  //
+  //   bit 47          17  16  15        9  8       0
+  //      +--------------+----+-----------+----------+
+  //      | BASE[47:17]  | X7 |  X[6:0]   |    0     |   BASE (128 KiB aligned) and X, concatenated
+  //      +--------------+----+-----------+----------+
+  //      |<------ C -------->|<-------- low -------->|
+  //    +   (STRIDE/512) * Y                             A * B
+  //    =   P = C + A * B       low                      origin
+  //
+  // No reset on these registers, so synthesis maps them into the DSP's.
+  val strideUnitWidth: Int = 32 - config.strideAlignShift
+  val rowShift: Int = config.strideAlignShift + config.tileHeightShift // 16: C and P start at this bit
+  val dspA = if (config.useAutoAdvance) Reg(UInt(strideUnitWidth bits)) else null
+  val dspB = if (config.useAutoAdvance) Reg(UInt(config.tileIndexWidth bits)) else null
+  val dspC = if (config.useAutoAdvance) Reg(UInt(config.addressWidth - rowShift bits)) else null
+  val dspM = if (config.useAutoAdvance) Reg(UInt(strideUnitWidth + config.tileIndexWidth bits)) else null
+  val dspP = if (config.useAutoAdvance) Reg(UInt(config.addressWidth - rowShift bits)) else null
+  val originLow = if (config.useAutoAdvance) Reg(UInt(rowShift bits)) else null
 
   val shadowStride = Reg(UInt(32 bits)) init (0)
-  val shadowTilesX = if (config.useAutoAdvance) Reg(UInt(16 bits)) init (1) else null
-  val shadowTilesY = if (config.useAutoAdvance) Reg(UInt(16 bits)) init (1) else null
+  val shadowTilesX = if (config.useAutoAdvance) Reg(UInt(config.tileIndexWidth bits)) init (1) else null
+  val shadowTilesY = if (config.useAutoAdvance) Reg(UInt(config.tileIndexWidth bits)) init (1) else null
 
   if (config.useAutoAdvance) {
     // Reset tile position to (0,0)
     when(RESET_POS) {
       CUR_TILE_X := 0
       CUR_TILE_Y := 0
-      tileOriginAddr := fullBaseAddr
-      rowStartTileAddr := fullBaseAddr
     }
   }
 
@@ -459,10 +504,10 @@ class AxiTileDma(
     val inFlight = Reg(UInt(log2Up(config.cdcDepth + 1) bits)) init (0)
     val inFlightRetire = Delay(ramEnReg, cycleCount = config.readPipeLatency + 2, init = False)
 
-    // Pipeline Stage 2: Fast 5-bit comparison with registered occupancy
-    val headroom = config.readPipeLatency + 3
+    // Pipeline Stage 2: comparison with registered occupancy. Every entry is usable: a read stays in
+    // inFlight until pushOccupancyReg shows it, and pops reach this side late, so the count is never low.
     val totalCommitted = pushOccupancyReg + inFlight
-    val hasRoom = totalCommitted < (config.cdcDepth - headroom)
+    val hasRoom = totalCommitted < config.cdcDepth
     val nextCanRead = active && (ramReadsLeft > 0) && hasRoom
 
     // Direct Register Outputs to BRAM pins (Zero combinational gates, optimal for 600 MHz)
@@ -617,6 +662,8 @@ class AxiTileDma(
   // starts on a bytesPerRow boundary and lies inside one 4KB page: all bursts are the same
   // compile-time length (burstBeats) and never need 4KB splitting.
   //
+  // With auto-advance, START writes the tile at CUR_POS (in any order), then ADVANCE moves it on.
+  //
   // AW and W are decoupled:
   //   - The AW planner issues bursts ahead of the data, up to maxOutstanding bursts
   //     awaiting their B response.
@@ -625,16 +672,12 @@ class AxiTileDma(
   // ===========================================================================
   object DmaState extends SpinalEnum {
     val IDLE, TRANSFER = newElement()
-    val ADVANCE_CALC_1 = if (config.useAutoAdvance) newElement() else null
-    val ADVANCE_CALC_2 = if (config.useAutoAdvance) newElement() else null
+    val ORIGIN_MUL = if (config.useAutoAdvance) newElement() else null
+    val ORIGIN_ADD = if (config.useAutoAdvance) newElement() else null
+    val ORIGIN_LOAD = if (config.useAutoAdvance) newElement() else null
+    val ADVANCE = if (config.useAutoAdvance) newElement() else null
   }
   val state = RegInit(DmaState.IDLE)
-
-  // Pipelined registers for multi-cycle tile-advance calculation
-  val advTileHeightStride = if (config.useAutoAdvance) Reg(UInt(config.addressWidth bits)) init (0) else null
-  val advStepRightAddr = if (config.useAutoAdvance) Reg(UInt(config.addressWidth bits)) init (0) else null
-  val advIsLastInRow = if (config.useAutoAdvance) RegInit(False) else null
-  val advIsLastInFrame = if (config.useAutoAdvance) RegInit(False) else null
 
   // ---------------------------------------------------------------------------
   // AW Burst Planner
@@ -760,8 +803,6 @@ class AxiTileDma(
     is(DmaState.IDLE) {
       when(SOFT_RESET || softResetPending) {
         softResetPending := False
-        tileOriginAddr := 0
-        rowStartTileAddr := 0
         if (config.useAutoAdvance) {
           CUR_TILE_X := 0
           CUR_TILE_Y := 0
@@ -777,20 +818,20 @@ class AxiTileDma(
 
         shadowStride := STRIDE(31 downto config.strideAlignShift) @@ U(0, config.strideAlignShift bits)
         if (config.useAutoAdvance) {
-          shadowTilesX := (TILES_X === 0) ? U(1, 16 bits) | TILES_X
-          shadowTilesY := (TILES_Y === 0) ? U(1, 16 bits) | TILES_Y
-
-          val currentOrigin =
-            ((CUR_TILE_X === 0 && CUR_TILE_Y === 0) || tileOriginAddr === 0) ? fullBaseAddr | tileOriginAddr
-          tileOriginAddr := currentOrigin
-          rowStartTileAddr := (CUR_TILE_X === 0) ? currentOrigin | rowStartTileAddr
-          planLineStart := currentOrigin
-          planAddr := currentOrigin
+          shadowTilesX := (TILES_X === 0) ? U(1, config.tileIndexWidth bits) | TILES_X
+          shadowTilesY := (TILES_Y === 0) ? U(1, config.tileIndexWidth bits) | TILES_Y
+          // The DSP's operands (see the origin diagram)
+          val baseColumn = fullBaseAddr(config.addressWidth - 1 downto config.baseAlignShift) @@ CUR_TILE_X @@
+            U(0, config.strideAlignShift bits)
+          dspA := STRIDE(31 downto config.strideAlignShift)
+          dspB := CUR_TILE_Y
+          dspC := baseColumn(config.addressWidth - 1 downto rowShift)
+          originLow := baseColumn(rowShift - 1 downto 0)
+          state := DmaState.ORIGIN_MUL
         } else {
-          tileOriginAddr := fullBaseAddr
-          rowStartTileAddr := fullBaseAddr
           planLineStart := fullBaseAddr
           planAddr := fullBaseAddr
+          state := DmaState.TRANSFER
         }
 
         curLineIdx := 0
@@ -799,7 +840,24 @@ class AxiTileDma(
 
         // Trigger high-frequency RAM reader in ramClock domain via CDC pulse
         startTilePulseAxi := True
+      }
+    }
 
+    if (config.useAutoAdvance) {
+      // The origin on the DSP: A * B, C + A * B, then {P, low}
+      is(DmaState.ORIGIN_MUL) {
+        dspM := dspA * dspB
+        state := DmaState.ORIGIN_ADD
+      }
+
+      is(DmaState.ORIGIN_ADD) {
+        dspP := dspC + dspM.resize(config.addressWidth - rowShift bits)
+        state := DmaState.ORIGIN_LOAD
+      }
+
+      is(DmaState.ORIGIN_LOAD) {
+        planLineStart := dspP @@ originLow
+        planAddr := dspP @@ originLow
         state := DmaState.TRANSFER
       }
     }
@@ -808,8 +866,8 @@ class AxiTileDma(
       // All bursts issued and every B response received (B implies all W beats sent)
       when(!planActive && outstandingBursts === 0) {
         if (config.useAutoAdvance) {
-          // done/BUSY are reported in ADVANCE_CALC_2, together with the new position and frame_done
-          state := DmaState.ADVANCE_CALC_1
+          // done/BUSY are reported in ADVANCE, together with the new position and frame_done
+          state := DmaState.ADVANCE
         } else {
           dmaBusy := False
           intrDone := True
@@ -819,41 +877,18 @@ class AxiTileDma(
     }
 
     if (config.useAutoAdvance) {
-      // ---------------------------------------------------------------------
-      // Multi-Cycle Pipelined 2D Raster Tile Advancing Calculation
-      // Cycle 1: Shift-based row jump & comparator step
-      // ---------------------------------------------------------------------
-      is(DmaState.ADVANCE_CALC_1) {
-        // tileHeight * stride = stride << tileHeightShift (Zero multipliers, pure bit shift)
-        advTileHeightStride := (shadowStride << config.tileHeightShift).resized
-        advStepRightAddr := tileOriginAddr + U(config.bytesPerRow, config.addressWidth bits)
-        advIsLastInRow := (CUR_TILE_X === (shadowTilesX - 1))
-        advIsLastInFrame := (CUR_TILE_X === (shadowTilesX - 1)) && (CUR_TILE_Y === (shadowTilesY - 1))
-        state := DmaState.ADVANCE_CALC_2
-      }
-
-      // ---------------------------------------------------------------------
-      // Cycle 2: Coordinate & address commit step (Zero timing pressure)
-      // ---------------------------------------------------------------------
-      is(DmaState.ADVANCE_CALC_2) {
-        when(advIsLastInFrame) {
-          // Completed entire frame! Wrap around to (0, 0)
+      // Next tile: right, the next row, or (0, 0) with frame_done
+      is(DmaState.ADVANCE) {
+        when(CUR_TILE_X === shadowTilesX - 1) {
           CUR_TILE_X := 0
-          CUR_TILE_Y := 0
-          tileOriginAddr := fullBaseAddr
-          rowStartTileAddr := fullBaseAddr
-          intrFrameDone := True
-        }.elsewhen(advIsLastInRow) {
-          // Wrap down to the next tile row
-          CUR_TILE_X := 0
-          CUR_TILE_Y := CUR_TILE_Y + 1
-          val nextTileRowOrigin = rowStartTileAddr + advTileHeightStride
-          rowStartTileAddr := nextTileRowOrigin
-          tileOriginAddr := nextTileRowOrigin
+          when(CUR_TILE_Y === shadowTilesY - 1) {
+            CUR_TILE_Y := 0
+            intrFrameDone := True
+          }.otherwise {
+            CUR_TILE_Y := CUR_TILE_Y + 1
+          }
         }.otherwise {
-          // Advance right to next tile in the current row
           CUR_TILE_X := CUR_TILE_X + 1
-          tileOriginAddr := advStepRightAddr
         }
 
         dmaBusy := False
@@ -962,7 +997,7 @@ object AxiTileDmaVerilog {
       maxBurstLength = 256,
       maxOutstanding = 8,
       idWidth = 4,
-      cdcDepth = 16, // 16-entry async CDC
+      cdcDepth = 32, // 32-entry async CDC, a LUTRAM's depth
       bramReadLatency = 4
     )
 

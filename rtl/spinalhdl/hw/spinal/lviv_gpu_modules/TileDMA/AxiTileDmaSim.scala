@@ -233,7 +233,7 @@ object AxiTileDmaSim extends App {
     maxBurstLength = 256,
     maxOutstanding = 8,
     idWidth = 4,
-    cdcDepth = 16,
+    cdcDepth = 32,
     useAutoAdvance = true,
     bramReadLatency = 4 // 3-cycle BRAM read latency (testing 3-cycle UltraScale+ BRAM pipeline mode)
   )
@@ -250,11 +250,11 @@ object AxiTileDmaSim extends App {
   val compiled = simConfig.compile(new AxiTileDma(config))
 
   // Scenario 1: 4KB-aligned frame, no backpressure (throughput baseline, no 4KB splits)
-  runGridTest("Aligned_FullSpeed", dramBaseAddr = 0x00010000L, frameRowStrideBytes = 2048, stallPercent = 0)
+  runGridTest("Aligned_FullSpeed", dramBaseAddr = 0x00020000L, frameRowStrideBytes = 2048, stallPercent = 0)
 
   // Scenario 2: non-power-of-2 stride (5 x 512 B) so tile lines land at varying offsets in 4KB pages;
   // random AW/W backpressure exercises the decoupled AW/W channels
-  runGridTest("Stride2560_Stalls", dramBaseAddr = 0x00010000L, frameRowStrideBytes = 2560, stallPercent = 30)
+  runGridTest("Stride2560_Stalls", dramBaseAddr = 0x00020000L, frameRowStrideBytes = 2560, stallPercent = 30)
 
   def runGridTest(name: String, dramBaseAddr: Long, frameRowStrideBytes: Int, stallPercent: Int): Unit =
     compiled.doSim(name) { dut =>

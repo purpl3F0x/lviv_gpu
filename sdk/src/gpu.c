@@ -241,8 +241,47 @@ void gpu_set_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t tile_x, u
     frontend_write_reg(gpu, APB_FRONT_END_FRONTEND_REG_BB_MAX_Y, box_end(tile_y, frame->height));
 }
 
+_Static_assert(GPU_FRAME_ALIGN == 1u << AXI_TILE_DMA_REG_BASE_LOW_BASE_ADDR_LOW_SHIFT,
+               "GPU_FRAME_ALIGN is the tile DMA's BASE alignment");
+
+// An address with no bits below its LOW register's field (the DMA would drop them: its alignment)
+static inline int aligned(const void *address, uint32_t low_mask)
+{
+    return ((uint32_t)(uintptr_t)address & ~low_mask) == 0;
+}
+
+// And none above its HIGH register's (past the DMA's address width)
+static inline int reachable(const void *address, uint32_t high_mask)
+{
+    return ((uint64_t)(uintptr_t)address >> 32 & ~(uint64_t)high_mask) == 0;
+}
+
+// The tile DMA's BASE_HIGH field: none, the register reserved, with 32-bit addresses
+#ifdef AXI_TILE_DMA_REG_BASE_HIGH_BASE_ADDR_HIGH_MASK
+#define TILE_DMA_BASE_HIGH_MASK AXI_TILE_DMA_REG_BASE_HIGH_BASE_ADDR_HIGH_MASK
+#else
+#define TILE_DMA_BASE_HIGH_MASK 0u
+#endif
+
+// The frame's memory as the DMAs take it (gpu_frame_t). The visibility DMA's masters are 32-bit.
+static gpu_status_t frame_check(const gpu_frame_t *frame)
+{
+    if (!aligned(frame->triangles, AXI_VISIBILITY_DMA_REG_TRI_LOW_TRI_BASE_LOW_MASK) ||
+        !aligned(frame->visibility, AXI_VISIBILITY_DMA_REG_VB_LOW_VB_BASE_LOW_MASK) ||
+        !aligned(frame->frame, AXI_TILE_DMA_REG_BASE_LOW_BASE_ADDR_LOW_MASK) ||
+        frame->stride % (GPU_TILE_SIZE * 4) != 0)
+        return GPU_BAD_ALIGN;
+    if (!reachable(frame->triangles, 0) || !reachable(frame->visibility, 0) ||
+        !reachable(frame->frame, TILE_DMA_BASE_HIGH_MASK))
+        return GPU_BAD_ADDRESS;
+    return GPU_OK;
+}
+
 gpu_status_t gpu_stream_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t tile)
 {
+    const gpu_status_t placed = frame_check(frame);
+    if (placed != GPU_OK)
+        return placed;
     vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_VB_LOW, (uint32_t)(uintptr_t)frame->visibility);
     vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_VB_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->visibility >> 32));
     vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_TRI_LOW, (uint32_t)(uintptr_t)frame->triangles);
@@ -271,6 +310,9 @@ gpu_status_t gpu_stream_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_
 
 gpu_status_t gpu_write_back_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t tile)
 {
+    const gpu_status_t placed = frame_check(frame);
+    if (placed != GPU_OK)
+        return placed;
     const uint32_t tile_x = tile % gpu_tiles_x(frame), tile_y = tile / gpu_tiles_x(frame);
     tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_BASE_LOW, (uint32_t)(uintptr_t)frame->frame);
     tile_dma_write_reg(gpu, AXI_TILE_DMA_REG_BASE_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->frame >> 32));
@@ -414,6 +456,9 @@ gpu_status_t gpu_frame(gpu_t *gpu, const gpu_frame_t *frame, uint32_t *failed_ti
     *failed_tile = 0;
     if (tiles_x == 0 || tiles_y == 0 || tiles_x * tiles_y > GPU_MAX_TILES)
         return GPU_BAD_SIZE;
+    const gpu_status_t placed = frame_check(frame);
+    if (placed != GPU_OK)
+        return placed;
 
     // The GPU reads the scene behind the CPU's caches (the frame is not cached: gpu_frame_t).
     Xil_DCacheFlushRange((UINTPTR)frame->triangles, frame->triangle_count * GPU_TRIANGLE_BYTES);
@@ -442,6 +487,10 @@ const char *gpu_status_name(gpu_status_t status)
         return "command processor bus error";
     case GPU_BAD_SIZE:
         return "bad frame size";
+    case GPU_BAD_ALIGN:
+        return "frame memory or stride misaligned";
+    case GPU_BAD_ADDRESS:
+        return "frame memory out of the DMAs' reach";
     }
     return "unknown";
 }

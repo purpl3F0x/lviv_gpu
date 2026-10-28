@@ -23,12 +23,11 @@
 // frontend, 0x820 + 0x20 * n thread n, 0xF00 tile DMA, 0xF80 visibility DMA.
 //
 // Clocks:
-//   lpd_clk   the control port, the crossbar, every APB slave's registers, the command processor
-//   mem_clk   the three DMAs (visibility, triangle, tile; their registers too, behind an APB clock
+//   lpd_clk   Low-power domain clock: the control port, the crossbar, every APB slave's registers, the command processor
+//   mem_clk   Memory domain clock: the three DMAs (visibility, triangle, tile; their registers too, behind an APB clock
 //             crossing each), their memory masters, and the core's frontend
-//   core_clk  the core's orchestrator and threads with their caches and frame buffers (the tile DMA
+//   core_clk  Core domain clock: the core's orchestrator and threads with their caches and frame buffers (the tile DMA
 //             reads those on it), and the texture masters
-// The command processor synchronises what it watches from the other clocks itself.
 //
 // Texture addresses: a texture cache makes 27-bit byte addresses (the texture LUT holds word
 // addresses), so 128 MiB; TEXTURE_WINDOW supplies the bits above, picking which 128 MiB.

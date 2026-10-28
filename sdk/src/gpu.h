@@ -63,7 +63,12 @@ typedef enum
     GPU_TILE_DMA_ERROR = -3, // tile write-back got a bad write response
     GPU_BUS_ERROR = -4,      // a command processor register access got an error response
     GPU_BAD_SIZE = -5,       // width or height 0, or more than 64 tiles
+    GPU_BAD_ALIGN = -6,      // gpu_frame_t's memory or stride not aligned as it says
+    GPU_BAD_ADDRESS = -7,    // gpu_frame_t's memory past the DMAs' reach (4 GiB)
 } gpu_status_t;
+
+// A frame's alignment: the tile DMA ignores BASE's bits 16..0 (AxiTileDma.scala, the tile's origin)
+#define GPU_FRAME_ALIGN (128u << 10)
 
 // What a frame is drawn from, and where it goes, in memory the GPU's masters reach (PS DDR below
 // 4 GiB). They do not see the CPU's caches: gpu_frame flushes the triangles and their visibility
@@ -74,7 +79,7 @@ typedef struct
     const gpu_triangle_t *triangles; // GPU_TRIANGLE_BYTES each, 32-byte aligned
     const uint64_t *visibility;      // per triangle, bit t set if it touches tile t; 16-byte aligned
     uint32_t triangle_count;
-    uint32_t *frame;        // ARGB, 4 KiB aligned, rows to the end of the last row of tiles
+    uint32_t *frame;        // ARGB, GPU_FRAME_ALIGN aligned, rows to the end of the last row of tiles
     uint32_t stride;        // bytes per frame row, a multiple of 512
     uint32_t width, height; // pixels; at most 64 tiles, tile t (t % tiles across, t / tiles across)
     uint32_t clear_color;   // ARGB, where no triangle draws
@@ -125,7 +130,8 @@ uint32_t gpu_texel_index(uint32_t x, uint32_t y);
 // GPU_TIMEOUT if the GPU stays busy.
 gpu_status_t gpu_flush_texture_caches(const gpu_t *gpu);
 
-// One tile, each step on its own (GPU_MODE_CPU).
+// One tile, each step on its own (GPU_MODE_CPU), any tile in any order; GPU_BAD_ALIGN and
+// GPU_BAD_ADDRESS as gpu_frame.
 gpu_status_t gpu_clear_zbuffers(const gpu_t *gpu); // every thread's back to 1.0, the far plane
 // The frontend's tile box: from the tile's first pixel to its last, or the frame's when the tile
 // runs past it.
@@ -133,7 +139,9 @@ void gpu_set_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t tile_x, u
 gpu_status_t gpu_stream_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t tile);
 gpu_status_t gpu_write_back_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_t tile);
 
-// The whole frame, by the tiles' runner of gpu->mode. On failure *failed_tile says where it stopped.
+// The whole frame, by the tiles' runner of gpu->mode. On failure *failed_tile says where it stopped;
+// GPU_BAD_SIZE, GPU_BAD_ALIGN or GPU_BAD_ADDRESS, for a frame outside gpu_frame_t's limits, before
+// anything.
 gpu_status_t gpu_frame(gpu_t *gpu, const gpu_frame_t *frame, uint32_t *failed_tile);
 
 const char *gpu_status_name(gpu_status_t status);

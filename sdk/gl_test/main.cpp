@@ -88,8 +88,9 @@ static bool turning;
 static const char start_model[] = "0:/suzanne.gltf";
 
 // Since the last report, from period_start: the frames drawn, the sum of their times (us) and of
-// their squares, of the front end's times (us) and of the command processor's cycle counts.
-static uint64_t frames_drawn, frame_us, frame_us2, front_us, cp_cycles;
+// their squares, of the front end's times (us), of the command processor's cycle counts and of the
+// tile DMA's for each frame's last tile write-back.
+static uint64_t frames_drawn, frame_us, frame_us2, front_us, cp_cycles, tile_cycles;
 static XTime period_start;
 
 static const char *mode_name(void)
@@ -132,7 +133,7 @@ static void start_drawing(void)
     }
     gpu_set_mode(&gpu, mode);
     drawing = true;
-    frames_drawn = frame_us = frame_us2 = front_us = cp_cycles = 0;
+    frames_drawn = frame_us = frame_us2 = front_us = cp_cycles = tile_cycles = 0;
     XTime_GetTime(&period_start);
     xil_printf("%s, %s\r\n", mode_name(), scene_name);
 }
@@ -163,6 +164,7 @@ static void draw_frame(void)
     front_us += (front - start) / (COUNTS_PER_SECOND / 1000000);
     if (mode == GPU_MODE_CP)
         cp_cycles += gpu_cp_frame_cycles(&gpu);
+    tile_cycles += gpu_tile_dma_cycles(&gpu);
     XTime now;
     XTime_GetTime(&now);
     if (now - period_start >= COUNTS_PER_SECOND)
@@ -171,13 +173,13 @@ static void draw_frame(void)
         const int rate10 = (int)(n * 10 * COUNTS_PER_SECOND / (now - period_start));
         // n * (sum of squares) - sum^2 is n^2 times the variance, never negative.
         const double deviation = std::sqrt((double)(n * frame_us2 - frame_us * frame_us)) / (double)n;
-        xil_printf("%s, %s: %d.%d frames/s, frame time %d \u00b1 %d us, front end %d us, %d triangles", mode_name(),
-                   scene_name, rate10 / 10, rate10 % 10, (int)(frame_us / n), (int)deviation, (int)(front_us / n),
-                   (int)lviv_gl_triangles());
+        xil_printf("%s, %s: %d.%d frames/s, frame time %d \u00b1 %d us, front end %d us, %d triangles (",
+                   mode_name(), scene_name, rate10 / 10, rate10 % 10, (int)(frame_us / n), (int)deviation,
+                   (int)(front_us / n), (int)lviv_gl_triangles());
         if (mode == GPU_MODE_CP)
-            xil_printf(" (CP cycle counter: %d)", (int)(cp_cycles / n));
-        xil_printf("\r\n");
-        frames_drawn = frame_us = frame_us2 = front_us = cp_cycles = 0;
+            xil_printf("CP cycle counter: %d, ", (int)(cp_cycles / n));
+        xil_printf("tile write-back: %d cycles)\r\n", (int)(tile_cycles / n));
+        frames_drawn = frame_us = frame_us2 = front_us = cp_cycles = tile_cycles = 0;
         period_start = now;
     }
 }

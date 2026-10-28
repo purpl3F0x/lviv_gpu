@@ -59,6 +59,11 @@ uint32_t gpu_cp_frame_cycles(const gpu_t *gpu)
     return cp_read_reg(gpu, CP_REG_FRAME_CYCLES);
 }
 
+uint32_t gpu_tile_dma_cycles(const gpu_t *gpu)
+{
+    return tile_dma_read_reg(gpu, AXI_TILE_DMA_REG_PERF);
+}
+
 uint32_t gpu_tiles_x(const gpu_frame_t *frame)
 {
     return (frame->width + GPU_TILE_SIZE - 1) / GPU_TILE_SIZE;

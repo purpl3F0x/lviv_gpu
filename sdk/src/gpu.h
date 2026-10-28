@@ -104,6 +104,9 @@ void gpu_cp_soft_reset(const gpu_t *gpu);
 // The command processor's clock cycles for its last frame (FRAME_CYCLES).
 uint32_t gpu_cp_frame_cycles(const gpu_t *gpu);
 
+// The tile DMA's clock cycles (mem_clk) for its last tile write-back (PERF).
+uint32_t gpu_tile_dma_cycles(const gpu_t *gpu);
+
 // Interrupt handlers, for the interrupt controller to call with the gpu_t (XScuGic_Connect): each
 // takes its DMA's pending events, clears them, which drops the line, and counts the interrupt.
 void gpu_vis_dma_isr(void *gpu);

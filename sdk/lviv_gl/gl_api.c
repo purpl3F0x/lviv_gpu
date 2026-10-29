@@ -233,12 +233,13 @@ int lviv_gl_init(gpu_t *gpu, int width, int height, void *frame_memory, size_t f
     return 0;
 }
 
-gpu_status_t lviv_gl_frame(uint32_t *target, uint32_t stride, uint32_t *failed_tile)
+// The first count triangles of the frame memory, into target; then the next frame
+static gpu_status_t render(uint32_t count, uint32_t *target, uint32_t stride, uint32_t *failed_tile)
 {
     const gpu_frame_t f = {
         .triangles = gl.triangles,
         .visibility = gl.visibility,
-        .triangle_count = gl.geom.count,
+        .triangle_count = count,
         .frame = target,
         .stride = stride,
         .width = (uint32_t)gl.width,
@@ -246,12 +247,22 @@ gpu_status_t lviv_gl_frame(uint32_t *target, uint32_t stride, uint32_t *failed_t
         .clear_color = gl.frame_clear_color,
     };
     uint32_t tile;
-    gl.last_triangles = gl.geom.count;
+    gl.last_triangles = count;
     const gpu_status_t status = gpu_frame(gl.gpu, &f, &tile);
     if (failed_tile)
         *failed_tile = tile;
     begin_frame();
     return status;
+}
+
+gpu_status_t lviv_gl_frame(uint32_t *target, uint32_t stride, uint32_t *failed_tile)
+{
+    return render(gl.geom.count, target, stride, failed_tile);
+}
+
+gpu_status_t lviv_gl_frame_again(uint32_t *target, uint32_t stride, uint32_t *failed_tile)
+{
+    return render(gl.geom.count ? gl.geom.count : gl.last_triangles, target, stride, failed_tile);
 }
 
 uint32_t lviv_gl_triangles(void)

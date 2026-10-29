@@ -185,6 +185,9 @@ int lviv_gl_init(gpu_t *gpu, int width, int height, void *frame_memory, size_t f
 // end of the last row of tiles, in memory the CPU does not cache: gpu_frame_t), and starts the next
 // frame. If it fails, the tile it stopped at goes to failed_tile (unless NULL).
 gpu_status_t lviv_gl_frame(uint32_t *target, uint32_t stride, uint32_t *failed_tile);
+// lviv_gl_frame for the last frame again, its triangles as the frame memory still holds them (no
+// front end); if anything was drawn since, that instead.
+gpu_status_t lviv_gl_frame_again(uint32_t *target, uint32_t stride, uint32_t *failed_tile);
 // The triangles the last frame sent to the GPU (after clipping, culling and binning).
 uint32_t lviv_gl_triangles(void);
 // glTexImage2D for the bound texture with the GPU's own texels, copied as they are: size x size

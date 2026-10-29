@@ -83,6 +83,8 @@ static gltf_scene_t *scene;
 static char scene_name[64];
 static float angle;
 static bool turning;
+// f: the front end once, then its triangles again every frame (kept: lviv_gl holds them)
+static bool keep_triangles, triangles_kept;
 
 // The model drawn from the start, if the card has it (none otherwise, until o opens one)
 static const char start_model[] = "0:/suzanne.gltf";
@@ -143,11 +145,15 @@ static void draw_frame(void)
 {
     XTime start, front, end;
     uint32_t failed_tile = 0;
+    const bool again = keep_triangles && triangles_kept;
     XTime_GetTime(&start);
-    draw_scene();
+    if (!again)
+        draw_scene();
     XTime_GetTime(&front);
-    const gpu_status_t status = lviv_gl_frame(frames[back], STRIDE, &failed_tile);
+    const gpu_status_t status = again ? lviv_gl_frame_again(frames[back], STRIDE, &failed_tile)
+                                      : lviv_gl_frame(frames[back], STRIDE, &failed_tile);
     XTime_GetTime(&end);
+    triangles_kept = true;
     if (status != GPU_OK)
     {
         xil_printf("%s, %s: failed at tile %d: %s\r\n", mode_name(), scene_name, (int)failed_tile,
@@ -186,8 +192,8 @@ static void draw_frame(void)
 
 static void print_keys(void)
 {
-    xil_printf("keys: 1 CPU, 2 command processor; s turn the model or stop it; r draw again; l SD card; "
-               "o open a model; ? keys\r\n");
+    xil_printf("keys: 1 CPU, 2 command processor; s turn the model or stop it; f front end every frame or "
+               "once; r draw again; l SD card; o open a model; ? keys\r\n");
 }
 
 // A key from the UART console, or -1 if there is none.
@@ -272,6 +278,7 @@ static void load_model(const char *path, bool missing_ok)
     }
     gltf_scene_free(scene);
     scene = loaded;
+    triangles_kept = false;
     std::snprintf(scene_name, sizeof scene_name, "%s", path + 3);
     gltf_scene_setup(scene, WIDTH, HEIGHT);
     xil_printf("model: %s, %d triangles, %d texture%s, %d light%s, %s camera; %u bytes read in %d ms, parsed in %d "
@@ -351,6 +358,10 @@ int main(void)
         case 's':
             turning = !turning;
             xil_printf("model: %s\r\n", turning ? "turning" : "still");
+            break;
+        case 'f':
+            keep_triangles = !keep_triangles;
+            xil_printf("front end: %s\r\n", keep_triangles ? "once, then the GPU alone" : "every frame");
             break;
         case 'r':
             start_drawing();

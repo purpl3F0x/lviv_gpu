@@ -7,6 +7,7 @@
 #include "sw_simd.h"
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 // The GPU's (sdk/include/gpu_map.h, which needs the BSP)
@@ -18,12 +19,6 @@
 #define TILE SW_RASTER_TILE
 _Static_assert(TILE >= 8 && GPU_TILE % TILE == 0, "SW_RASTER_TILE must divide the GPU's tile");
 #define TILES (GPU_TILES * (GPU_TILE / TILE) * (GPU_TILE / TILE)) // in a frame, at most
-
-// The triangles binned to the tiles, an entry for each tile a triangle's box takes; past this many
-// in a frame, its tiles each go through all its triangles
-#ifndef SW_RASTER_BINNED
-#define SW_RASTER_BINNED (1 << 18)
-#endif
 
 // Positions in fixed point, 4 fractional bits, so that the edge functions fit 32 bits: in a
 // triangle's box at most twice the frame's area (2^21 pixels at most) times 16 * 16
@@ -83,9 +78,10 @@ static struct
 static _Alignas(64) uint32_t tile_color[TILE * TILE];
 static _Alignas(64) float tile_z[TILE * TILE];
 
-// Each tile's triangles, from bin_start[tile] to bin_start[tile + 1] in binned; the visibility bit
-// of its GPU tile
-static uint32_t binned[SW_RASTER_BINNED];
+// Each tile's triangles, from bin_start[tile] to bin_start[tile + 1] in binned (an entry for each
+// tile a triangle's box takes); the visibility bit of its GPU tile
+static uint32_t *binned;     // on the heap: room_for
+static uint32_t binned_room; // its entries
 static uint32_t bin_start[TILES + 1], bin_fill[TILES];
 static uint64_t bin_bit[TILES];
 
@@ -840,6 +836,20 @@ static void write_tile(const gpu_frame_t *frame, const box_t *box)
 #endif
 }
 
+// Room in binned for n entries (a quarter more when it grows, for the frames after); 0 if the heap
+// has none
+static int room_for(uint32_t n)
+{
+    if (n <= binned_room)
+        return 1;
+    free(binned);
+    binned_room = n + n / 4;
+    binned = malloc((size_t)binned_room * sizeof *binned);
+    if (!binned)
+        binned_room = 0;
+    return binned != NULL;
+}
+
 gpu_status_t sw_raster_frame(const gpu_frame_t *frame)
 {
     const uint32_t gpu_across = (frame->width + GPU_TILE - 1) / GPU_TILE;
@@ -871,7 +881,8 @@ gpu_status_t sw_raster_frame(const gpu_frame_t *frame)
         bin_fill[i] = 0;
     }
     bin_start[tiles] = total;
-    const int all_binned = total <= SW_RASTER_BINNED;
+    // With no room on the heap, its tiles each go through all its triangles
+    const int all_binned = room_for(total);
     if (all_binned)
         for (uint32_t t = 0; t < frame->triangle_count; t++)
         {

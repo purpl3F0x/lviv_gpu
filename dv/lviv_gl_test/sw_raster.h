@@ -9,8 +9,8 @@
 // cache. What the core draws: counter-clockwise triangles, the pixels whose centers they cover (by
 // the top-left rule where on an edge, not both triangles'), z and 1/w linear, color and texture
 // coordinates perspective-correct, the depth test, the nearest texel, the texture functions and
-// the blend (GL's rounding: 255 as 1, not the core's 255/256). Plain C, no OS or BSP headers and no
-// heap: it builds for the host and for the A53 alike.
+// the blend (GL's rounding: 255 as 1, not the core's 255/256). Plain C, no OS or BSP headers, the
+// bins on the heap (malloc): it builds for the host and for the A53 alike.
 #pragma once
 
 #include "gpu.h"

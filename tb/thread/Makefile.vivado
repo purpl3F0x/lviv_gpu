@@ -2,7 +2,7 @@
 #   xsim simulation (scripts/vivado/xsim.mk) and out-of-context synth/impl (below, scripts/vivado/ooc_flow.tcl).
 # Usage: make -f Makefile.vivado [sim|gui_sim|synth|impl|synth_gui|impl_gui|ooc_clean|ip|clean|distclean]
 
-RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/fp_wrappers.sv ../../rtl/fp_cmp_le.sv ../../rtl/axis_skid_buffer.sv \
+RTL = ../../rtl/gpu_types_pkg.sv ../../rtl/fp_wrappers.sv ../../rtl/fp_depth_func.sv ../../rtl/axis_skid_buffer.sv \
       ../../rtl/delay_pipe.sv ../../rtl/fx_texture_interpolator.sv ../../rtl/fx_color_interpolator.sv \
       ../../rtl/fragment_shader.sv ../../rtl/blend_unit.sv ../../rtl/z_buffer_ram.sv \
       ../../rtl/texture_address_generator.sv ../../rtl/texture_cache.sv $(SPINAL_GEN_DIR)/ApbThreadRegs.v \

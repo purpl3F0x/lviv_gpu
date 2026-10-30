@@ -20,7 +20,7 @@ RTL_SRCS = ../../rtl/gpu_types_pkg.sv \
            ../../rtl/sync_fifo.sv \
            ../../rtl/orchestrator_alu.sv \
            ../../rtl/thread_orchestrator.sv \
-           ../../rtl/fp_cmp_le.sv \
+           ../../rtl/fp_depth_func.sv \
            ../../rtl/fx_texture_interpolator.sv \
            ../../rtl/fx_color_interpolator.sv \
            ../../rtl/fragment_shader.sv \

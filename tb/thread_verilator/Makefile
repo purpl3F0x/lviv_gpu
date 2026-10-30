@@ -18,7 +18,7 @@ SV_SRCS = verilator.vlt \
           thread_verilator_wrap.sv \
           ../../tb/common/axi_ram.v \
           ../../rtl/fp_wrappers.sv \
-          ../../rtl/fp_cmp_le.sv \
+          ../../rtl/fp_depth_func.sv \
           ../../rtl/axis_skid_buffer.sv \
           ../../rtl/delay_pipe.sv \
           ../../rtl/fx_texture_interpolator.sv \

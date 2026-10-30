@@ -7,7 +7,7 @@ import gpu_types_pkg::*;
 //   stage 1: register a, b and func
 //   stage 2: lt / gt / eq (-0 equals +0; NaNs are not handled)
 //   stage 3: pass = |(func & {gt, eq, lt}), one LUT from registers
-module fp_cmp_le (
+module fp_depth_func (
     input aclk,
     input aclken,
 

@@ -15,8 +15,8 @@ logic [31:0] fp_fma_3_res;
 logic [31:0] fp_fma_4_res;
 logic [31:0] mem_read_1_rdata;
 logic [31:0] fp_recip_1_out;
-logic [0:0] fp_cmp_1_pred;
-logic fp_cmp_1_pred_valid;
+logic [0:0] fp_depth_func_1_pred;
+logic fp_depth_func_1_pred_valid;
 logic [0:0] mem_write_1_pred;
 logic mem_write_1_fire;
 logic [31:0] fp_mul_8_res;
@@ -51,7 +51,7 @@ assign dfactor_op_tdata = thread_data_buf.dfactor_op;
 logic [31:0] color_tdata;
 assign color_tdata = fx_color_interpolate_1_res;
 logic comp_z_tdata;
-assign comp_z_tdata = fp_cmp_1_pred;
+assign comp_z_tdata = fp_depth_func_1_pred;
 
 // ---- Unit input ready wires ----
 // None (non-blocking FP modules use aclken/valid_in)
@@ -70,7 +70,7 @@ assign comp_z_tdata = fp_cmp_1_pred;
 // fp_fma_4         -> fp_fma_4          out=fp_fma_4_res        start= 32  end= 48  valid=(pipe_en)  expr=fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area))))
 // mem_read_1       -> mem_read_1        out=mem_read_1_rdata    start= 47  end= 50  valid=(pipe_en)  expr=mem_read(addr)
 // fp_recip_1       -> fp_recip_1        out=fp_recip_1_out      start= 48  end= 77  valid=(pipe_en)  expr=(1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area)))))
-// fp_cmp_1         -> fp_cmp_1          out=fp_cmp_1_pred       start= 50  end= 53  valid=(pipe_en)  expr=depth_compare(fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))), mem_read(addr), depth_func)
+// fp_depth_func_1  -> fp_depth_func_1   out=fp_depth_func_1_pred  start= 50  end= 53  valid=(pipe_en)  expr=depth_compare(fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))), mem_read(addr), depth_func)
 // mem_write_1      -> mem_write_1       out=mem_write_1_pred    start= 53  end= 54  valid=(pipe_en)  expr=mem_write(addr, fma(v2_z, (e2 * inv_area), fma(v1_z, (e1 * inv_area), (v0_z * (e0 * inv_area)))))
 // fp_mul_5         -> fp_mul_8          out=fp_mul_8_res        start= 77  end= 85  valid=(pipe_en)  expr=((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v0_w * (e0 * inv_area)))
 // fp_mul_7         -> fp_mul_9          out=fp_mul_9_res        start= 77  end= 85  valid=(pipe_en)  expr=((1 / fma(v2_w, (e2 * inv_area), fma(v1_w, (e1 * inv_area), (v0_w * (e0 * inv_area))))) * (v1_w * (e1 * inv_area)))
@@ -84,9 +84,9 @@ assign comp_z_tdata = fp_cmp_1_pred;
 
 // ---- Non-AXIS consumer fire wiring ----
 logic mem_read_1_fire;
-logic fp_cmp_1_fire;
+logic fp_depth_func_1_fire;
 assign mem_read_1_fire = valid_pipe[47];
-assign fp_cmp_1_fire = valid_pipe[51];
+assign fp_depth_func_1_fire = valid_pipe[51];
 
 // ---- Delay alignment for late-consumed inputs ----
 logic [31:0] align_v0_z_to_fp_mul_10_i0_d8;
@@ -102,8 +102,8 @@ logic [31:0] align_fp_mul_3_to_fp_fma_2_i1_d24;
 logic [31:0] align_v2_z_to_fp_fma_4_i0_d32;
 logic [31:0] align_fp_mul_3_to_fp_fma_4_i1_d24;
 logic [THREAD_ADDR_W-1:0] align_addr_to_mem_read_1_i0_d47;
-logic [31:0] align_fp_fma_4_to_fp_cmp_1_i0_d2;
-logic [2:0] align_depth_func_to_fp_cmp_1_i2_d50;
+logic [31:0] align_fp_fma_4_to_fp_depth_func_1_i0_d2;
+logic [2:0] align_depth_func_to_fp_depth_func_1_i2_d50;
 logic [THREAD_ADDR_W-1:0] align_addr_to_mem_write_1_i0_d53;
 logic [31:0] align_fp_fma_4_to_mem_write_1_i1_d5;
 logic [31:0] align_fp_mul_4_to_fp_mul_5_i1_d61;
@@ -136,8 +136,8 @@ delay_pipe #(.WIDTH(64), .STAGES(24)) u_align_s8_d24 (.clk(clk), .rst_n(1'b1), .
 assign {align_v2_w_to_fp_fma_2_i0_d32, align_fp_mul_3_to_fp_fma_2_i1_d24} = align_s8_d24_out;
 delay_pipe #(.WIDTH(32), .STAGES(32)) u_align_v2_z_to_fp_fma_4_i0_d32_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.v2_z), .data_out(align_v2_z_to_fp_fma_4_i0_d32));
 delay_pipe #(.WIDTH(THREAD_ADDR_W), .STAGES(47)) u_align_addr_to_mem_read_1_i0_d47_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.addr[THREAD_ADDR_W-1:0]), .data_out(align_addr_to_mem_read_1_i0_d47));
-delay_pipe #(.WIDTH(32), .STAGES(2)) u_align_fp_fma_4_to_fp_cmp_1_i0_d2_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_fma_4_res), .data_out(align_fp_fma_4_to_fp_cmp_1_i0_d2));
-delay_pipe #(.WIDTH(3), .STAGES(50)) u_align_depth_func_to_fp_cmp_1_i2_d50_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.depth_func), .data_out(align_depth_func_to_fp_cmp_1_i2_d50));
+delay_pipe #(.WIDTH(32), .STAGES(2)) u_align_fp_fma_4_to_fp_depth_func_1_i0_d2_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_fma_4_res), .data_out(align_fp_fma_4_to_fp_depth_func_1_i0_d2));
+delay_pipe #(.WIDTH(3), .STAGES(50)) u_align_depth_func_to_fp_depth_func_1_i2_d50_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(thread_data_buf.depth_func), .data_out(align_depth_func_to_fp_depth_func_1_i2_d50));
 delay_pipe #(.WIDTH(THREAD_ADDR_W), .STAGES(6)) u_align_addr_to_mem_write_1_i0_d53_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(align_addr_to_mem_read_1_i0_d47), .data_out(align_addr_to_mem_write_1_i0_d53));
 delay_pipe #(.WIDTH(32), .STAGES(5)) u_align_fp_fma_4_to_mem_write_1_i1_d5_data_delay (.clk(clk), .rst_n(1'b1), .clken(pipe_en_internal), .data_in(fp_fma_4_res), .data_out(align_fp_fma_4_to_mem_write_1_i1_d5));
 logic [96-1:0] align_s16_d61_in, align_s16_d61_out;
@@ -244,16 +244,16 @@ fp_recip #(.LATENCY(29)) u_fp_recip_1 (
     .a(fp_fma_3_res),
     .result(fp_recip_1_out)
 );
-fp_cmp_le u_fp_cmp_1 (
+fp_depth_func u_fp_depth_func_1 (
     .aclk(clk),
     .aclken(pipe_en_internal),
-    .s_axis_a(align_fp_fma_4_to_fp_cmp_1_i0_d2),
+    .s_axis_a(align_fp_fma_4_to_fp_depth_func_1_i0_d2),
     .s_axis_b(mem_read_1_rdata),
-    .func(depth_func_t'(align_depth_func_to_fp_cmp_1_i2_d50)),
-    .m_axis_res(fp_cmp_1_pred[0])
+    .func(depth_func_t'(align_depth_func_to_fp_depth_func_1_i2_d50)),
+    .m_axis_res(fp_depth_func_1_pred[0])
 );
 assign mem_write_1_fire = valid_pipe[53];
-assign mem_write_1_pred[0] = (fp_cmp_1_pred[0]);
+assign mem_write_1_pred[0] = (fp_depth_func_1_pred[0]);
 assign z_wr_en = mem_write_1_fire && mem_write_1_pred[0] && pipe_en_internal;
 assign z_wr_addr = align_addr_to_mem_write_1_i0_d53;
 assign z_wr_data = align_fp_fma_4_to_mem_write_1_i1_d5;

@@ -10,7 +10,7 @@ SUPPORTED_OPS = {
     "fp_mul",
     "fp_fma",
     "fp_recip",
-    "fp_cmp",
+    "fp_depth_func",
     "mux",
     "mem_read",
     "mem_write",
@@ -26,8 +26,8 @@ DEFAULT_LATENCIES = {
     "fp_mul": 8,
     "fp_fma": 19,
     "fp_recip": 28,
-    # fp_cmp_le: input registers, lt/gt/eq, function select.
-    "fp_cmp": 3,
+    # fp_depth_func: input registers, lt/gt/eq, function select.
+    "fp_depth_func": 3,
     "mux": 1,
     "mem_read": 1,
     "mem_write": 1,
@@ -334,12 +334,12 @@ class HardwareDAG:
             self.global_valid_expr,
             self._input_valid_expr(left),
         )
-        cache_key = ("fp_cmp", cmp_kind, expr, valid_expr)
+        cache_key = ("fp_depth_func", cmp_kind, expr, valid_expr)
         if cache_key in self.expression_cache:
             return self.expression_cache[cache_key]
 
         node_id = self._new_node(
-            "fp_cmp", expr, cmp_kind=cmp_kind, valid_expr=valid_expr
+            "fp_depth_func", expr, cmp_kind=cmp_kind, valid_expr=valid_expr
         )
         operands = (left, right) if func is None else (left, right, func)
         self._add_edges(node_id, operands, tuple(self.control_dependencies))
@@ -484,7 +484,7 @@ class HardwareDAG:
         return str(sig)
 
     def _unit_out_wire_name(self, op_type, unit_name):
-        if op_type in ("fp_cmp", "mem_write"):
+        if op_type in ("fp_depth_func", "mem_write"):
             return f"{unit_name}_pred"
         if op_type == "fp_recip":
             return f"{unit_name}_out"
@@ -501,7 +501,7 @@ class HardwareDAG:
             if isinstance(sig, (Signal, PredicateSignal)) and sig.hw_id
         ]
 
-        if op_type == "fp_cmp":
+        if op_type == "fp_depth_func":
             for sig in inputs:
                 if isinstance(sig, (Signal, PredicateSignal)) and sig.hw_id:
                     return sig
@@ -538,7 +538,7 @@ class HardwareDAG:
 
     def _op_out_width(self, op_type):
         """Return the output bit-width for a given op type."""
-        if op_type in ("fp_cmp", "mem_write"):
+        if op_type in ("fp_depth_func", "mem_write"):
             return 1
         return _FX_OP_WIDTHS.get(op_type, 32)
 
@@ -594,7 +594,7 @@ class HardwareDAG:
             wire = wire_name_by_node[node]
             width = self._op_out_width(info.op_type)
             lines.append(f"logic [{width-1}:0] {wire};")
-            if info.op_type == "fp_cmp":
+            if info.op_type == "fp_depth_func":
                 lines.append(f"logic {wire}_valid;")
             if info.op_type == "mem_write":
                 lines.append(f"logic {node}_fire;")
@@ -744,7 +744,7 @@ class HardwareDAG:
         consumer_fire_nodes = {
             node
             for node in sorted_ops
-            if self.ops[node].op_type in ("fp_cmp", "mem_read", "mux")
+            if self.ops[node].op_type in ("fp_depth_func", "mem_read", "mux")
             and len(self.op_inputs[node]) > 0
         }
 
@@ -1003,16 +1003,16 @@ class HardwareDAG:
                     lines.append(f"assign z_wr_en = {wr_en_expr} && pipe_en_internal;")
                     lines.append(f"assign z_wr_addr = {addr};")
                     lines.append(f"assign z_wr_data = {data};")
-            elif info.op_type == "fp_cmp":
+            elif info.op_type == "fp_depth_func":
                 a = input_ref_by_edge[(node, 0)]
                 b = input_ref_by_edge[(node, 1)]
-                # Every compare kind uses fp_cmp_le: "func" takes the per-token function from its
+                # Every compare kind uses fp_depth_func: "func" takes the per-token function from its
                 # third input, the fixed kinds a constant one.
                 if info.cmp_kind == "func":
                     func = f"depth_func_t'({input_ref_by_edge[(node, 2)]})"
                 else:
                     func = _CMP_KIND_FUNC[info.cmp_kind]
-                lines.append(f"fp_cmp_le u_{unit} (")
+                lines.append(f"fp_depth_func u_{unit} (")
                 lines.append("    .aclk(clk),")
                 lines.append("    .aclken(pipe_en_internal),")
                 lines.append(f"    .s_axis_a({a}),")
@@ -1553,7 +1553,7 @@ if __name__ == "__main__":
         "fp_mul": 8,
         "fp_fma": 16,
         "fp_recip": 29,
-        "fp_cmp": 3,
+        "fp_depth_func": 3,
         "fp_to_fx2_23": 3,
         "mem_read": 3,
         "mem_write": 1,

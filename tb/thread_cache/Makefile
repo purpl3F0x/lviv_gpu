@@ -5,7 +5,7 @@ SNAPSHOT = tb_sim
 
 RTL_SRCS = ../../rtl/gpu_types_pkg.sv \
            ../../rtl/fp_wrappers.sv \
-           ../../rtl/fp_cmp_le.sv \
+           ../../rtl/fp_depth_func.sv \
            ../../rtl/axis_skid_buffer.sv \
            ../../rtl/delay_pipe.sv \
            ../../rtl/fx_texture_mul.sv \

@@ -1,4 +1,4 @@
-# Block design with gpu_top's raster core on the ZCU104 (gpu_test_bd.tcl), the CPU driving it.
+# Block design with gpu_top's raster core and the L2 on the ZCU104 (gpu_test_bd.tcl), the CPU driving it.
 # Usage: make [project|gui|synth|impl|bitstream|xsa|export_bd|clean]
 #        make [vitis|vitis_gui|vitis_build|vitis_build_<app>|vitis_clean]; see scripts/vivado/bd.mk.
 
@@ -9,7 +9,7 @@ BD_TCL = gpu_test_bd.tcl
 XDC = gpu_test.xdc
 
 include ../gpu_top.mk
-RTL = $(GPU_TOP_RTL)
+RTL = $(GPU_TOP_RTL) $(SPINAL_GEN_DIR)/L2Cache.v
 
 # The Vitis applications, on the drivers in sdk/src (the SD card's on the BSP's xilffs): raster_test,
 # the raster core's tests in sdk/raster_test; gl_test, models from glTF files on the SD card drawn

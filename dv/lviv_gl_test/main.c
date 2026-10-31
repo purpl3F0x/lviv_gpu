@@ -5,7 +5,8 @@
 // (sw_raster.c), and how long it all took is reported, to compare with the GPU.
 //
 // Usage: lviv_gl_test FILE OUT [FRAMES]
-//   OUT     the last frame: OUT.png as the CPU draws it, else (OUT.hex) its data; - for none
+//   OUT     the last frame: OUT.png as the CPU draws it, else (OUT.hex) its data, its textures
+//           next to it (OUT_textures.hex); - for none
 //   FRAMES  that many frames, 1 if not given, the model turned a degree a frame as gl_test turns
 //           it; their times: the front end's (to gpu_frame) and the CPU's drawing
 
@@ -33,6 +34,14 @@ static gpu_frame_t last_frame; // the last frame gpu_frame got, for OUT
 static double raster_seconds;  // in sw_raster, all frames
 static uint32_t pixels[HEIGHT * WIDTH];
 
+// The textures as gpu_set_texture had them (ids: gpu_map.h's GPU_TEXTURES), for OUT_textures.hex
+#define TEXTURES 128
+static struct
+{
+    const uint32_t *texels; // NULL: none
+    uint32_t log2_size;
+} textures[TEXTURES];
+
 static double seconds(void)
 {
     struct timespec t;
@@ -52,6 +61,35 @@ static int write_hex(const gpu_frame_t *frame)
         fprintf(out, "%016llx", (unsigned long long)frame->visibility[t]);
         for (int w = 0; w < GPU_TRIANGLE_BYTES / 4; w++)
             fprintf(out, " %08x", words[w]);
+        fprintf(out, "\n");
+    }
+    return fclose(out) == 0 ? 0 : -1;
+}
+
+// For $readmemh: each texture's words at its word address in the texture window, after a comment
+// line with its table entry, "// texture ID ADDRESS SIZE" (hex address, size code). Addresses from
+// the lowest texture's: lviv_gl puts each at a multiple of its size, largest first.
+static int write_textures(void)
+{
+    const uint32_t *lowest = NULL;
+    for (int t = 0; t < TEXTURES; t++)
+        if (textures[t].texels && (!lowest || textures[t].texels < lowest))
+            lowest = textures[t].texels;
+    const size_t n = strlen(out_path);
+    const int stem = (int)(n >= 4 && strcmp(out_path + n - 4, ".hex") == 0 ? n - 4 : n);
+    char path[1024];
+    snprintf(path, sizeof path, "%.*s_textures.hex", stem, out_path);
+    FILE *out = fopen(path, "w");
+    if (!out)
+        return -1;
+    for (int t = 0; t < TEXTURES; t++)
+    {
+        if (!textures[t].texels)
+            continue;
+        const uint32_t address = (uint32_t)(textures[t].texels - lowest);
+        fprintf(out, "// texture %d %08x %u\n@%08x\n", t, address, textures[t].log2_size, address);
+        for (uint32_t w = 0; w < 1u << (2 * textures[t].log2_size); w++)
+            fprintf(out, "%08x%c", textures[t].texels[w], w % 8 == 7 ? '\n' : ' ');
         fprintf(out, "\n");
     }
     return fclose(out) == 0 ? 0 : -1;
@@ -88,6 +126,11 @@ gpu_status_t gpu_frame(gpu_t *gpu, const gpu_frame_t *frame, uint32_t *failed_ti
 int gpu_set_texture(const gpu_t *gpu, uint32_t id, const uint32_t *texels, uint32_t log2_size)
 {
     (void)gpu;
+    if (id < TEXTURES)
+    {
+        textures[id].texels = texels;
+        textures[id].log2_size = log2_size;
+    }
     return sw_raster_set_texture(id, texels, log2_size);
 }
 
@@ -157,7 +200,7 @@ static int run(void)
            "(fastest %.3f)\n",
            frames, frames == 1 ? "" : "s", frame_ms, 1e3 / frame_ms, fastest * 1e3, frame_ms - raster_ms,
            sw_raster_simd(), raster_ms, fastest_raster * 1e3);
-    if (out_path && (out_png ? write_png(&last_frame) : write_hex(&last_frame)) != 0)
+    if (out_path && (out_png ? write_png(&last_frame) : write_hex(&last_frame) || write_textures()) != 0)
     {
         perror(out_path);
         return 1;

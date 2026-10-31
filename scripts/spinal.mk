@@ -23,7 +23,7 @@ SBT ?= sbt
 # Per module: its generator object, the Scala files it is built from (keep these in step with the
 # code: the crossbar sizes its windows from the register blocks), and its register map files.
 SPINAL_MODULES = APBFrontendRegs ApbClockCrossing ApbLutRam ApbThreadRegs Axi4ToApbXbar AxiTileDma \
-                 AxiVisibilityDma CommandProcessor
+                 AxiVisibilityDma CommandProcessor L2Cache
 
 SPINAL_MAIN_APBFrontendRegs = APBFrontendRegsVerilog
 SPINAL_SRCS_APBFrontendRegs = ControlModules/APBFrontendRegs.scala
@@ -59,6 +59,10 @@ SPINAL_MAIN_CommandProcessor = CommandProcessorVerilog
 SPINAL_SRCS_CommandProcessor = ControlModules/CommandProcessor.scala ControlModules/Axi4ToApbXbar.scala \
                                ControlModules/APBFrontendRegs.scala ControlModules/ApbThreadRegs.scala
 SPINAL_DOCS_CommandProcessor = $(addprefix command_processor_regmap.,h json html)
+
+SPINAL_MAIN_L2Cache = L2CacheVerilog
+SPINAL_SRCS_L2Cache = L2Cache/L2Cache.scala
+SPINAL_DOCS_L2Cache = $(addprefix l2_cache_regmap.,h json html)
 
 SPINAL_VERILOG = $(SPINAL_MODULES:%=$(SPINAL_GEN_DIR)/%.v)
 SPINAL_DOCS = $(foreach m,$(SPINAL_MODULES),$(addprefix $(SPINAL_DOC_DIR)/$(m)/,$(SPINAL_DOCS_$(m))))

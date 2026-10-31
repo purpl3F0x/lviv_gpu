@@ -16,16 +16,14 @@
 // clocks: 20, 80),
 // +INTERLEAVE=0|1 (DDR beats of different IDs interleaved, 1), +REQS= (random requests a port
 // a phase, 1500).
-// Ways, SizeKib, OnMemClock, LineBytes: the L2Cache's (L2CacheVerilog's arguments; the default's
-// here).
+// Ways, SizeKib, LineBytes: the L2Cache's (L2CacheConfig's defaults here).
 
 `timescale 1ns / 1ps
 
 module tb_l2_cache #(
     parameter int Ways = 2,
     parameter int SizeKib = 1024,
-    parameter bit OnMemClock = 1'b0,
-    parameter int LineBytes = 512
+    parameter int LineBytes = 1024
 );
 
   localparam int N = 4;
@@ -395,12 +393,10 @@ module tb_l2_cache #(
     end
   endtask
 
-  // What the cycles counter should hold: the cache's clocks neither clearing nor frozen; as of the
+  // What the cycles counter should hold: core_clk's clocks neither clearing nor frozen; as of the
   // last snapshot
   longint counted = 0, counted_at_read;
-  logic cache_clk;
-  assign cache_clk = OnMemClock ? mem_clk : core_clk;
-  always @(posedge cache_clk)
+  always @(posedge core_clk)
     if (dut.perf_clearing) counted <= 0;
     else if (!dut.CNT_FREEZE) counted <= counted + 1;
 

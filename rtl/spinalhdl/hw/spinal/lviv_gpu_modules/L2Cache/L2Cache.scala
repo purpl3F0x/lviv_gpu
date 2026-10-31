@@ -7,12 +7,22 @@ import spinal.lib.bus.amba4.axilite._
 import spinal.lib.bus.regif._
 import spinal.lib.bus.regif.AccessType._
 
+
+//        ┌────────────────────────────────┐
+//        │          ┌──────────┐          │  To L1 caches
+//        │┌───────┐ │          │ ┌───────┐│◄─────
+// to DDR ││  CDC  │ │          │ │Arbiter││◄─────
+//  ◄─────┤│ LUTRAM│ │   URAM   │ │ Round ││◄─────
+//        ││       │ │          │ │ Robin ││◄─────
+//        │└───────┘ │          │ └───────┘│
+//        │          └──────────┘          │
+//        └────────────────────────────────┘
+
 // =============================================================================
-// L2 texture cache: N read-only 128-bit slaves (the threads' L1 texture caches, one 256 B block
-// a request, one request at a time each), one read-only 512-bit master to DDR. Data in URAM,
-// tags in BRAM, all on core_clk (the slaves') but the master's side (mem_clk) and the register
-// port (axil_clk: AXI-Lite, the CPU's alone); or, onMemClock, all on mem_clk but the slaves' side.
-// Read-only: nothing is ever dirty, an eviction drops the line, a flush invalidates every line.
+// L2 texture cache in URAM: 
+//     - N read-only 128-bit slaves (the threads' L1 texture caches, one request at a time)
+//     - Single AXI-Master to DDR
+//     - tags in BRAM
 //
 //   s_axi_tex[n] -> arbiter (round robin; ports asking for the same block join the granted one)
 //     -> tag sequencer, one operation at a time: lookup, fill done, flush sweep
@@ -23,6 +33,16 @@ import spinal.lib.bus.regif.AccessType._
 //     -> per port: a block's 4 words, out as 16 x 128 with RLAST
 //
 // Performance counters: 8-bit counters in fabric, their carries added into a RAM
+//
+// ===========================================================================
+// DDR master (its AR and R cross into mem_clk)
+//
+//   MSHR AR   (core_clk) -> arCc: mshrs max 8 entries        -> m_axi AR (mem_clk)
+//   m_axi R   (mem_clk)  -> rCc: cdcDepth x 512-bit beats    -> fill     (core_clk)
+//
+// Both in LUTRAM (32 deep at no extra cost). The fill takes a beat every clock, so with core_clk
+// the faster rCc holds only the beats in flight across the clocks
+//
 // =============================================================================
 case class L2CacheConfig(
     ports: Int = 4,
@@ -30,11 +50,10 @@ case class L2CacheConfig(
     slaveAddressWidth: Int = 32,
     masterAddressWidth: Int = 32,
     totalBytes: Int = 1 << 20,
-    lineBytes: Int = 512,
+    lineBytes: Int = 1024,
     ways: Int = 2,
-    onMemClock: Boolean = false, // the cache on mem_clk, the slaves crossing from core_clk
-    dataReadLatency: Int = 4, // URAM readSync + pipeline registers
-    cdcDepth: Int = 32 // DDR read data crossing (LUTRAM depth)
+    dataReadLatency: Option[Int] = None, // URAM readSync + pipeline registers (None: auto choose latency for optimal cascade height)
+    cdcDepth: Int = 32 // DDR read data crossing (LUTRAM depth), contains data + AXI response ID
 ) {
   require(ports >= 1 && ports <= 8, "ports must be 1 to 8")
   require(ways >= 2 && ways <= 4, "ways must be 2 to 4")
@@ -46,7 +65,7 @@ case class L2CacheConfig(
     totalBytes % (lineBytes * ways) == 0 && isPow2(totalBytes / (lineBytes * ways)),
     "totalBytes must be lineBytes x ways x a power of 2 (the sets)"
   )
-  require(dataReadLatency >= 1, "dataReadLatency must be at least 1")
+  require(dataReadLatency.forall(_ >= 1), "dataReadLatency must be at least 1")
   require(
     cdcDepth >= 8 && isPow2(cdcDepth),
     "cdcDepth must be a power of 2 >= 8"
@@ -72,6 +91,9 @@ case class L2CacheConfig(
   val lineAddrBits = cachedAddressWidth - offsetBits
   val dataWords = totalBytes / masterBytes
   val dataAddrBits = log2Up(dataWords)
+  // URAM rows (4K deep) in the cascade: a pipeline stage per 2 rows
+  val uramRows = (dataWords + 4095) / 4096
+  val readLatency = dataReadLatency.getOrElse(2 + uramRows / 2)
   // Lines in flight: a port has its block from the first half of a line while the rest comes in,
   // and may ask for another
   val mshrs = 2 * ports
@@ -157,20 +179,11 @@ case class L2DdrR(c: L2CacheConfig) extends Bundle {
   val last = Bool()
 }
 
-case class L2Word(c: L2CacheConfig) extends Bundle {
-  val data = Bits(c.masterBytes * 8 bits)
-  val resp = Bits(2 bits)
-}
-
-// The cache runs on the component's clock: core_clk, or (onMemClock) mem_clk; the other clock is
-// otherClockDomain (mem_clk or core_clk)
-class L2Cache(val c: L2CacheConfig, otherClockDomain: ClockDomain = null, axilClockDomain: ClockDomain = null)
+// The cache runs on the component's clock (core_clk), the DDR master on memClockDomain (mem_clk)
+class L2Cache(val c: L2CacheConfig, memClockDomain: ClockDomain = null, axilClockDomain: ClockDomain = null)
     extends Component {
-  val otherClock =
-    if (otherClockDomain != null) otherClockDomain
-    else ClockDomain.external(if (c.onMemClock) "core" else "mem", withReset = true)
-  val slaveClock = if (c.onMemClock) otherClock else ClockDomain.current
-  val memClock = if (c.onMemClock) ClockDomain.current else otherClock
+  val coreClock = ClockDomain.current
+  val memClock = if (memClockDomain != null) memClockDomain else ClockDomain.external("mem", withReset = true)
   val axilClock = if (axilClockDomain != null) axilClockDomain else ClockDomain.external("axil", withReset = true)
   val axilConfig = AxiLite4Config(addressWidth = log2Up(L2Cache.regBytes(c)), dataWidth = 32)
 
@@ -204,8 +217,8 @@ class L2Cache(val c: L2CacheConfig, otherClockDomain: ClockDomain = null, axilCl
     s"NUM_READ_OUTSTANDING ${c.mshrs}, MAX_BURST_LENGTH ${c.lineBeats}, SUPPORTS_NARROW_BURST 0"
   )
 
-  slaveClock.clock.setName("core_clk")
-  slaveClock.reset.setName("core_resetn")
+  coreClock.clock.setName("core_clk")
+  coreClock.reset.setName("core_resetn")
   memClock.clock.setName("mem_clk")
   memClock.reset.setName("mem_resetn")
   axilClock.clock.setName("axil_clk")
@@ -222,7 +235,7 @@ class L2Cache(val c: L2CacheConfig, otherClockDomain: ClockDomain = null, axilCl
       .addAttribute("X_INTERFACE_INFO", s"xilinx.com:signal:reset:1.0 $rst RST")
       .addAttribute("X_INTERFACE_PARAMETER", "POLARITY ACTIVE_LOW")
   }
-  busClock(slaveClock, "core_clk", "core_resetn", (0 until c.ports).map(p => s"s_axi_$p").mkString(":"))
+  busClock(coreClock, "core_clk", "core_resetn", (0 until c.ports).map(p => s"s_axi_$p").mkString(":"))
   busClock(memClock, "mem_clk", "mem_resetn", "m_axi")
   busClock(axilClock, "axil_clk", "axil_resetn", "s_axil")
 
@@ -261,14 +274,14 @@ class L2Cache(val c: L2CacheConfig, otherClockDomain: ClockDomain = null, axilCl
   // ===========================================================================
   // Registers
   // ===========================================================================
-  // The registers on the cache's clock with what they count and control; AXI-Lite crosses from
-  // axil_clk to them, each channel by toggle (an access a few clocks of each)
+  // The registers on core_clk with what they count and control; AXI-Lite crosses from axil_clk to
+  // them, each channel by toggle (an access a few clocks of each)
   val axil = AxiLite4(axilConfig)
-  axil.aw << StreamCCByToggle(io.s_axil.aw, axilClock, ClockDomain.current)
-  axil.w << StreamCCByToggle(io.s_axil.w, axilClock, ClockDomain.current)
-  axil.ar << StreamCCByToggle(io.s_axil.ar, axilClock, ClockDomain.current)
-  io.s_axil.b << StreamCCByToggle(axil.b, ClockDomain.current, axilClock)
-  io.s_axil.r << StreamCCByToggle(axil.r, ClockDomain.current, axilClock)
+  axil.aw << StreamCCByToggle(io.s_axil.aw, axilClock, coreClock)
+  axil.w << StreamCCByToggle(io.s_axil.w, axilClock, coreClock)
+  axil.ar << StreamCCByToggle(io.s_axil.ar, axilClock, coreClock)
+  io.s_axil.b << StreamCCByToggle(axil.b, coreClock, axilClock)
+  io.s_axil.r << StreamCCByToggle(axil.r, coreClock, axilClock)
   val busif = AxiLite4BusInterface(axil, (0x0000, L2Cache.regBytes(c)), "L2_CACHE")
 
   val REG_CTRL = busif.newRegAt(address = 0x00, doc = "Control")
@@ -347,29 +360,21 @@ class L2Cache(val c: L2CacheConfig, otherClockDomain: ClockDomain = null, axilCl
       .resize(c.dataAddrBits)
 
   // ===========================================================================
-  // DDR master (its AR and R cross into mem_clk, unless the cache is on it)
+  // DDR master (its AR and R cross into mem_clk)
+  //
+  //   MSHR AR   (core_clk) -> arCc: mshrs max 8 entries        -> m_axi AR (mem_clk)
+  //   m_axi R   (mem_clk)  -> rCc: cdcDepth x 512-bit beats    -> fill     (core_clk)
+  //
+  // Both in LUTRAM (32 deep at no extra cost). The fill takes a beat every clock, so with core_clk
+  // the faster rCc holds only the beats in flight across the clocks
   // ===========================================================================
   val ddrAr = Stream(L2DdrAr(c)) // one an MSHR: the queue always has room
-  val arCc = !c.onMemClock generate StreamFifoCC(
-    L2DdrAr(c),
-    c.mshrs max 8,
-    pushClock = ClockDomain.current,
-    popClock = memClock
-  )
-  val arQueue = c.onMemClock generate StreamFifo(L2DdrAr(c), c.mshrs max 8)
-  val rCc = !c.onMemClock generate StreamFifoCC(
-    L2DdrR(c),
-    c.cdcDepth,
-    pushClock = memClock,
-    popClock = ClockDomain.current
-  )
-  if (c.onMemClock) arQueue.io.push << ddrAr
-  else {
-    arCc.ram.addAttribute("ram_style", "distributed")
-    rCc.ram.addAttribute("ram_style", "distributed")
-    arCc.io.push << ddrAr
-  }
-  val arOut = if (c.onMemClock) arQueue.io.pop else arCc.io.pop
+  val arCc = StreamFifoCC(L2DdrAr(c), c.mshrs max 8, pushClock = coreClock, popClock = memClock)
+  val rCc = StreamFifoCC(L2DdrR(c), c.cdcDepth, pushClock = memClock, popClock = coreClock)
+  arCc.ram.addAttribute("ram_style", "distributed")
+  rCc.ram.addAttribute("ram_style", "distributed")
+  arCc.io.push << ddrAr
+  val arOut = arCc.io.pop
 
   io.m_axi.ar.valid := arOut.valid
   io.m_axi.ar.addr := (arOut.line @@ U(0, c.offsetBits bits)).resized
@@ -386,11 +391,11 @@ class L2Cache(val c: L2CacheConfig, otherClockDomain: ClockDomain = null, axilCl
   rIn.resp := io.m_axi.r.resp
   rIn.last := io.m_axi.r.last
   io.m_axi.r.ready := rIn.ready
-  if (!c.onMemClock) rCc.io.push << rIn
-  val ddrR = if (c.onMemClock) rIn else rCc.io.pop
+  rCc.io.push << rIn
+  val ddrR = rCc.io.pop
 
   // ===========================================================================
-  // Slave ports: one request each (onMemClock: its AR and data cross from and to core_clk)
+  // Slave ports: one request each
   // ===========================================================================
   val port = for (p <- 0 until N) yield new Area {
     val busy = RegInit(False) // request taken, its last beat not yet out
@@ -400,15 +405,12 @@ class L2Cache(val c: L2CacheConfig, otherClockDomain: ClockDomain = null, axilCl
     val block = Reg(UInt(c.blockAddrBits bits)) init (0)
     // What an L1 asks for: a block, 16 x 128-bit INCR
     val sAr = io.s_axi(p).ar
-    val arCheck = new ClockingArea(slaveClock) {
-      assert(
-        !sAr.fire || (sAr.len === c.slaveBeats - 1 && sAr.size === log2Up(c.slaveBytes) &&
-          sAr.burst === Axi4.burst.INCR && sAr.addr(log2Up(c.blockBytes) - 1 downto 0) === 0),
-        s"L2Cache: port $p AR not a 256 B block"
-      )
-    }
-    val arBlock = sAr.translateWith(sAr.addr(c.cachedAddressWidth - 1 downto log2Up(c.blockBytes)))
-    val ar = if (c.onMemClock) StreamCCByToggle(arBlock, slaveClock, ClockDomain.current) else arBlock
+    assert(
+      !sAr.fire || (sAr.len === c.slaveBeats - 1 && sAr.size === log2Up(c.slaveBytes) &&
+        sAr.burst === Axi4.burst.INCR && sAr.addr(log2Up(c.blockBytes) - 1 downto 0) === 0),
+      s"L2Cache: port $p AR not a 256 B block"
+    )
+    val ar = sAr.translateWith(sAr.addr(c.cachedAddressWidth - 1 downto log2Up(c.blockBytes)))
     ar.ready := !busy
     when(ar.fire) {
       busy := True
@@ -424,7 +426,7 @@ class L2Cache(val c: L2CacheConfig, otherClockDomain: ClockDomain = null, axilCl
     val r = io.s_axi(p).r
 
     // Four 128-bit LUTRAM lanes of 4 words, the lowest lane first. One request a port: they always fit
-    val buffer = !c.onMemClock generate new Area {
+    val buffer = new Area {
       val wrPtr = Reg(UInt(2 bits)) init (0)
       val rdWord = Reg(UInt(2 bits)) init (0)
       val sub = Reg(UInt(2 bits)) init (0)
@@ -454,43 +456,6 @@ class L2Cache(val c: L2CacheConfig, otherClockDomain: ClockDomain = null, axilCl
       assert(!push || words =/= c.blockBeats, s"L2Cache: port $p buffer overflow")
       r << out.m2sPipe()
       when(r.fire && r.last) { busy := False }
-    }
-
-    // The words across to core_clk (room for a block), 4 beats each there; busy until the last
-    // has left
-    val crossing = c.onMemClock generate new Area {
-      val words = StreamFifoCC(L2Word(c), c.blockBeats, pushClock = ClockDomain.current, popClock = slaveClock)
-      words.ram.addAttribute("ram_style", "distributed")
-      words.io.push.valid := push
-      words.io.push.data := pushData
-      words.io.push.resp := pushResp
-      assert(!push || words.io.push.ready, s"L2Cache: port $p buffer overflow")
-      val pushed = Reg(UInt(2 bits)) init (0)
-      val allIn = RegInit(False)
-      when(push) {
-        pushed := pushed + 1
-        when(pushed === c.blockBeats - 1) { allIn := True }
-      }
-      when(allIn && words.io.pushOccupancy === 0) {
-        allIn := False
-        busy := False
-      }
-      val out = new ClockingArea(slaveClock) {
-        val word = words.io.pop
-        val sub = Reg(UInt(2 bits)) init (0)
-        val n = Reg(UInt(2 bits)) init (0) // the word of the block
-        val beat = Stream(Axi4R(c.slaveConfig))
-        beat.valid := word.valid
-        beat.data := word.data.subdivideIn(4 slices)(sub)
-        beat.resp := word.resp
-        beat.last := n === c.blockBeats - 1 && sub === 3
-        word.ready := beat.ready && sub === 3
-        when(beat.fire) {
-          sub := sub + 1
-          when(sub === 3) { n := n + 1 }
-        }
-        r << beat.m2sPipe()
-      }
     }
 
     count(s"port${p}_requests", ar.fire)
@@ -572,12 +537,12 @@ class L2Cache(val c: L2CacheConfig, otherClockDomain: ClockDomain = null, axilCl
     val addr = RegNext(job.word + beat)
     var data = dataMem.readSync(addr, enable = en)
     var load = RegNext(en)
-    for (_ <- 1 until c.dataReadLatency) {
+    for (_ <- 1 until c.readLatency) {
       data = RegNextWhen(data, load)
       load = RegNext(load)
     }
-    val push = Vec((0 until N).map(p => Delay(job.valid && job.mask(p), c.dataReadLatency + 1, init = False)))
-    val resp = Delay(job.resp, c.dataReadLatency + 1)
+    val push = Vec((0 until N).map(p => Delay(job.valid && job.mask(p), c.readLatency + 1, init = False)))
+    val resp = Delay(job.resp, c.readLatency + 1)
     // A read still to come may be of a line an allocation would replace
     val busy = job.valid || en
   }
@@ -902,22 +867,20 @@ class L2Cache(val c: L2CacheConfig, otherClockDomain: ClockDomain = null, axilCl
   }
 }
 
-// Another configuration from key=value arguments: kib=, ways=, clock=core|mem, latency=
-// (dataReadLatency), line= (lineBytes), dir= (the target directory)
-object L2CacheVerilog {
-  def main(args: Array[String]): Unit = {
-    val a = args.map(_.split("=", 2)).collect { case Array(k, v) => k -> v }.toMap
-    val d = L2CacheConfig()
-    val config = d.copy(
-      totalBytes = a.get("kib").fold(d.totalBytes)(_.toInt * 1024),
-      ways = a.get("ways").fold(d.ways)(_.toInt),
-      onMemClock = a.get("clock").fold(d.onMemClock)(_ == "mem"),
-      dataReadLatency = a.get("latency").fold(d.dataReadLatency)(_.toInt),
-      lineBytes = a.get("line").fold(d.lineBytes)(_.toInt)
-    )
-    SpinalConfig(
-      targetDirectory = a.getOrElse("dir", "rtl/L2Cache"),
-      defaultConfigForClockDomains = ClockDomainConfig(resetActiveLevel = LOW, resetKind = SYNC)
-    ).withPrivateNamespace.generateVerilog(new L2Cache(config))
-  }
+object L2CacheVerilog extends App {
+  val config = L2CacheConfig(
+    ports = 4,
+    cachedAddressWidth = 27,
+    slaveAddressWidth = 32,
+    masterAddressWidth = 32,
+    totalBytes = 1 << 20, // 1 MiB
+    lineBytes = 1024,
+    ways = 2,
+    dataReadLatency = None, // from the URAM depth
+    cdcDepth = 32
+  )
+  SpinalConfig(
+    targetDirectory = "rtl/L2Cache",
+    defaultConfigForClockDomains = ClockDomainConfig(resetActiveLevel = LOW, resetKind = SYNC)
+  ).withPrivateNamespace.generateVerilog(new L2Cache(config))
 }

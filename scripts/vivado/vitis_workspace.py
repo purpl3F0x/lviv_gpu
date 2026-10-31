@@ -25,6 +25,7 @@ import glob
 import json
 import os
 import shutil
+import subprocess
 import sys
 import time
 
@@ -55,7 +56,7 @@ else:
 
 
 def open_workspace(client):
-    # The server of a vitis run that has just ended holds the workspace for a few more seconds.
+    # A server that has just been stopped can hold the workspace for a few more seconds.
     for attempt in range(30):
         try:
             client.set_workspace(path=workspace)
@@ -203,6 +204,15 @@ def build(client):
     print(f"Built {elf}")
 
 
+def stop_server(client):
+    # On Windows dispose() kills only the server's cmd.exe: its Java server lives on and holds the
+    # workspace for a minute (the next stage waits, the IDE says it is in use). Its whole tree.
+    cp = getattr(getattr(client, "_serverObj", None), "cp", None)
+    if os.name == "nt" and cp is not None and cp.poll() is None:
+        subprocess.run(["taskkill", "/PID", str(cp.pid), "/T", "/F"], capture_output=True)
+    vitis.dispose()
+
+
 if os.path.exists(done_file):
     os.remove(done_file)
 client = vitis.create_client()
@@ -215,4 +225,4 @@ except Exception as e:
     print(f"ERROR: {e}")
     sys.exit(1)
 finally:
-    vitis.dispose()
+    stop_server(client)

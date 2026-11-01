@@ -1,6 +1,7 @@
 # Vivado project flow for a block design under bd/<name>/, and the Vitis workspace of its software.
 #
-# Include from its Makefile after setting BD_NAME, PART, BOARD_PART, RTL, BD_TCL and XDC, and for
+# Include from its Makefile after setting BD_NAME, PART, BOARD_PART, RTL, BD_TCL and XDC (and
+# BOARD_REPO_PATHS for board files of its own, which the project keeps), and for
 # the Vitis targets VITIS_APPS (the applications' names), for each application <app>
 # VITIS_APP_SRC_<app> (its source directories, or single files), VITIS_APP_INCLUDES_<app>,
 # VITIS_APP_EXTERNAL_INCLUDES_<app> (libraries' include directories, such as git submodules: not
@@ -52,6 +53,7 @@ BD_ARGS = $(REPO_ROOT)/build/bd/$(BD_NAME)_args.tcl
 define BD_ARGS_TCL
 set part $(PART)
 set board_part $(BOARD_PART)
+set board_repo_paths [list $(abspath $(BOARD_REPO_PATHS))]
 set proj_dir $(BD_DIR)
 set proj_name $(BD_NAME)
 set sources [list $(abspath $(RTL))]

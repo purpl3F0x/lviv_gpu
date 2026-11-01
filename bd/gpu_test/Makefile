@@ -4,7 +4,9 @@
 
 BD_NAME = gpu_test
 PART = xczu7ev-ffvc1156-2-e
-BOARD_PART = xilinx.com:zcu104:part0:1.1
+# The ZCU104 with the PL DDR4 SODIMM's part left to the design (bd/boards/zcu104_lviv)
+BOARD_PART = xilinx.com:zcu104_lviv:part0:1.1
+BOARD_REPO_PATHS = ../boards
 BD_TCL = gpu_test_bd.tcl
 XDC = gpu_test.xdc
 

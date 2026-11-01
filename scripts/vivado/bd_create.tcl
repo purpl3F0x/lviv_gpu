@@ -3,7 +3,7 @@
 # constraints. Used by bd.mk.
 # Usage: vivado -mode batch -source bd_create.tcl -tclargs <bd_args.tcl>
 # bd_args.tcl (written by bd.mk) sets:
-#   part board_part proj_dir proj_name sources include_dirs bd_tcl xdc_files
+#   part board_part board_repo_paths proj_dir proj_name sources include_dirs bd_tcl xdc_files
 
 # Re-run this file untraced: Vivado echoes every command of a -source script (the "# ..." lines).
 if {![info exists ::untraced]} { set ::untraced 1; source -notrace [info script]; return }
@@ -15,6 +15,10 @@ set xpr $proj_dir/$proj_name.xpr
 create_project -force $proj_name $proj_dir -part $part
 
 if {[catch {
+  # Board files of the design's own, kept in the project for every later run and the GUI
+  if {[info exists board_repo_paths] && [llength $board_repo_paths]} {
+    set_property board_part_repo_paths $board_repo_paths [current_project]
+  }
   set_property board_part $board_part [current_project]
   set_property target_language Verilog [current_project]
 

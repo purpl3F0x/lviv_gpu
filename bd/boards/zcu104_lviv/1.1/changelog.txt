@@ -1,0 +1,2 @@
+lviv_gpu: zcu104 1.1 as zcu104_lviv; the PL DDR4 SODIMM preset without part, speed or clocks
+

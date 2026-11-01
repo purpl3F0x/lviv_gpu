@@ -208,13 +208,14 @@ class L2Cache(val c: L2CacheConfig, memClockDomain: ClockDomain = null, axilCloc
   for (p <- 0 until c.ports) renameAxi(io.s_axi(p), s"s_axi_$p")
   renameAxi(io.m_axi, "m_axi")
   AxiLite4SpecRenamer(io.s_axil)
-  // For a block design: the master's limits (Vivado would assume 2 reads outstanding, bursts of
-  // up to 256 and narrow ones, and size the interconnect for those)
+  // For a block design: the master's limits (Vivado would assume 2 reads outstanding, one ID at a
+  // time, bursts of up to 256 and narrow ones, and size the interconnect for those)
   for (s <- io.m_axi.flatten)
     s.addAttribute("X_INTERFACE_INFO", s"xilinx.com:interface:aximm:1.0 m_axi ${s.getName().stripPrefix("m_axi_").toUpperCase}")
   io.m_axi.ar.addr.addAttribute(
     "X_INTERFACE_PARAMETER",
-    s"NUM_READ_OUTSTANDING ${c.mshrs}, MAX_BURST_LENGTH ${c.lineBeats}, SUPPORTS_NARROW_BURST 0"
+    s"NUM_READ_OUTSTANDING ${c.mshrs}, NUM_READ_THREADS ${c.mshrs}, MAX_BURST_LENGTH ${c.lineBeats}, " +
+      "SUPPORTS_NARROW_BURST 0"
   )
 
   coreClock.clock.setName("core_clk")

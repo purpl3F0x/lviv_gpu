@@ -123,7 +123,8 @@ case class L2CacheConfig(
   )
 }
 
-object L2CacheSeq extends SpinalEnum {
+// One-hot: each state's decode a register
+object L2CacheSeq extends SpinalEnum(defaultEncoding = binaryOneHot) {
   val IDLE, READ, WAIT, DECIDE, ACT, FILL, SWEEP = newElement()
 }
 
@@ -504,10 +505,11 @@ class L2Cache(val c: L2CacheConfig, memClockDomain: ClockDomain = null, axilCloc
       waiting(p) := mask(p) && sameBlock
     }
     val blockDone = in.valid && beat(1 downto 0) === c.blockBeats - 1
+    // Each MSHR's enables from its own beat count, not the muxed one
     for (k2 <- 0 until c.mshrs) when(in.valid && k === k2) {
       mshr(k2).beats := mshr(k2).beats + 1
       when(in.resp =/= 0) { mshr(k2).err := True }
-      when(blockDone) { mshr(k2).mask := mshr(k2).mask & ~waiting }
+      when(mshr(k2).beats(1 downto 0) === c.blockBeats - 1) { mshr(k2).mask := mshr(k2).mask & ~waiting }
     }
     // The job a clock later, its reads after the block's last write
     val blockFirst = beat.resize(c.beatBits) & U(c.lineBeats - c.blockBeats, c.beatBits bits)
@@ -608,6 +610,14 @@ class L2Cache(val c: L2CacheConfig, memClockDomain: ClockDomain = null, axilCloc
     val freeOh = OHMasking.first(~mshrValid)
     val freeIdx = OHToUInt(freeOh).resize(c.mshrBits)
 
+    // The MSHR updates ACT and FILL decide, made a clock later (in IDLE) so that their enables come
+    // from registers. No lookup reads the MSHRs before WAIT, and no beat comes in for a line
+    // being allocated, or joined (none had yet: a block's last is at least 3 clocks away)
+    val mshrAlloc, mshrJoin, mshrFree = Reg(Bits(c.mshrs bits)) init (0)
+    mshrAlloc := 0
+    mshrJoin := 0
+    mshrFree := 0
+
     // Every port of the lookup's mask: pending again, waiting for MSHR k
     def replay(k: UInt): Unit =
       for (p <- 0 until N) when(mask(p)) {
@@ -627,20 +637,22 @@ class L2Cache(val c: L2CacheConfig, memClockDomain: ClockDomain = null, axilCloc
     ddrAr.id := freeIdx
     fillDone.io.pop.ready := False
 
-    // One write port each: the states below pick what it writes
+    // One write port each: the states below pick what it writes, the RAM takes it a clock later
+    // from registers (READ, the next read, is two clocks after ACT, FILL or SWEEP at the soonest)
     val tagWe = Bits(c.ways bits)
     val tagWa = UInt(c.setBits bits)
     val tagWd = Bits(c.tagBits + 1 bits)
     tagWe := 0
     tagWa := set
     tagWd := False ## tag.asBits
-    for (w <- 0 until c.ways) tagMem(w).write(tagWa, tagWd, enable = tagWe(w))
+    val tagWeQ = RegNext(tagWe) init (0)
+    for (w <- 0 until c.ways) tagMem(w).write(RegNext(tagWa), RegNext(tagWd), enable = tagWeQ(w))
     val lruWe = False
     val lruWa = UInt(c.setBits bits)
     val lruWd = Bits(c.lruBits bits)
     lruWa := set
     lruWd := lruTouch(lruNow, victim)
-    lruMem.write(lruWa, lruWd, enable = lruWe)
+    lruMem.write(RegNext(lruWa), RegNext(lruWd), enable = RegNext(lruWe) init (False))
 
     switch(state) {
       is(IDLE) {
@@ -653,7 +665,7 @@ class L2Cache(val c: L2CacheConfig, memClockDomain: ClockDomain = null, axilCloc
           fillDone.io.pop.ready := True
           state := FILL
         } elsewhen (flushing) {
-          when(!mshrValid.orR) {
+          when(!mshrValid.orR && !mshrAlloc.orR) {
             sweepSet := 0
             state := SWEEP
           }
@@ -707,7 +719,7 @@ class L2Cache(val c: L2CacheConfig, memClockDomain: ClockDomain = null, axilCloc
           val firstBeatNow = fill.in.valid && fill.k === k
           val canJoin = Vec(mshr.map(_.beats === 0))(k) && !firstBeatNow
           when(canJoin) {
-            for (k2 <- 0 until c.mshrs) when(k === k2) { mshr(k2).mask := mshr(k2).mask | mask }
+            mshrJoin := inFlight
             count("merges", True)
             countPorts("merges")
           } otherwise {
@@ -750,14 +762,7 @@ class L2Cache(val c: L2CacheConfig, memClockDomain: ClockDomain = null, axilCloc
           // The victim way: {tag, not valid} until its fill is done; the AR to DDR
           for (w <- 0 until c.ways) tagWe(w) := victim === w
           lruWe := True
-          for (k2 <- 0 until c.mshrs) when(freeIdx === k2) {
-            mshr(k2).valid := True
-            mshr(k2).line := line
-            mshr(k2).way := victim
-            mshr(k2).mask := mask
-            mshr(k2).beats := 0
-            mshr(k2).err := False
-          }
+          mshrAlloc := freeOh
           ddrAr.valid := True
           count("misses", True)
           countPorts("misses")
@@ -774,7 +779,7 @@ class L2Cache(val c: L2CacheConfig, memClockDomain: ClockDomain = null, axilCloc
         for (w <- 0 until c.ways) tagWe(w) := fillWay === w
         tagWa := setOf(fillLine)
         tagWd := !fillErr ## tagOf(fillLine).asBits
-        for (k2 <- 0 until c.mshrs) when(fillK === k2) { mshr(k2).valid := False }
+        mshrFree := UIntToOh(fillK, c.mshrs)
         for (p <- 0 until N) when(port(p).hold && port(p).holdIdx === fillK) { port(p).hold := False }
         state := IDLE
       }
@@ -791,6 +796,20 @@ class L2Cache(val c: L2CacheConfig, memClockDomain: ClockDomain = null, axilCloc
           state := IDLE
         }
       }
+    }
+
+    // line, victim and mask hold until the next READ
+    for (k <- 0 until c.mshrs) {
+      when(mshrAlloc(k)) {
+        mshr(k).valid := True
+        mshr(k).line := line
+        mshr(k).way := victim
+        mshr(k).mask := mask
+        mshr(k).beats := 0
+        mshr(k).err := False
+      }
+      when(mshrJoin(k)) { mshr(k).mask := mshr(k).mask | mask }
+      when(mshrFree(k)) { mshr(k).valid := False }
     }
   }
 

@@ -130,6 +130,10 @@ class AxiVisibilityDma(
     val irq_done = out Bool () // Dedicated Tile Done Interrupt output (masked)
     val irq_error = out Bool () // Dedicated Error Interrupt output (masked)
     val irq_frame_done = out Bool () // Dedicated Frame Done Interrupt output (masked)
+
+    // 6. The triangle stream, for the stall counters (aclk domain)
+    val tri_stream_valid = in Bool () // the DataMover offers a beat
+    val core_stall = in Bool () // a triangle waits for the core
   }
 
   noIoPrefix()
@@ -235,6 +239,7 @@ class AxiVisibilityDma(
   val AUTO_ADV_EN =
     if (config.useAutoAdvance) REG_CTRL.field(Bool(), RW, resetValue = 1, doc = "Enable auto-advancing tile index")
     else null
+  val CNT_CLEAR = REG_CTRL.field(Bool(), W1P, doc = "Clear the stall counters")
 
   // 0x04: STATUS REGISTER (W1C fields are internal registers in regif)
   val REG_STATUS = busif.newRegAt(address = 0x04, doc = "DMA Status Register")
@@ -351,13 +356,29 @@ class AxiVisibilityDma(
       )
     } else null
 
+  // 0x40 - 0x54: stall counters, cycles summed over tiles and frames until CTRL.CNT_CLEAR (they wrap)
+  val counterBase = 0x40
+  val counterDefs = Seq(
+    "CNT_BUSY" -> "Busy on a tile",
+    "CNT_VB_WAIT" -> "Filtering, no visibility word yet",
+    "CNT_CMD_WAIT" -> "A command, the DataMover's queue full",
+    "CNT_RETIRE_WAIT" -> "All commands out, their triangles still on their way",
+    "CNT_TRI_STARVED" -> "Triangles in flight, no beat from the DataMover",
+    "CNT_TRI_BACKPRESSURE" -> "A triangle the core does not take"
+  )
+  val cntValue = UInt(32 bits) // the counter at the bus's read address
+  for (((name, doc), i) <- counterDefs.zipWithIndex) {
+    val reg = busif.newRegAt(address = counterBase + 4 * i, doc = doc)(SymbolName(s"REG_$name"))
+    reg.field(UInt(32 bits), RO, doc = doc)(SymbolName(name)) := cntValue
+  }
+
   // ===========================================================================
-  // INTERRUPT FACTORY REGISTERS (0x40 - 0x4C)
+  // INTERRUPT FACTORY REGISTERS (0x70 - 0x7C)
   // RegGroup RFMS4:
-  //   0x40: INTR_INT_RAW    - Raw interrupt event flags (W1C: write 1 to clear)
-  //   0x44: INTR_INT_FORCE  - Software debug force (W1S: write 1 to trigger raw)
-  //   0x48: INTR_INT_MASK   - Mask register (RW: 1 = masked/off, 0 = unmasked/open)
-  //   0x4C: INTR_INT_STATUS - Masked status register (RO: raw && !mask)
+  //   0x70: INTR_INT_RAW    - Raw interrupt event flags (W1C: write 1 to clear)
+  //   0x74: INTR_INT_FORCE  - Software debug force (W1S: write 1 to trigger raw)
+  //   0x78: INTR_INT_MASK   - Mask register (RW: 1 = masked/off, 0 = unmasked/open)
+  //   0x7C: INTR_INT_STATUS - Masked status register (RO: raw && !mask)
   // Fields:
   //   Bit 0: done           - Tile scan & command generation complete
   //   Bit 1: error          - AXI read error or DataMover status error
@@ -367,7 +388,7 @@ class AxiVisibilityDma(
   val intrError = False
   val intrFrameDone = False
 
-  val INTR = busif.newIntrRFMS4(addr = 0x40, doc = "DMA Interrupt Controller")
+  val INTR = busif.newIntrRFMS4(addr = 0x70, doc = "DMA Interrupt Controller")
   val irqDoneStat =
     INTR.fieldAt(0, intrDone, maskRstVal = 0, doc = "Tile done interrupt (1: unmasked/open)")(SymbolName("done"))
   val irqErrorStat =
@@ -1079,6 +1100,68 @@ class AxiVisibilityDma(
         }
       }
     }
+  }
+
+  // ===========================================================================
+  // 7. STALL COUNTERS: 8 bits each in fabric, the upper 24 in a LUTRAM (a carry a clock), as the
+  // L2's performance counters
+  // ===========================================================================
+  val stall = new Area {
+    val events = Seq(
+      dmaBusy,
+      filterState === FilterState.FILTER_STREAM && !vbFifo.io.pop.valid,
+      cmdStreamInternal.valid && !cmdStreamInternal.ready,
+      filterState === FilterState.WAIT_RETIRE,
+      statStsCount =/= statCmdCount && !io.tri_stream_valid, // commands out without their status
+      io.core_stall
+    )
+    val K = events.size
+    val idxBits = log2Up(K)
+    val low = Vec.fill(K)(Reg(UInt(8 bits)) init (0))
+    val carry = Vec.fill(K)(RegInit(False))
+    val upper = Mem(UInt(24 bits), 1 << idxBits)
+    upper.addAttribute("ram_style", "distributed")
+
+    // CNT_CLEAR, and reset: the RAM zeroed a word a clock
+    val clearing = RegInit(True)
+    val clearIdx = Reg(UInt(idxBits bits)) init (0)
+    when(CNT_CLEAR) {
+      clearing := True
+      clearIdx := 0
+    }.elsewhen(clearing) {
+      clearIdx := clearIdx + 1
+      when(clearIdx === K - 1) { clearing := False }
+    }
+
+    // A carry picked, its word read and incremented, then written. A counter carries again 256
+    // clocks later at the soonest: no hazard
+    val pickOh = OHMasking.first(carry.asBits)
+    val pick = !clearing && carry.asBits.orR
+    val p1Valid = RegNext(pick) init (False)
+    val p1Idx = RegNext(OHToUInt(pickOh).resize(idxBits))
+    val p2Valid = RegNext(p1Valid && !clearing) init (False)
+    val p2Idx = RegNext(p1Idx)
+    val p2Sum = RegNext(upper.readAsync(p1Idx) + 1)
+    upper.write(
+      address = Mux(clearing, clearIdx, p2Idx),
+      data = Mux(clearing, U(0, 24 bits), p2Sum),
+      enable = clearing || p2Valid
+    )
+    for (i <- 0 until K) {
+      val sum = low(i).resize(9) + events(i).asUInt.resize(9)
+      when(clearing || CNT_CLEAR) {
+        low(i) := 0
+        carry(i) := False
+      }.otherwise {
+        low(i) := sum(7 downto 0)
+        carry(i) := (carry(i) && !(pick && pickOh(i))) || sum(8)
+      }
+    }
+
+    // A counter register read: its RAM word and low byte, at the bus address. Exact a few clocks
+    // after the DMA stops, once its last carries are in
+    val rdIdx = ((busif.readAddress() - counterBase) >> 2).resize(idxBits)
+    cntValue := upper.readAsync(rdIdx) @@ low(rdIdx)
   }
 }
 

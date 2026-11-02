@@ -33,7 +33,7 @@ module tb_axi_tile_dma;
   localparam logic [6:0] Ctrl = 7'h00, Status = 7'h04, BaseLow = 7'h08, BaseHigh = 7'h0C;
   localparam logic [6:0] Stride = 7'h10, TilesX = 7'h14, TilesY = 7'h18, CurPos = 7'h1C;
   localparam logic [6:0] Line = 7'h20, Perf = 7'h24, ClearValue = 7'h28;
-  localparam logic [6:0] IntRaw = 7'h40, IntForce = 7'h44, IntMask = 7'h48, IntStatus = 7'h4C;
+  localparam logic [6:0] IntRaw = 7'h70, IntForce = 7'h74, IntMask = 7'h78, IntStatus = 7'h7C;
   localparam logic [31:0] Start = 32'h1, ResetPos = 32'h2, SoftReset = 32'h4, Clear = 32'h8;
   localparam logic [31:0] Busy = 32'h1, LastBresp = 32'h6, SoftResetPending = 32'h8;
   localparam logic [31:0] ClearBusy = 32'h10;

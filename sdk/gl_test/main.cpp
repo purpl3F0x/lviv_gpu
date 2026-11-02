@@ -136,6 +136,7 @@ static void start_drawing(void)
     gpu_set_mode(&gpu, mode);
     drawing = true;
     frames_drawn = frame_us = frame_us2 = front_us = cp_cycles = tile_cycles = 0;
+    gpu_vis_dma_counters_clear(&gpu);
     XTime_GetTime(&period_start);
     xil_printf("%s, %s\r\n", mode_name(), scene_name);
 }
@@ -185,6 +186,13 @@ static void draw_frame(void)
         if (mode == GPU_MODE_CP)
             xil_printf("CP cycle counter: %d, ", (int)(cp_cycles / n));
         xil_printf("tile write-back: %d cycles)\r\n", (int)(tile_cycles / n));
+        gpu_vis_dma_counters_t vis;
+        gpu_vis_dma_counters(&gpu, &vis);
+        xil_printf("  visibility DMA a frame (mem_clk cycles): busy %d; waiting for visibility %d, commands %d, "
+                   "retire %d; triangles starved %d, held by the core %d\r\n",
+                   (int)(vis.busy / n), (int)(vis.vb_wait / n), (int)(vis.cmd_wait / n), (int)(vis.retire_wait / n),
+                   (int)(vis.tri_starved / n), (int)(vis.tri_backpressure / n));
+        gpu_vis_dma_counters_clear(&gpu);
         frames_drawn = frame_us = frame_us2 = front_us = cp_cycles = tile_cycles = 0;
         period_start = now;
     }

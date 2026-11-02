@@ -335,13 +335,13 @@ object AxiTileDmaSim extends App {
         }
       }
 
-      // Poll Interrupt RAW register (0x40) until DONE (bit 0) is asserted; returns RAW value
+      // Poll Interrupt RAW register (0x70) until DONE (bit 0) is asserted; returns RAW value
       def waitTileDone(label: String): Long = {
         var status = 0L
         var pollCycles = 0
         do {
           axiClock.waitSampling(10)
-          status = apbDriver.read(0x40) // INTR_INT_RAW (bit 0 = done, bit 1 = error, bit 2 = frame_done)
+          status = apbDriver.read(0x70) // INTR_INT_RAW (bit 0 = done, bit 1 = error, bit 2 = frame_done)
           pollCycles += 10
           if (pollCycles % 2000 == 0) {
             val perf = apbDriver.read(0x24)
@@ -373,7 +373,7 @@ object AxiTileDmaSim extends App {
       apbDriver.write(0x10, frameRowStrideBytes) // STRIDE
       apbDriver.write(0x14, gridTilesX) // TILES_X = 4
       apbDriver.write(0x18, gridTilesY) // TILES_Y = 3
-      apbDriver.write(0x48, 0x00) // INTR_INT_MASK = 0 (unmask done, error, frame_done)
+      apbDriver.write(0x78, 0x00) // INTR_INT_MASK = 0 (unmask done, error, frame_done)
 
       println("[AXI-Lite] Initialized BaseAddr, Stride, TilesX, TilesY, and Interrupt Mask registers.")
 
@@ -401,8 +401,8 @@ object AxiTileDmaSim extends App {
 
           println(f"    Completed in $perfCycles cycles. RawIntr=0x$status%X. Next Tile Pos=($nextX, $nextY)")
 
-          // Clear DONE raw interrupt flag (W1C at 0x40)
-          apbDriver.write(0x40, 0x01)
+          // Clear DONE raw interrupt flag (W1C at 0x70)
+          apbDriver.write(0x70, 0x01)
 
           // Check FRAME_DONE on the very last tile (3, 2)
           if (tileX == gridTilesX - 1 && tileY == gridTilesY - 1) {
@@ -412,7 +412,7 @@ object AxiTileDmaSim extends App {
             )
             assert(nextX == 0 && nextY == 0, "Tile coordinates must wrap back to (0,0) after frame completion!")
             println("    >> FRAME_DONE successfully asserted and coordinates wrapped to (0,0)!")
-            apbDriver.write(0x40, 0x04) // Clear FRAME_DONE raw interrupt flag
+            apbDriver.write(0x70, 0x04) // Clear FRAME_DONE raw interrupt flag
           }
         }
       }
@@ -498,7 +498,7 @@ object AxiTileDmaSim extends App {
       apbDriver.write(0x00, 0x01) // START while reset pending: must be ignored
 
       waitTileDone("Tile with pending SOFT_RESET")
-      apbDriver.write(0x40, 0x01)
+      apbDriver.write(0x70, 0x01)
       axiClock.waitSampling(10)
       val statusAfter = apbDriver.read(0x04)
       assert((statusAfter & 0x09) == 0, f"BUSY/SOFT_RESET_PENDING must clear after reset, STATUS=0x$statusAfter%X")
@@ -508,7 +508,7 @@ object AxiTileDmaSim extends App {
       fillTileBram(0x6b, 0x6b)
       apbDriver.write(0x00, 0x01) // START after reset
       waitTileDone("Tile after SOFT_RESET")
-      apbDriver.write(0x40, 0x01)
+      apbDriver.write(0x70, 0x01)
       assert(countTileErrors(0, 0, 0x6b, 0x6b) == 0, "Tile after SOFT_RESET must not contain stale data")
       println("  - Deferred SOFT_RESET verified (pending flag, START blocked, position reset, clean restart).")
     }

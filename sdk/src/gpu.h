@@ -111,6 +111,21 @@ uint32_t gpu_cp_frame_cycles(const gpu_t *gpu);
 // The tile DMA's clock cycles (mem_clk) for its last tile write-back (PERF).
 uint32_t gpu_tile_dma_cycles(const gpu_t *gpu);
 
+// The visibility DMA's stall counters: mem_clk cycles summed over tiles and frames since
+// gpu_vis_dma_counters_clear (they wrap: 14 s at 300 MHz). Exact once the GPU is not rendering.
+typedef struct
+{
+    uint32_t busy;             // working on a tile
+    uint32_t vb_wait;          // filtering, no visibility word yet
+    uint32_t cmd_wait;         // a command, the DataMover's queue full
+    uint32_t retire_wait;      // all commands out, their triangles still on their way
+    uint32_t tri_starved;      // triangles in flight, no beat from the DataMover
+    uint32_t tri_backpressure; // a triangle the core does not take
+} gpu_vis_dma_counters_t;
+
+void gpu_vis_dma_counters(const gpu_t *gpu, gpu_vis_dma_counters_t *counters);
+void gpu_vis_dma_counters_clear(const gpu_t *gpu);
+
 // Interrupt handlers, for the interrupt controller to call with the gpu_t (XScuGic_Connect): each
 // takes its DMA's pending events, clears them, which drops the line, and counts the interrupt.
 void gpu_vis_dma_isr(void *gpu);

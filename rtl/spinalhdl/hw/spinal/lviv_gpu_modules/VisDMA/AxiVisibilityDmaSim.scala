@@ -182,6 +182,8 @@ object AxiVisibilityDmaSim extends App {
 
   simConfig.compile(new AxiVisibilityDma(config)).doSim("AxiVisibilityDma_Test") { dut =>
     dut.clockDomain.forkStimulus(period = 10)
+    dut.io.tri_stream_valid #= false
+    dut.io.core_stall #= false
 
     val apbDriver = new SimApbDriver(dut.io.s_apb, dut.clockDomain)
     val vbMemory = new AxiReadOnlyMemorySim(dut.io.m_axi_vb, dut.clockDomain)
@@ -320,7 +322,7 @@ object AxiVisibilityDmaSim extends App {
 
     // Clear DONE and IRQ (Write 1 to clear)
     apbDriver.write(0x04, 0x0a)
-    apbDriver.write(0x40, 0x07) // INTR_INT_RAW W1C (done, error, frame_done) drives io.irq
+    apbDriver.write(0x70, 0x07) // INTR_INT_RAW W1C (done, error, frame_done) drives io.irq
     dut.clockDomain.waitSampling(2)
     assert(!dut.io.irq.toBoolean, "Error: IRQ should be deasserted after W1C clear!")
 
@@ -356,7 +358,7 @@ object AxiVisibilityDmaSim extends App {
     println("=================================================================")
     // Clear DONE and IRQ
     apbDriver.write(0x04, 0x0a)
-    apbDriver.write(0x40, 0x07) // INTR_INT_RAW W1C (done, error, frame_done) drives io.irq
+    apbDriver.write(0x70, 0x07) // INTR_INT_RAW W1C (done, error, frame_done) drives io.irq
     dut.clockDomain.waitSampling(2)
 
     val oddN = 13
@@ -413,7 +415,7 @@ object AxiVisibilityDmaSim extends App {
     println("Test 5: BTT_LIMIT = 2 triangles splits a 5-triangle run starting on an odd triangle")
     println("=================================================================")
     apbDriver.write(0x04, 0x0a)
-    apbDriver.write(0x40, 0x07)
+    apbDriver.write(0x70, 0x07)
     dut.clockDomain.waitSampling(2)
 
     val limitN = 8

@@ -238,10 +238,10 @@ class AxiTileDma(
   val CLEAR = REG_CTRL.field(
     Bool(),
     W1P,
-    doc = "Fill the four tile RAMs with CLEAR_VALUE, STATUS.CLEAR_BUSY until done (ignored while BUSY or CLEAR_BUSY)"
+    doc = "Fill the tile RAM with CLEAR_VALUE, STATUS.CLEAR_BUSY until done (ignored while BUSY or CLEAR_BUSY)"
   )
 
-  // 0x04: STATUS (Operational status flags; interrupt events managed by INTR factory at 0x40)
+  // 0x04: STATUS (Operational status flags; interrupt events managed by INTR factory at 0x70)
   val REG_STATUS = busif.newRegAt(address = 0x04, doc = "DMA Status Register")
   val BUSY = REG_STATUS.field(Bool(), RO, doc = "DMA active transfer busy flag")
   val LAST_BRESP = REG_STATUS.field(Bits(2 bits), RO, doc = "Last AXI write response status")
@@ -363,12 +363,12 @@ class AxiTileDma(
   )
 
   // ===========================================================================
-  // INTERRUPT FACTORY REGISTERS (0x40 - 0x4C)
+  // INTERRUPT FACTORY REGISTERS (0x70 - 0x7C)
   // RegGroup RFMS4:
-  //   0x40: INTR_INT_RAW    - Raw interrupt event flags (W1C: write 1 to clear)
-  //   0x44: INTR_INT_FORCE  - Software debug force (W1S: write 1 to trigger raw)
-  //   0x48: INTR_INT_MASK   - Mask register (RW: 1 = masked/off, 0 = unmasked/open)
-  //   0x4C: INTR_INT_STATUS - Masked status register (RO: raw && !mask)
+  //   0x70: INTR_INT_RAW    - Raw interrupt event flags (W1C: write 1 to clear)
+  //   0x74: INTR_INT_FORCE  - Software debug force (W1S: write 1 to trigger raw)
+  //   0x78: INTR_INT_MASK   - Mask register (RW: 1 = masked/off, 0 = unmasked/open)
+  //   0x7C: INTR_INT_STATUS - Masked status register (RO: raw && !mask)
   // Fields:
   //   Bit 0: done           - Tile transfer complete
   //   Bit 1: error          - AXI bus write error (SLVERR/DECERR)
@@ -378,7 +378,7 @@ class AxiTileDma(
   val intrError = False
   val intrFrameDone = False
 
-  val INTR = busif.newIntrRFMS4(addr = 0x40, doc = "DMA Interrupt Controller")
+  val INTR = busif.newIntrRFMS4(addr = 0x70, doc = "DMA Interrupt Controller")
   val irqDoneStat =
     INTR.fieldAt(0, intrDone, maskRstVal = 0, doc = "Tile done interrupt (1: unmasked/open)")(SymbolName("done"))
   val irqErrorStat =

@@ -65,6 +65,23 @@ uint32_t gpu_tile_dma_cycles(const gpu_t *gpu)
     return tile_dma_read_reg(gpu, AXI_TILE_DMA_REG_PERF);
 }
 
+void gpu_vis_dma_counters(const gpu_t *gpu, gpu_vis_dma_counters_t *counters)
+{
+    counters->busy = vis_dma_read_reg(gpu, AXI_VISIBILITY_DMA_REG_CNT_BUSY);
+    counters->vb_wait = vis_dma_read_reg(gpu, AXI_VISIBILITY_DMA_REG_CNT_VB_WAIT);
+    counters->cmd_wait = vis_dma_read_reg(gpu, AXI_VISIBILITY_DMA_REG_CNT_CMD_WAIT);
+    counters->retire_wait = vis_dma_read_reg(gpu, AXI_VISIBILITY_DMA_REG_CNT_RETIRE_WAIT);
+    counters->tri_starved = vis_dma_read_reg(gpu, AXI_VISIBILITY_DMA_REG_CNT_TRI_STARVED);
+    counters->tri_backpressure = vis_dma_read_reg(gpu, AXI_VISIBILITY_DMA_REG_CNT_TRI_BACKPRESSURE);
+}
+
+void gpu_vis_dma_counters_clear(const gpu_t *gpu)
+{
+    // CTRL's RW bits kept (its W1P bits read 0)
+    const uint32_t ctrl = vis_dma_read_reg(gpu, AXI_VISIBILITY_DMA_REG_CTRL);
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_CTRL, ctrl | BIT(AXI_VISIBILITY_DMA_REG_CTRL_CNT_CLEAR_SHIFT));
+}
+
 uint32_t gpu_tiles_x(const gpu_frame_t *frame)
 {
     return (frame->width + GPU_TILE_SIZE - 1) / GPU_TILE_SIZE;

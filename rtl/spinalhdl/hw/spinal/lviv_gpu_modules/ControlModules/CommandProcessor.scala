@@ -63,7 +63,7 @@ object CommandProcessor {
   val causeSize = 4 // WIDTH or HEIGHT 0, or more than maxTiles tiles
 
   // The units' registers it writes, from their regif maps (sdk/include/generated/<Name>/*.h).
-  val intRaw = 0x40 // both DMAs' RFMS4 block: INT_RAW, write 1 to clear
+  val intRaw = 0x70 // both DMAs' RFMS4 block: INT_RAW, write 1 to clear
   val intDone = 0x1
 
   val visCtrl = 0x00

@@ -404,6 +404,8 @@ module gpu_top #(
   logic [511:0] tri_stream_tdata;
   logic [ 63:0] tri_stream_tkeep;
   logic tri_stream_tvalid, tri_stream_tready;
+  frontend_data_in_t adapted_tri, core_tri;
+  logic adapted_tri_valid, adapted_tri_ready, core_tri_valid, core_tri_ready;
 
   AxiVisibilityDma u_vis_dma (
       .aclk(mem_clk),
@@ -444,11 +446,10 @@ module gpu_top #(
       .irq(vis_dma_irq),
       .irq_done(vis_irq_done),
       .irq_error(vis_irq_error),
-      .irq_frame_done()
+      .irq_frame_done(),
+      .tri_stream_valid(tri_stream_tvalid),
+      .core_stall(core_tri_valid && !core_tri_ready)
   );
-
-  frontend_data_in_t adapted_tri, core_tri;
-  logic adapted_tri_valid, adapted_tri_ready, core_tri_valid, core_tri_ready;
 
   triangle_stream_adapter #(
       .TRIANGLE_STRIDE(TRIANGLE_STRIDE)

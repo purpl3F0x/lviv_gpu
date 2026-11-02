@@ -51,8 +51,11 @@ module tb_gpu_top;
   localparam logic [11:0] VisTriBase = 12'hF90, VisTriCount = 12'hF98, VisTileIndex = 12'hF9C;
   localparam logic [11:0] TileCtrl = 12'hF00, TileStatus = 12'hF04, TileBase = 12'hF08;
   localparam logic [11:0] TileStride = 12'hF10, TileTilesX = 12'hF14, TileTilesY = 12'hF18;
-  localparam logic [11:0] TileCur = 12'hF1C, TileIrqRaw = 12'hF44, TileIrqClear = 12'hF40;
-  localparam logic [11:0] TileClearValue = 12'hF28, VisIrqRaw = 12'hFC0, VisTileCount = 12'hFB8;
+  localparam logic [11:0] TileCur = 12'hF1C, TileIrqRaw = 12'hF74, TileIrqClear = 12'hF70;
+  localparam logic [11:0] TileClearValue = 12'hF28, VisIrqRaw = 12'hFF0, VisTileCount = 12'hFB8;
+  // The visibility DMA's PERF and stall counters (busy first); CTRL's CNT_CLEAR is bit 4
+  localparam logic [11:0] VisPerf = 12'hFB4, VisCounters = 12'hFC0;
+  localparam int VisCounterCount = 6;
   localparam logic [11:0] FrontendBbMaxX = 12'h80C, FrontendBbMaxY = 12'h810;
   localparam logic [11:0] CpCtrl = 12'h400, CpStatus = 12'h404, CpMode = 12'h408;
   localparam logic [11:0] CpSize = 12'h40C, CpCycles = 12'h410;
@@ -707,8 +710,11 @@ module tb_gpu_top;
     return 32'((t + 1) * tile_size - 1 < size ? (t + 1) * tile_size - 1 : size - 1);
   endfunction
 
+  longint vis_perf_sum;  // the per-tile frame's PERF readings
+
   task automatic render_tile(input int tx, input int ty);
     int tile;
+    logic [31:0] perf;
     tile = ty * TilesX + tx;
     open_tile(tile);
 
@@ -728,6 +734,8 @@ module tb_gpu_top;
     wait_bits(VisStatus, 32'h2, 32'h2, "visibility DMA DONE");
     expect_read(VisStatus, 32'h64, 32'h0, "visibility DMA error flags");
     axi_write(VisStatus, 32'h2);  // clear DONE
+    axi_read(VisPerf, perf);
+    vis_perf_sum += perf;
 
     wait_core_idle();
     if (received != tile_order.size())
@@ -736,6 +744,24 @@ module tb_gpu_top;
 
     write_back_tile(tx, ty);
     $display("[%0t] tile (%0d, %0d): %0d triangles", $time, tx, ty, received);
+  endtask
+
+  // The visibility DMA's stall counters after the per-tile frame: busy all its tiles' PERF, the
+  // waits inside it; then cleared
+  task automatic check_vis_counters();
+    logic [31:0] count[VisCounterCount];
+    for (int i = 0; i < VisCounterCount; i++) axi_read(12'(VisCounters + 4 * i), count[i]);
+    $display("[%0t] visibility DMA: busy %0d, waiting for visibility %0d, commands %0d,",
+             $time, count[0], count[1], count[2]);
+    $display("[%0t]   retire %0d;", $time, count[3]);
+    $display("[%0t]   triangles starved %0d, held by the core %0d", $time, count[4], count[5]);
+    if (longint'(count[0]) != vis_perf_sum)
+      error($sformatf("visibility DMA busy %0d, its tiles' PERF %0d", count[0], vis_perf_sum));
+    if (longint'(count[1]) + count[2] + count[3] > count[0] || count[4] > count[0])
+      error("visibility DMA waits past its busy cycles");
+    axi_write(VisCtrl, 32'h10);  // CNT_CLEAR
+    for (int i = 0; i < VisCounterCount; i++)
+      expect_read(12'(VisCounters + 4 * i), 32'hFFFF_FFFF, 32'h0, "visibility DMA counter clear");
   endtask
 
   // The tile DMA: the frame buffers to tile (tx, ty) of the image.
@@ -983,8 +1009,10 @@ module tb_gpu_top;
       axi_write(LutSize, 32'(tex_size));
     end
     clear_frame_buffers(ClearColor);
+    axi_write(VisCtrl, 32'h10);  // the stall counters cleared
     for (int ty = 0; ty < TilesY; ty++)
       for (int tx = 0; tx < TilesX; tx++) render_tile(tx, ty);
+    check_vis_counters();
     cp_checks();
     cp_frame();
     $display("[%0t] image not checked here (make compares it with raster_sw's)", $time);

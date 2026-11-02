@@ -11,7 +11,24 @@ BD_TCL = gpu_test_bd.tcl
 XDC = gpu_test.xdc
 
 include ../gpu_top.mk
-RTL = $(GPU_TOP_RTL) $(SPINAL_GEN_DIR)/L2Cache.v
+# ddr_xbar: taxi's AXI crossbar and width adapter; ctrl_xbar: its AXI to AXI-Lite adapter and
+# AXI-Lite crossbar (the submodule rtl/third_party/taxi)
+TAXI = ../../rtl/third_party/taxi/src
+DDR_XBAR_RTL = $(TAXI)/axi/rtl/taxi_axi_if.sv \
+               $(TAXI)/prim/rtl/taxi_penc.sv \
+               $(TAXI)/prim/rtl/taxi_arbiter.sv \
+               $(addprefix $(TAXI)/axi/rtl/taxi_axi_,register_rd.sv register_wr.sv crossbar_addr.sv \
+                 crossbar_rd.sv crossbar_wr.sv crossbar.sv adapter_rd.sv adapter_wr.sv adapter.sv) \
+               ddr_xbar.sv \
+               ddr_xbar_bd.v
+CTRL_XBAR_RTL = $(TAXI)/axi/rtl/taxi_axil_if.sv \
+                $(addprefix $(TAXI)/axi/rtl/taxi_axi_axil_,adapter_rd.sv adapter_wr.sv adapter.sv) \
+                $(addprefix $(TAXI)/axi/rtl/taxi_axil_,register_rd.sv register_wr.sv tie_rd.sv tie_wr.sv \
+                  crossbar_addr.sv crossbar_rd.sv crossbar_wr.sv crossbar_1s_rd.sv crossbar_1s_wr.sv \
+                  crossbar_1s.sv) \
+                ctrl_xbar.sv \
+                ctrl_xbar_bd.v
+RTL = $(GPU_TOP_RTL) $(SPINAL_GEN_DIR)/L2Cache.v $(DDR_XBAR_RTL) $(CTRL_XBAR_RTL)
 
 # The Vitis applications, on the drivers in sdk/src (the SD card's on the BSP's xilffs): raster_test,
 # the raster core's tests in sdk/raster_test; gl_test, models from glTF files on the SD card drawn

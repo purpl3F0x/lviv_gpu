@@ -13,3 +13,6 @@
 [submodule "dv/raster_sw/libs/xilinx_hls"]
 	path = dv/raster_sw/libs/xilinx_hls
 	url = https://github.com/Xilinx/HLS_arbitrary_Precision_Types.git
+[submodule "rtl/third_party/taxi"]
+	path = rtl/third_party/taxi
+	url = https://github.com/fpganinja/taxi

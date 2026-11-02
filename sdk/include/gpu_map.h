@@ -13,14 +13,23 @@
 #include "generated/CommandProcessor/command_processor_regmap.h"
 #include "generated/L2Cache/l2_cache_regmap.h"
 
-// PL DDR presense check
-#ifdef XPAR_DDR4_0_BASEADDRESS
+// PL DDR presense check: the CPU's window on it through ddr_xbar, or through SmartConnect
+#if defined(XPAR_DDR_XBAR_BD_0_BASEADDR)
+#define GPU_PL_DDR XPAR_DDR_XBAR_BD_0_BASEADDR
+#elif defined(XPAR_DDR4_0_BASEADDRESS)
 #define GPU_PL_DDR XPAR_DDR4_0_BASEADDRESS
 #endif
 
-// The L2 texture cache's registers - if available
+// The control port and the L2 texture cache's registers - if available: through ctrl_xbar, 4 KiB
+// each from its base, or through SmartConnect
+#if defined(XPAR_CTRL_XBAR_BD_0_BASEADDR)
+#define GPU_CTRL_BASEADDR XPAR_CTRL_XBAR_BD_0_BASEADDR
+#define GPU_L2_BASEADDR (XPAR_CTRL_XBAR_BD_0_BASEADDR + 0x1000)
+#else
+#define GPU_CTRL_BASEADDR XPAR_GPU_TOP_BD_0_BASEADDR
 #ifdef XPAR_L2CACHE_0_BASEADDR
 #define GPU_L2_BASEADDR XPAR_L2CACHE_0_BASEADDR
+#endif
 #endif
 
 #define GPU_THREADS 4

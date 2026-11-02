@@ -42,7 +42,7 @@ typedef enum
 
 typedef struct
 {
-    uintptr_t base;     // the control port (XPAR_GPU_TOP_BD_0_BASEADDR in xparameters.h)
+    uintptr_t base;     // the control port (GPU_CTRL_BASEADDR, gpu_map.h)
     int use_interrupts; // wait for the DMAs' interrupts instead of polling them
     gpu_mode_t mode;    // gpu_set_mode
     // The last frame finished in this mode: the frame buffers hold ready_color (each write-back leaves

@@ -37,7 +37,7 @@
 
 // gpu_0's control port, from the address map of the XSA the platform was made from.
 #ifndef GPU_BASEADDR
-#define GPU_BASEADDR XPAR_GPU_TOP_BD_0_BASEADDR
+#define GPU_BASEADDR GPU_CTRL_BASEADDR
 #endif
 
 // The GPU's frame, shown on the DP output as it is.

@@ -45,6 +45,9 @@ create_bd_design $design_name
 
 set ps [create_bd_cell -type ip -vlnv [ip_vlnv zynq_ultra_ps_e] zynq_ultra_ps_e_0]
 apply_bd_automation -rule xilinx.com:bd_rule:zynq_ultra_ps_e -config {apply_board_preset "1"} $ps
+# The PS DDR4 at its parts' speed (MT40A256M16GE-083E, DDR4-2400) instead of the board preset's 2133P:
+# Vivado's DDR preset, which also re-solves the clocks
+set_property CONFIG.SUBPRESET1 {DDR4_MICRON_MT40A256M16GE_083E} $ps
 set_property -dict [list \
     CONFIG.PSU__USE__M_AXI_GP0 {1} \
     CONFIG.PSU__MAXIGP0__DATA_WIDTH {32} \

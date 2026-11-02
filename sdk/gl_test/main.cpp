@@ -331,6 +331,12 @@ int main(void)
     glClearColor(0x63 / 255.0f, 0x63 / 255.0f, 0x63 / 255.0f, 1.0f); // raster_sw's
     xil_printf("lviv_gl: frame memory at 0x%x, %d MiB: %d triangles a frame\r\n", (int)(uintptr_t)lviv_frame_start,
                (int)(lviv_frame_bytes() >> 20), (int)(lviv_frame_bytes() / LVIV_GL_TRIANGLE_BYTES));
+#ifdef GPU_PL_DDR
+    xil_printf("GPU memory: PL DDR, triangles and textures copied there by the GDMA (CPU at 0x%x%08x)\r\n",
+               (unsigned)((uint64_t)GPU_PL_DDR >> 32), (unsigned)GPU_PL_DDR);
+#else
+    xil_printf("GPU memory: PS DDR\r\n");
+#endif
 
     // Black (the frame buffers start zeroed) until the first frame is shown
     if (dp_init(&gic, frames[back], STRIDE) != 0)

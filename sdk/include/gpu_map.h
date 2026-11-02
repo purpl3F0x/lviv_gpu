@@ -4,12 +4,24 @@
 #pragma once
 
 #include "xil_types.h" // the generated headers use the BSP's u32
+#include "xparameters.h"
 
 #include "generated/APBFrontendRegs/apb_front_end_regmap.h"
 #include "generated/ApbThreadRegs/apb_thread_regmap.h"
 #include "generated/AxiTileDma/axi_tile_dma_regmap.h"
 #include "generated/AxiVisibilityDma/axi_visibility_dma_regmap.h"
 #include "generated/CommandProcessor/command_processor_regmap.h"
+#include "generated/L2Cache/l2_cache_regmap.h"
+
+// PL DDR presense check
+#ifdef XPAR_DDR4_0_BASEADDRESS
+#define GPU_PL_DDR XPAR_DDR4_0_BASEADDRESS
+#endif
+
+// The L2 texture cache's registers - if available
+#ifdef XPAR_L2CACHE_0_BASEADDR
+#define GPU_L2_BASEADDR XPAR_L2CACHE_0_BASEADDR
+#endif
 
 #define GPU_THREADS 4
 #define GPU_TILE_SIZE 128

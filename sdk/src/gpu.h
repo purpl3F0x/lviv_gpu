@@ -65,6 +65,7 @@ typedef enum
     GPU_BAD_SIZE = -5,       // width or height 0, or more than 64 tiles
     GPU_BAD_ALIGN = -6,      // gpu_frame_t's memory or stride not aligned as it says
     GPU_BAD_ADDRESS = -7,    // gpu_frame_t's memory past the DMAs' reach (4 GiB)
+    GPU_COPY_ERROR = -8,     // the triangles' copy to PL DDR failed
 } gpu_status_t;
 
 // A frame's alignment: the tile DMA ignores BASE's bits 16..0 (AxiTileDma.scala, the tile's origin)
@@ -73,7 +74,8 @@ typedef enum
 // What a frame is drawn from, and where it goes, in memory the GPU's masters reach (PS DDR below
 // 4 GiB). They do not see the CPU's caches: gpu_frame flushes the triangles and their visibility
 // words from them, and the frame must be memory the CPU does not cache (Xil_SetTlbAttributes
-// NORM_NONCACHE on its 2 MiB blocks), or kept out of its caches by the caller.
+// NORM_NONCACHE on its 2 MiB blocks), or kept out of its caches by the caller. With PL DDR
+// (GPU_PL_DDR), gpu_frame copies the triangles there, to the same address, by the GDMA.
 typedef struct
 {
     const gpu_triangle_t *triangles; // GPU_TRIANGLE_BYTES each, 32-byte aligned
@@ -83,6 +85,8 @@ typedef struct
     uint32_t stride;        // bytes per frame row, a multiple of 512
     uint32_t width, height; // pixels; at most 64 tiles, tile t (t % tiles across, t / tiles across)
     uint32_t clear_color;   // ARGB, where no triangle draws
+    // The triangles and visibility words as the last frame sent them: not flushed or copied again
+    int triangles_unchanged;
 } gpu_frame_t;
 
 // Tiles across and down a frame.
@@ -122,15 +126,15 @@ gpu_status_t gpu_clear_frame_buffers(const gpu_t *gpu, uint32_t color);
 // Texture id (a triangle's tex_id): 1 << log2_size texels square, ARGB, in Morton order (bit 2i of
 // a texel's index is bit i of its x, bit 2i + 1 bit i of its y: gpu_texel_index), at a multiple of
 // their own size in bytes, inside the texture window (gpu_map.h). Waits until the GPU is not
-// rendering a frame, then flushes the texels from the data cache and the texture caches
-// (gpu_flush_texture_caches). Returns 0, or -1 if the GPU cannot use them where they are or does
-// not stop rendering.
+// rendering a frame, then flushes the texels from the data cache (with PL DDR, copies them there,
+// to the same address) and the texture caches (gpu_flush_texture_caches). Returns 0, or -1 if the
+// GPU cannot use them where they are or does not stop rendering.
 int gpu_set_texture(const gpu_t *gpu, uint32_t id, const uint32_t *texels, uint32_t log2_size);
 uint32_t gpu_texel_index(uint32_t x, uint32_t y);
-// Every thread's texture cache flushed (THREAD_REG_CACHE's CACHE_FLUSH), so that it holds no texels
-// from before, once no frame is on its way: the command processor and both DMAs not busy, the core
-// idle (gpu_wait_idle). The flush resets the cache, which would break a line fill under way.
-// GPU_TIMEOUT if the GPU stays busy.
+// Every thread's texture cache flushed (THREAD_REG_CACHE's CACHE_FLUSH), and the L2 if there is one,
+// so that they hold no texels from before, once no frame is on its way: the command processor and
+// both DMAs not busy, the core idle (gpu_wait_idle). The flush resets the cache, which would break
+// a line fill under way. GPU_TIMEOUT if the GPU stays busy.
 gpu_status_t gpu_flush_texture_caches(const gpu_t *gpu);
 
 // One tile, each step on its own (GPU_MODE_CPU), any tile in any order; GPU_BAD_ALIGN and

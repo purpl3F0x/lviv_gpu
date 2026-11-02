@@ -1,5 +1,6 @@
 #include "dp.h"
 
+#include "board.h"
 #include "sleep.h"
 #include "xavbuf.h"
 #include "xavbuf_clk.h"
@@ -9,7 +10,6 @@
 #include "xil_mmu.h"
 #include "xil_printf.h"
 #include "xiltimer.h" // XTime_GetTime, COUNTS_PER_SECOND
-#include "xinterrupt_wrap.h"
 #include "xparameters.h"
 #include "xpseudo_asm.h" // dsb
 
@@ -65,21 +65,6 @@ static void on_hpd_pulse(void *ref)
     }
 }
 
-// A PS block's interrupt on the application's GIC, from the block's SDT interrupt ID (bits [11:0]
-// the number, [15:12] the device tree trigger type), set up as XSetupInterruptSystem would set it
-// on the BSP's own GIC instance.
-static int connect_interrupt(XScuGic *gic, u32 intr_id, Xil_InterruptHandler handler, void *ref)
-{
-    const u32 id = XGet_IntrId(intr_id) + XGet_IntrOffset(intr_id);
-    const u8 trigger = (XGet_TriggerType(intr_id) == 1 || XGet_TriggerType(intr_id) == 2) ? XINTR_IS_EDGE_TRIGGERED
-                                                                                          : XINTR_IS_LEVEL_TRIGGERED;
-    XScuGic_SetPriorityTriggerType(gic, id, XINTERRUPT_DEFAULT_PRIORITY, trigger);
-    if (XScuGic_Connect(gic, id, handler, ref) != XST_SUCCESS)
-        return -1;
-    XScuGic_Enable(gic, id);
-    return 0;
-}
-
 // The graphics layer's color conversion into the blender, for 0xAARRGGBB words (DRM's ARGB8888)
 // read as RGBA8888: the identity XAVBuf_ConfigureGraphicsPipeline writes, with red and blue swapped,
 // as Linux's ZynqMP display driver does for that format.
@@ -133,8 +118,8 @@ int dp_init(XScuGic *gic, const uint32_t *frame, uint32_t stride)
     // The driver asserts a reference that is not NULL; the handlers do not use it.
     XDpPsu_SetHpdEventHandler(&dp_tx, on_hpd_event, &dp_tx);
     XDpPsu_SetHpdPulseHandler(&dp_tx, on_hpd_pulse, &dp_tx);
-    if (connect_interrupt(gic, dp_config->IntrId, (Xil_InterruptHandler)XDpPsu_HpdInterruptHandler, &dp_tx) != 0 ||
-        connect_interrupt(gic, dma_config->IntrId, (Xil_InterruptHandler)XDpDma_InterruptHandler, dpdma) != 0)
+    if (board_connect_irq(gic, dp_config->IntrId, (Xil_InterruptHandler)XDpPsu_HpdInterruptHandler, &dp_tx) != 0 ||
+        board_connect_irq(gic, dma_config->IntrId, (Xil_InterruptHandler)XDpDma_InterruptHandler, dpdma) != 0)
         return -1;
     XDpDma_InterruptEnable(dpdma, XDPDMA_IEN_VSYNC_INT_MASK);
 

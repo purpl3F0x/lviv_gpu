@@ -1,5 +1,6 @@
 #include "gpu.h"
 
+#include "gdma.h"
 #include "gpu_map.h"
 #include "gpu_regs.h"
 #include "sleep.h"
@@ -168,21 +169,38 @@ static gpu_status_t wait_not_rendering(const gpu_t *gpu)
 }
 
 // The GPU not rendering
-static void flush_texture_caches(const gpu_t *gpu)
+static gpu_status_t flush_texture_caches(const gpu_t *gpu)
 {
     for (int n = 0; n < GPU_THREADS; n++)
         thread_write_reg(gpu, n, THREAD_REG_CACHE, THREAD_REG_CACHE_CACHE_FLUSH_MASK);
     // CACHE_FLUSH crosses into the thread clock as a pulse that resets the cache, its lines invalid
     // at the next edge, with nothing to read back: a few thread clocks, well within this.
     usleep(1);
+#ifdef GPU_L2_BASEADDR
+    // FLUSH reads 1 until every line is invalid
+    Xil_Out32(GPU_L2_BASEADDR + L2_CACHE_REG_CTRL, L2_CACHE_REG_CTRL_FLUSH_MASK);
+    for (uint32_t polls = 0; Xil_In32(GPU_L2_BASEADDR + L2_CACHE_REG_CTRL) & L2_CACHE_REG_CTRL_FLUSH_MASK; polls++)
+        if (polls == GPU_POLL_LIMIT)
+            return GPU_TIMEOUT;
+#endif
+    return GPU_OK;
 }
 
 gpu_status_t gpu_flush_texture_caches(const gpu_t *gpu)
 {
     const gpu_status_t status = wait_not_rendering(gpu);
-    if (status == GPU_OK)
-        flush_texture_caches(gpu);
-    return status;
+    return status == GPU_OK ? flush_texture_caches(gpu) : status;
+}
+
+// Out of the CPU's caches for the GPU; with PL DDR, copied there to the same address
+static int to_gpu(const void *data, size_t bytes)
+{
+    Xil_DCacheFlushRange((UINTPTR)data, (INTPTR)bytes);
+#ifdef GPU_PL_DDR
+    return gdma_copy(GPU_PL_DDR + (uintptr_t)data, (uintptr_t)data, bytes);
+#else
+    return 0;
+#endif
 }
 
 uint32_t gpu_texel_index(uint32_t x, uint32_t y)
@@ -205,13 +223,13 @@ int gpu_set_texture(const gpu_t *gpu, uint32_t id, const uint32_t *texels, uint3
     if (wait_not_rendering(gpu) != GPU_OK)
         return -1;
     // The texture caches read it behind the CPU's caches,
-    Xil_DCacheFlushRange((UINTPTR)texels, (INTPTR)bytes);
+    if (to_gpu(texels, bytes) != 0)
+        return -1;
     lut_write_reg(gpu, GPU_LUT_BASE(id), (uint32_t)(offset / 4));
     lut_write_reg(gpu, GPU_LUT_SIZE(id), log2_size);
     // and may still hold lines of what was there before: another texture's, or this one's older
     // texels
-    flush_texture_caches(gpu);
-    return 0;
+    return flush_texture_caches(gpu) == GPU_OK ? 0 : -1;
 }
 
 gpu_status_t gpu_clear_zbuffers(const gpu_t *gpu)
@@ -466,8 +484,12 @@ gpu_status_t gpu_frame(gpu_t *gpu, const gpu_frame_t *frame, uint32_t *failed_ti
         return placed;
 
     // The GPU reads the scene behind the CPU's caches (the frame is not cached: gpu_frame_t).
-    Xil_DCacheFlushRange((UINTPTR)frame->triangles, frame->triangle_count * GPU_TRIANGLE_BYTES);
-    Xil_DCacheFlushRange((UINTPTR)frame->visibility, frame->triangle_count * sizeof(uint64_t));
+    if (!frame->triangles_unchanged)
+    {
+        if (to_gpu(frame->triangles, (size_t)frame->triangle_count * GPU_TRIANGLE_BYTES) != 0)
+            return GPU_COPY_ERROR;
+        Xil_DCacheFlushRange((UINTPTR)frame->visibility, frame->triangle_count * sizeof(uint64_t));
+    }
 
     gpu_status_t status =
         gpu->mode == GPU_MODE_CP ? cp_frame(gpu, frame, failed_tile) : cpu_frame(gpu, frame, failed_tile);
@@ -496,6 +518,8 @@ const char *gpu_status_name(gpu_status_t status)
         return "frame memory or stride misaligned";
     case GPU_BAD_ADDRESS:
         return "frame memory out of the DMAs' reach";
+    case GPU_COPY_ERROR:
+        return "copy to PL DDR failed";
     }
     return "unknown";
 }

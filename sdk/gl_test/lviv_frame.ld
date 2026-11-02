@@ -1,7 +1,8 @@
 /* gl_test's frame memory for lviv_gl (main.cpp gives it to lviv_gl_init): where the GPU reads each
  * frame's triangles and their tile masks from, 256 MiB at a fixed address in the PS's DDR4, above
- * the program (the PL's DDR4 later). At 104 bytes a triangle, about 2.58 million triangles a
- * frame. NOLOAD: none of it in the ELF, nothing downloaded, nothing cleared at start-up.
+ * the program (with PL DDR, the triangles copied there by the driver). At 104 bytes a triangle,
+ * about 2.58 million triangles a frame. NOLOAD: none of it in the ELF, nothing downloaded, nothing
+ * cleared at start-up.
  *
  * Added to the application's own linker script (Vitis's lscript.ld) as a second -T
  * (VITIS_APP_LDFLAGS_gl_test, bd/gpu_test/Makefile). The link fails if a section of the program

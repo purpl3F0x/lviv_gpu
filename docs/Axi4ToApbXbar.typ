@@ -29,10 +29,11 @@ Internally only 1 Read/Write transaction is allowed at a time. The GPU's address
 
 #v(2em)
 
-== Address Map
-#v(1em)
-#let data = json("../sdk/include/generated/Axi4ToApbXbar/address_map.json")
-#figure(
-  addr_map(data.regions),
-  caption: "GPU Address Map",
-)<gpu_address_map>
+
+//   == Address Map
+//   #v(1em)
+//   #let data = json("../sdk/include/generated/Axi4ToApbXbar/address_map.json")
+//   #figure(
+//     addr_map(data.regions),
+//     caption: "GPU Address Map",
+//   )<gpu_address_map>

@@ -1,5 +1,7 @@
 #include "dp.h"
 
+#include <stdatomic.h>
+
 #include "board.h"
 #include "sleep.h"
 #include "xavbuf.h"
@@ -7,11 +9,11 @@
 #include "xdpdma.h"
 #include "xdppsu.h"
 #include "xil_cache.h"
+#include "xil_exception.h"
 #include "xil_mmu.h"
 #include "xil_printf.h"
-#include "xiltimer.h" // XTime_GetTime, COUNTS_PER_SECOND
 #include "xparameters.h"
-#include "xpseudo_asm.h" // dsb
+#include "xpseudo_asm.h" // mfcpsr, mtcpsr
 
 #define DP_BYTES_PER_PIXEL 4
 #define DP_TRAINING_ATTEMPTS 3
@@ -34,10 +36,33 @@ static XDpDma *const dpdma = &dpdma_block.instance;
 static XVidC_VideoMode mode; // DP_WIDTH x DP_HEIGHT at 60 Hz
 static int dma_started;      // the DPDMA reads the frame from the first stream on, connected or not
 static volatile int stream_on;
-static u16 frame_id; // the descriptor ID of the frame of the last dp_show
+
+// The frame buffers, and by their index: the one the DPDMA reads, the one it takes at the next
+// vertical sync, the one drawn waiting for that one to go, dp_back's (-1: none); the descriptor ID of
+// the frame queued last. The vertical sync interrupt keeps them too: elsewhere, interrupts_off.
+static uint32_t *buffers[DP_FRAMES];
+static int screen, queued = -1, ready = -1, drawn = -1;
+static u16 frame_id;
+static volatile uint32_t shown; // the frames the DPDMA switched to, read with interrupts on
 
 static void start(void);
 static void stop(const char *why);
+
+// One core: interrupts off is the lock against the vertical sync interrupt, and compiler fences
+// (C11's, for a signal handler on the same thread) keep the accesses between off and restore.
+static u32 interrupts_off(void)
+{
+    const u32 daif = mfcpsr();
+    Xil_ExceptionDisable();
+    atomic_signal_fence(memory_order_seq_cst);
+    return daif;
+}
+
+static void interrupts_restore(u32 daif)
+{
+    atomic_signal_fence(memory_order_seq_cst);
+    mtcpsr(daif);
+}
 
 // The hot-plug interrupt's: a monitor plugged in or pulled
 static void on_hpd_event(void *ref)
@@ -65,6 +90,76 @@ static void on_hpd_pulse(void *ref)
     }
 }
 
+// The DPDMA reading the frames: its channel triggered, at the first vertical sync of the first stream
+static int dma_running(void)
+{
+    return dpdma->Gfx.Channel.Current != NULL && dpdma->Gfx.TriggerStatus == XDPDMA_TRIGGER_DONE;
+}
+
+// Frame buffer f taken by the DPDMA at the next vertical sync: the descriptor not in use set up for
+// f, with an ID of its own, then the channel's start address pointed at it and the channel
+// retriggered (XDpDma_DisplayGfxFrameBuffer would wait for the vertical sync interrupt, a frame
+// more). As XDpDma_SetupChannel, but the descriptor whole in memory before the start address moves:
+// a retrigger still pending may fetch it from then on. One at a time: the other one is being read.
+static void queue(int f)
+{
+    XDpDma_Channel *const channel = &dpdma->Gfx.Channel;
+    XDpDma_Descriptor *const desc =
+        channel->Current == &channel->Descriptor0 ? &channel->Descriptor1 : &channel->Descriptor0;
+    frame_buffer.Address = (u64)(uintptr_t)buffers[f];
+    XDpDma_InitVideoDescriptor(desc, &frame_buffer);
+    desc->DSCR_ID = ++frame_id;
+    __asm__ __volatile__("dsb sy" ::: "memory"); // the BSP's dsb() does not hold the compiler back
+    channel->Current = desc;
+    XDpDma_WriteReg(dpdma->Config.BaseAddr, XDPDMA_CH3_DSCR_STRT_ADDRE, UPPER_32_BITS((UINTPTR)desc));
+    XDpDma_WriteReg(dpdma->Config.BaseAddr, XDPDMA_CH3_DSCR_STRT_ADDR, LOWER_32_BITS((UINTPTR)desc));
+    XDpDma_ReTrigger(dpdma, GraphicsChan);
+    queued = f;
+}
+
+// The frame on its way, on the screen once the DPDMA has read its descriptor (the ID Linux's ZynqMP
+// DPDMA driver follows too), the one it replaces free; then a frame waiting, sent. In the vertical
+// sync interrupt or with interrupts off.
+static void advance(void)
+{
+    if (!dma_running())
+        return;
+    if (queued >= 0 && (XDpDma_ReadReg(dpdma->Config.BaseAddr, XDPDMA_CH3_DSCR_ID) & 0xFFFF) == frame_id)
+    {
+        screen = queued;
+        queued = -1;
+        shown++;
+    }
+    if (queued < 0 && ready >= 0)
+    {
+        queue(ready);
+        ready = -1;
+    }
+}
+
+// At a vertical sync: advance (dp_back and dp_present do too: the descriptor may come in after the
+// interrupt reads its ID). A frame not taken at it has its retrigger sent again: harmless while the
+// first is pending (the same descriptor at the same start address), and the frame not stuck should
+// one be lost.
+static void on_vsync(void)
+{
+    const int waiting = queued;
+    advance();
+    if (queued >= 0 && queued == waiting)
+        XDpDma_ReTrigger(dpdma, GraphicsChan);
+}
+
+// The DPDMA's interrupt: its driver's handler (the channel's first trigger, at a vertical sync), then
+// the frame buffers' turns
+static void on_dpdma_interrupt(void *ref)
+{
+    (void)ref;
+    const u32 status = XDpDma_ReadReg(dpdma->Config.BaseAddr, XDPDMA_ISR);
+    XDpDma_InterruptHandler(dpdma);
+    if (status & XDPDMA_ISR_VSYNC_INT_MASK)
+        on_vsync();
+}
+
 // The graphics layer's color conversion into the blender, for 0xAARRGGBB words (DRM's ARGB8888)
 // read as RGBA8888: the identity XAVBuf_ConfigureGraphicsPipeline writes, with red and blue swapped,
 // as Linux's ZynqMP display driver does for that format.
@@ -74,7 +169,7 @@ static void set_graphics_csc(u32 base)
         XAVBuf_WriteReg(base, XAVBUF_V_BLEND_IN2CSC_COEFF0 + 4 * i, i == 2 || i == 4 || i == 6 ? DP_CSC_ONE : 0);
 }
 
-int dp_init(XScuGic *gic, const uint32_t *frame, uint32_t stride)
+int dp_init(XScuGic *gic, uint32_t *const frames[DP_FRAMES], uint32_t stride)
 {
     XDpPsu_Config *dp_config = XDpPsu_LookupConfig(XPAR_XDPPSU_0_BASEADDR);
     XDpDma_Config *dma_config = XDpDma_LookupConfig(XPAR_XDPDMA_0_BASEADDR);
@@ -109,17 +204,20 @@ int dp_init(XScuGic *gic, const uint32_t *frame, uint32_t stride)
     frame_buffer.Stride = stride;
     frame_buffer.LineSize = DP_WIDTH * DP_BYTES_PER_PIXEL;
     frame_buffer.Size = stride * DP_HEIGHT;
-    dp_show(frame);
+    for (int f = 0; f < DP_FRAMES; f++)
+        buffers[f] = frames[f];
+    frame_buffer.Address = (u64)(uintptr_t)buffers[screen];
 
     // Hot-plug: HPD events (plugged in or pulled) and HPD pulses (the monitor asks for attention).
-    // The DPDMA's vertical sync interrupt starts the frame (XDpDma_DisplayGfxFrameBuffer).
+    // The DPDMA's vertical sync interrupt starts the frame (XDpDma_DisplayGfxFrameBuffer) and sends
+    // the ones after.
     XDpPsu_WriteReg(dp_config->BaseAddr, XDPPSU_INTR_DIS, 0xFFFFFFFF);
     XDpPsu_WriteReg(dp_config->BaseAddr, XDPPSU_INTR_MASK, 0xFFFFFFFF);
     // The driver asserts a reference that is not NULL; the handlers do not use it.
     XDpPsu_SetHpdEventHandler(&dp_tx, on_hpd_event, &dp_tx);
     XDpPsu_SetHpdPulseHandler(&dp_tx, on_hpd_pulse, &dp_tx);
     if (board_connect_irq(gic, dp_config->IntrId, (Xil_InterruptHandler)XDpPsu_HpdInterruptHandler, &dp_tx) != 0 ||
-        board_connect_irq(gic, dma_config->IntrId, (Xil_InterruptHandler)XDpDma_InterruptHandler, dpdma) != 0)
+        board_connect_irq(gic, dma_config->IntrId, on_dpdma_interrupt, dpdma) != 0)
         return -1;
     XDpDma_InterruptEnable(dpdma, XDPDMA_IEN_VSYNC_INT_MASK);
 
@@ -134,36 +232,52 @@ int dp_init(XScuGic *gic, const uint32_t *frame, uint32_t stride)
     return 0;
 }
 
-void dp_show(const uint32_t *frame)
+uint32_t *dp_back(void)
 {
-    frame_buffer.Address = (u64)(uintptr_t)frame;
-    // Before the channel's first trigger (at a vertical sync after the first stream starts) that
-    // takes the frame buffer as it is then. After, its descriptor not in use is set up for frame, with
-    // an ID of its own, and the DPDMA fetches it at the next vertical sync: here, not at the vertical
-    // sync interrupt as XDpDma_DisplayGfxFrameBuffer would, which would take one more frame.
-    if (dpdma->Gfx.Channel.Current != NULL && dpdma->Gfx.TriggerStatus == XDPDMA_TRIGGER_DONE)
+    const u32 daif = interrupts_off();
+    advance();
+    int f = 0;
+    while (f < DP_FRAMES && (f == screen || f == queued || f == ready))
+        f++;
+    if (f == DP_FRAMES) // none free: the one waiting, drawn over
     {
-        XDpDma_SetupChannel(dpdma, GraphicsChan);
-        dpdma->Gfx.Channel.Current->DSCR_ID = ++frame_id;
-        dsb(); // the descriptor in memory before the DPDMA is told to fetch it
-        XDpDma_ReTrigger(dpdma, GraphicsChan);
+        f = ready;
+        ready = -1;
     }
+    drawn = f;
+    interrupts_restore(daif);
+    return buffers[f];
 }
 
-int dp_wait_shown(void)
+void dp_present(void)
 {
-    if (dpdma->Gfx.Channel.Current == NULL)
-        return -1;
-    XTime start, now;
-    XTime_GetTime(&start);
-    // The ID of the descriptor the DPDMA is reading (Linux's ZynqMP DPDMA driver follows its flips so)
-    while ((XDpDma_ReadReg(dpdma->Config.BaseAddr, XDPDMA_CH3_DSCR_ID) & 0xFFFF) != frame_id)
+    const u32 daif = interrupts_off();
+    const int f = drawn;
+    drawn = -1;
+    if (f >= 0)
     {
-        XTime_GetTime(&now);
-        if (now - start > COUNTS_PER_SECOND / 30)
-            return -1;
+        advance();
+        if (!dma_running())
+        {
+            // Not read yet: the channel's first trigger takes the frame buffer as it is then
+            screen = f;
+            frame_buffer.Address = (u64)(uintptr_t)buffers[f];
+        }
+        else if (queued < 0)
+        {
+            queue(f);
+        }
+        else
+        {
+            ready = f; // for the vertical sync interrupt; one waiting before, dropped
+        }
     }
-    return 0;
+    interrupts_restore(daif);
+}
+
+uint32_t dp_frames_shown(void)
+{
+    return shown;
 }
 
 // The link at the most both the monitor and the board take (the mode needs less).

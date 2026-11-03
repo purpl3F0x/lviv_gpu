@@ -50,14 +50,14 @@
 
 static_assert(WIDTH == DP_WIDTH && HEIGHT == DP_HEIGHT, "the frame is shown as it is");
 
-// Two frame buffers: one on the screen, the other drawn into, then shown. The GPU writes them and
-// the DPDMA reads them, both behind the CPU's caches: they get 2 MiB blocks of their own (the
-// standalone translation table's for DDR below 4 GiB), not cached (main), so that nothing needs a
-// cache flush.
+// The frame buffers the DP output takes turns with (dp.h): one on the screen, one on its way there,
+// one drawn into, so that the GPU draws as fast as it can. The GPU writes them and the DPDMA reads
+// them, both behind the CPU's caches: they get 2 MiB blocks of their own (the standalone translation
+// table's for DDR below 4 GiB), not cached (main), so that nothing needs a cache flush.
 #define MMU_BLOCK 0x200000
 static union {
-    uint32_t frames[2][FRAME_WORDS];
-    uint8_t blocks[(sizeof(uint32_t[2][FRAME_WORDS]) + MMU_BLOCK - 1) / MMU_BLOCK * MMU_BLOCK];
+    uint32_t frames[DP_FRAMES][FRAME_WORDS];
+    uint8_t blocks[(sizeof(uint32_t[DP_FRAMES][FRAME_WORDS]) + MMU_BLOCK - 1) / MMU_BLOCK * MMU_BLOCK];
 } frame_memory __attribute__((aligned(MMU_BLOCK)));
 static uint32_t (*const frames)[FRAME_WORDS] = frame_memory.frames;
 
@@ -73,12 +73,12 @@ static size_t lviv_frame_bytes(void)
 static gpu_t gpu;
 static XScuGic gic; // static: the DP output's interrupt handlers hold on to it
 
-static int back;     // the frame buffer not on the screen
 static bool drawing; // a frame after another
 static gpu_mode_t mode = GPU_MODE_CPU;
 
 // The model, from the SD card (none: nothing drawn), its file's name; its turn (degrees) and
-// whether it turns
+// whether it turns, TURN_RATE degrees a second whatever the frame rate
+#define TURN_RATE 60.0f
 static gltf_scene_t *scene;
 static char scene_name[64];
 static float angle;
@@ -91,38 +91,28 @@ static const char start_model[] = "0:/suzanne.gltf";
 
 // Since the last report, from period_start: the frames drawn, the sum of their times (us) and of
 // their squares, of the front end's times (us), of the command processor's cycle counts and of the
-// tile DMA's for each frame's last tile write-back.
+// tile DMA's for each frame's last tile write-back; dp_frames_shown then.
 static uint64_t frames_drawn, frame_us, frame_us2, front_us, cp_cycles, tile_cycles;
 static XTime period_start;
+static uint32_t period_shown;
 
 static const char *mode_name(void)
 {
     return mode == GPU_MODE_CP ? "CP" : "CPU";
 }
 
-// The frame buffer drawn into on the screen from the next vertical sync on; the one before, once it
-// is no longer read, drawn into next. With no stream to follow, a frame time at 60 Hz instead.
-static void show_back(void)
-{
-    static XTime last;
-    dp_show(frames[back]);
-    if (dp_wait_shown() != 0)
-    {
-        XTime now;
-        do
-            XTime_GetTime(&now);
-        while (now - last < COUNTS_PER_SECOND / 60);
-    }
-    XTime_GetTime(&last);
-    back ^= 1;
-}
-
-// A frame of the model, turned by angle about its vertical axis, for lviv_gl_frame
+// A frame of the model, turned by angle about its vertical axis, for lviv_gl_frame; the angle on by
+// the time since the last (a tenth of a second at most, after a pause)
 static void draw_scene(void)
 {
-    gltf_scene_draw(scene, angle);
+    static XTime last;
+    XTime now;
+    XTime_GetTime(&now);
+    const float seconds = std::fmin((float)(now - last) / COUNTS_PER_SECOND, 0.1f);
+    last = now;
     if (turning)
-        angle = angle >= 359.0f ? 0.0f : angle + 1.0f;
+        angle = std::fmod(angle + TURN_RATE * seconds, 360.0f);
+    gltf_scene_draw(scene, angle);
 }
 
 // The frames from now on drawn by mode, once there is a model.
@@ -138,10 +128,12 @@ static void start_drawing(void)
     frames_drawn = frame_us = frame_us2 = front_us = cp_cycles = tile_cycles = 0;
     gpu_vis_dma_counters_clear(&gpu);
     XTime_GetTime(&period_start);
+    period_shown = dp_frames_shown();
     xil_printf("%s, %s\r\n", mode_name(), scene_name);
 }
 
-// One frame, drawn and shown, and once a second a report; drawing stops at one that fails.
+// One frame, drawn and sent to the screen without waiting for it, and once a second a report;
+// drawing stops at one that fails.
 static void draw_frame(void)
 {
     XTime start, front, end;
@@ -151,8 +143,10 @@ static void draw_frame(void)
     if (!again)
         draw_scene();
     XTime_GetTime(&front);
-    const gpu_status_t status = again ? lviv_gl_frame_again(frames[back], STRIDE, &failed_tile)
-                                      : lviv_gl_frame(frames[back], STRIDE, &failed_tile);
+    // Taken after the front end: until then, a frame waiting for the screen can still be sent
+    uint32_t *const frame = dp_back();
+    const gpu_status_t status =
+        again ? lviv_gl_frame_again(frame, STRIDE, &failed_tile) : lviv_gl_frame(frame, STRIDE, &failed_tile);
     XTime_GetTime(&end);
     triangles_kept = true;
     if (status != GPU_OK)
@@ -162,7 +156,7 @@ static void draw_frame(void)
         drawing = false;
         return;
     }
-    show_back();
+    dp_present();
 
     const uint64_t t = (end - front) / (COUNTS_PER_SECOND / 1000000);
     frames_drawn++;
@@ -177,12 +171,14 @@ static void draw_frame(void)
     if (now - period_start >= COUNTS_PER_SECOND)
     {
         const uint64_t n = frames_drawn;
+        const uint32_t shown = dp_frames_shown();
         const int rate10 = (int)(n * 10 * COUNTS_PER_SECOND / (now - period_start));
+        const int shown10 = (int)((uint64_t)(shown - period_shown) * 10 * COUNTS_PER_SECOND / (now - period_start));
         // n * (sum of squares) - sum^2 is n^2 times the variance, never negative.
         const double deviation = std::sqrt((double)(n * frame_us2 - frame_us * frame_us)) / (double)n;
-        xil_printf("%s, %s: %d.%d frames/s, frame time %d \u00b1 %d us, front end %d us, %d triangles (",
-                   mode_name(), scene_name, rate10 / 10, rate10 % 10, (int)(frame_us / n), (int)deviation,
-                   (int)(front_us / n), (int)lviv_gl_triangles());
+        xil_printf("%s, %s: %d.%d frames/s (%d.%d shown), frame time %d \u00b1 %d us, front end %d us, %d triangles (",
+                   mode_name(), scene_name, rate10 / 10, rate10 % 10, shown10 / 10, shown10 % 10, (int)(frame_us / n),
+                   (int)deviation, (int)(front_us / n), (int)lviv_gl_triangles());
         if (mode == GPU_MODE_CP)
             xil_printf("CP cycle counter: %d, ", (int)(cp_cycles / n));
         xil_printf("tile write-back: %d cycles)\r\n", (int)(tile_cycles / n));
@@ -195,6 +191,7 @@ static void draw_frame(void)
         gpu_vis_dma_counters_clear(&gpu);
         frames_drawn = frame_us = frame_us2 = front_us = cp_cycles = tile_cycles = 0;
         period_start = now;
+        period_shown = shown;
     }
 }
 
@@ -347,12 +344,14 @@ int main(void)
 #endif
 
     // Black (the frame buffers start zeroed) until the first frame is shown
-    if (dp_init(&gic, frames[back], STRIDE) != 0)
+    uint32_t *buffers[DP_FRAMES];
+    for (int f = 0; f < DP_FRAMES; f++)
+        buffers[f] = frames[f];
+    if (dp_init(&gic, buffers, STRIDE) != 0)
     {
         xil_printf("DisplayPort: setup failed\r\n");
         return 1;
     }
-    back ^= 1;
     xil_printf("DisplayPort: %d x %d at 60 Hz; plug in or pull a monitor\r\n", DP_WIDTH, DP_HEIGHT);
     print_keys();
     load_model(start_model, true);

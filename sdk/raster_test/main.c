@@ -2,10 +2,11 @@
 // the UART console.
 //
 // The DisplayPort output runs in the background from the start, 1280 x 720 at 60 Hz (dp.c). It
-// shows the test pattern first; then the triangle, drawn again for every frame, one a vertical sync
-// (60 frames a second while a frame takes less than 16.7 ms): into the frame buffer not on the
-// screen, shown from the next vertical sync on. Once a second, the frame rate, the frame time (its
-// mean and standard deviation), and with the command processor its cycle counter (the mean).
+// shows the test pattern first; then the triangle, drawn again for every frame, as fast as the GPU
+// draws it: triple buffered, each frame into a frame buffer neither on the screen nor on its way
+// there, sent to the screen without waiting for it (at most one a vertical sync is shown). Once a
+// second, the frame rate (and how many were shown), the frame time (its mean and standard
+// deviation), and with the command processor its cycle counter (the mean).
 // Keys:
 //   1, 2     who draws it: 1 the CPU, tile by tile; 2 the command processor, in one START
 //   c, t, b  the triangle's color: c its corners' colors (untextured), t the texture alone, b the
@@ -97,14 +98,14 @@ static const corner_t corners[3] = {
 
 static gpu_triangle_t triangle __attribute__((aligned(64)));
 static uint64_t visibility __attribute__((aligned(64)));
-// Two frame buffers: one on the screen, the other drawn into, then shown. The GPU writes them and
-// the DPDMA reads them, both behind the CPU's caches: they get 2 MiB blocks of their own (the
-// standalone translation table's for DDR below 4 GiB), not cached (main), so that nothing needs a
-// cache flush.
+// The frame buffers the DP output takes turns with (dp.h): one on the screen, one on its way there,
+// one drawn into. The GPU writes them and the DPDMA reads them, both behind the CPU's caches: they
+// get 2 MiB blocks of their own (the standalone translation table's for DDR below 4 GiB), not cached
+// (main), so that nothing needs a cache flush.
 #define MMU_BLOCK 0x200000
 static union {
-    uint32_t frames[2][FRAME_WORDS];
-    uint8_t blocks[(sizeof(uint32_t[2][FRAME_WORDS]) + MMU_BLOCK - 1) / MMU_BLOCK * MMU_BLOCK];
+    uint32_t frames[DP_FRAMES][FRAME_WORDS];
+    uint8_t blocks[(sizeof(uint32_t[DP_FRAMES][FRAME_WORDS]) + MMU_BLOCK - 1) / MMU_BLOCK * MMU_BLOCK];
 } frame_memory __attribute__((aligned(MMU_BLOCK)));
 static uint32_t (*const frames)[FRAME_WORDS] = frame_memory.frames;
 static uint32_t texture[TEX_SIZE * TEX_SIZE] __attribute__((aligned(4 * TEX_SIZE * TEX_SIZE)));
@@ -112,16 +113,16 @@ static uint32_t texture[TEX_SIZE * TEX_SIZE] __attribute__((aligned(4 * TEX_SIZE
 static gpu_t gpu;
 static XScuGic gic; // static: the DP output's interrupt handlers hold on to it
 
-static int back;       // the frame buffer not on the screen
 static int texture_ok; // the texture is in the GPU's texture table
 static int drawing;    // a frame after another, not the test pattern
 static gpu_mode_t mode = GPU_MODE_CPU;
 static shade_t shade = SHADE_COLOR;
 
 // Since the last report, from period_start: the frames drawn, the sum of their times (us) and of
-// their squares, and of the command processor's cycle counts.
+// their squares, and of the command processor's cycle counts; dp_frames_shown then.
 static uint64_t frames_drawn, frame_us, frame_us2, cp_cycles;
 static XTime period_start;
+static uint32_t period_shown;
 
 // raster_sw's edge function (rasterizer.h): c's distance from edge a -> b times the edge's length,
 // positive on the inside of a triangle counter-clockwise on the screen.
@@ -264,28 +265,11 @@ static int build_triangle(shade_t how)
     return tiles;
 }
 
-// The frame buffer drawn into on the screen from the next vertical sync on; the one before, once it
-// is no longer read, drawn into next. With no stream to follow, a frame time at 60 Hz instead.
-static void show_back(void)
-{
-    static XTime last;
-    dp_show(frames[back]);
-    if (dp_wait_shown() != 0)
-    {
-        XTime now;
-        do
-            XTime_GetTime(&now);
-        while (now - last < COUNTS_PER_SECOND / 60);
-    }
-    XTime_GetTime(&last);
-    back ^= 1;
-}
-
 static void show_test_pattern(void)
 {
     drawing = 0;
-    fill_test_pattern(frames[back]);
-    show_back();
+    fill_test_pattern(dp_back());
+    dp_present();
     xil_printf("test pattern\r\n");
 }
 
@@ -303,6 +287,7 @@ static void start_drawing(void)
     drawing = 1;
     frames_drawn = frame_us = frame_us2 = cp_cycles = 0;
     XTime_GetTime(&period_start);
+    period_shown = dp_frames_shown();
     xil_printf("%s, %s\r\n", mode_names[mode], shade_names[shade]);
 }
 
@@ -325,14 +310,15 @@ static uint64_t isqrt(uint64_t n)
     return root;
 }
 
-// One frame, drawn and shown, and once a second a report; drawing stops at one that fails.
+// One frame, drawn and sent to the screen without waiting for it, and once a second a report;
+// drawing stops at one that fails.
 static void draw_frame(void)
 {
     gpu_frame_t f = {
         .triangles = &triangle,
         .visibility = &visibility,
         .triangle_count = 1,
-        .frame = frames[back],
+        .frame = dp_back(),
         .stride = STRIDE,
         .width = WIDTH,
         .height = HEIGHT,
@@ -350,7 +336,7 @@ static void draw_frame(void)
         drawing = 0;
         return;
     }
-    show_back();
+    dp_present();
 
     const uint64_t t = (end - start) / (COUNTS_PER_SECOND / 1000000);
     frames_drawn++;
@@ -363,16 +349,20 @@ static void draw_frame(void)
     if (now - period_start >= COUNTS_PER_SECOND)
     {
         const uint64_t n = frames_drawn;
+        const uint32_t shown = dp_frames_shown();
         const int rate10 = (int)(n * 10 * COUNTS_PER_SECOND / (now - period_start));
+        const int shown10 = (int)((uint64_t)(shown - period_shown) * 10 * COUNTS_PER_SECOND / (now - period_start));
         // n * (sum of squares) - sum^2 is n^2 times the variance, never negative.
         const uint64_t deviation = isqrt((n * frame_us2 - frame_us * frame_us) / (n * n));
-        xil_printf("%s, %s: %d.%d frames/s, frame time %d \u00b1 %d us", mode_names[mode], shade_names[shade],
-                   rate10 / 10, rate10 % 10, (int)(frame_us / n), (int)deviation);
+        xil_printf("%s, %s: %d.%d frames/s (%d.%d shown), frame time %d \u00b1 %d us", mode_names[mode],
+                   shade_names[shade], rate10 / 10, rate10 % 10, shown10 / 10, shown10 % 10, (int)(frame_us / n),
+                   (int)deviation);
         if (mode == GPU_MODE_CP)
             xil_printf(" (CP cycle counter: %d)", (int)(cp_cycles / n));
         xil_printf("\r\n");
         frames_drawn = frame_us = frame_us2 = cp_cycles = 0;
         period_start = now;
+        period_shown = shown;
     }
 }
 
@@ -417,13 +407,15 @@ int main(void)
     else
         xil_printf("texture: at 0x%x, outside the GPU's texture window\r\n", (int)(uintptr_t)texture);
 
-    fill_test_pattern(frames[back]);
-    if (dp_init(&gic, frames[back], STRIDE) != 0)
+    fill_test_pattern(frames[0]);
+    uint32_t *buffers[DP_FRAMES];
+    for (int f = 0; f < DP_FRAMES; f++)
+        buffers[f] = frames[f];
+    if (dp_init(&gic, buffers, STRIDE) != 0)
     {
         xil_printf("DisplayPort: setup failed\r\n");
         return 1;
     }
-    back ^= 1;
     xil_printf("DisplayPort: %d x %d at 60 Hz, the test pattern; plug in or pull a monitor\r\n", DP_WIDTH, DP_HEIGHT);
     print_keys();
 

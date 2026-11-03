@@ -6,20 +6,23 @@
 
 // Field constructors, the same vocabulary as packet. Widths are in bits; the
 // first positional argument, if any, is the label.
-#let _field(kind, width, rest, anchor: none, fill: none) = (
+#let _field(kind, width, rest, anchor: none, fill: none, used: none) = (
   kind: kind,
   width: width,
   label: rest.pos().at(0, default: none),
   anchor: anchor,
   fill: fill,
+  used: used,
 )
 
-#let bytes(n, ..rest, at: none, fill: none) = _field(
+// `used: (bits, word)`: only the low `bits` of each `word`-bit word are used
+#let bytes(n, ..rest, at: none, fill: none, used: none) = _field(
   "field",
   n * 8,
   rest,
   anchor: if at != none { at * 8 },
   fill: fill,
+  used: used,
 )
 #let bits(n, ..rest, at: none, fill: none) = _field(
   "field",
@@ -50,6 +53,8 @@
   cut-at: 0.55, // where the "~" cut sits, as a fraction down the box
   cut-amp: 0.12, // height of the "~" wave
   cut-gap: 0.2, // thickness of the band in the "~"
+  brace-amp: 0.2, // how far a group's brace sticks out
+  brace-label-gap: 0.15, // brace tip to its label
 )
 
 #let _cm(l) = l / 1cm
@@ -134,6 +139,8 @@
 //   fill         a color, or an array of colors cycled over the boxes in order.
 //                A field's own `fill` wins and does not use up a slot.
 //   end-labels   also show each box's last-byte address at its bottom edge
+//   groups       braces right of the sizes, each over its bytes (in proportion
+//                inside a box): an array of (at: byte, size: bytes, label: content)
 #let struct(
   ..args,
   width: 4cm,
@@ -148,6 +155,7 @@
   stroke: 0.8pt + black,
   fill: (luma(200), white),
   end-labels: true,
+  groups: (),
 ) = context {
   let label-size = if label-size == auto { size } else { label-size }
   let meta-size = if meta-size == auto { label-size * 0.8 } else { meta-size }
@@ -176,6 +184,7 @@
     import cetz.draw: content, line
     let shift = 0.0 // how far callouts hung below earlier boxes push the rest down
     let slot-i = 0 // how many boxes have taken an automatic fill so far
+    let spans = () // each box's bits and edges, for the group braces
     let bot = 0.0
     for e in entries {
       let top = -(e.top + shift)
@@ -186,7 +195,18 @@
         let is-gap = e.kind == "gap"
         let cut = if e.clamped { top - _look.cut-at * e.height }
         let box-fill = if e.fill != none { e.fill } else { slot }
-        _shape(x0, x1, top, bot, (stroke: stroke, fill: box-fill), gap: is-gap, cut: cut)
+        if e.used == none {
+          _shape(x0, x1, top, bot, (stroke: stroke, fill: box-fill), gap: is-gap, cut: cut)
+        } else {
+          // the used low bits lit (on the right, as in a register), the rest as a gap
+          let (bits, word) = e.used
+          let ux = x1 - bits / word * (x1 - x0)
+          _shape(x0, ux, top, bot, none, gap: true, cut: cut)
+          _shape(ux, x1, top, bot, (stroke: stroke, fill: box-fill), cut: cut)
+          _shape(x0, x1, top, bot, (stroke: stroke, fill: none), cut: cut)
+          let uy = if cut == none { (top + bot) / 2 } else { (top + cut + _look.cut-amp) / 2 }
+          content(((ux + x1) / 2, uy), meta(str(bits - 1) + ":0"))
+        }
 
         // Label: centred in the box (above the "~" when cut) on one or two
         // lines, else hung below the box on a leader.
@@ -261,6 +281,39 @@
 
       // size column (right), centred on the box
       content((x1 + _look.side-gap, (top + bot) / 2), meta(_size-str(e.size)), anchor: "west")
+      spans.push((start: e.start, end: e.start + e.size, top: top, bot: bot))
+    }
+
+    // Group braces, clear of the widest size label
+    if groups.len() > 0 and entries.len() > 0 {
+      import cetz.decorations: brace
+      let size-w = calc.max(..entries.map(e => _cm(measure(meta(_size-str(e.size))).width)))
+      let bx = x1 + 2 * _look.side-gap + size-w
+      // y of a bit position: its box's edge, or in proportion inside the box
+      let y-at(bit) = {
+        for s in spans {
+          if bit >= s.start and bit <= s.end {
+            return s.top - (bit - s.start) / (s.end - s.start) * (s.top - s.bot)
+          }
+        }
+        none
+      }
+      for (i, g) in groups.enumerate() {
+        let y0 = y-at(g.at * 8)
+        let y1 = y-at((g.at + g.size) * 8)
+        if y0 != none and y1 != none {
+          let name = "group-" + str(i)
+          brace(
+            (bx, y0),
+            (bx, y1),
+            amplitude: _look.brace-amp,
+            content-offset: _look.brace-label-gap,
+            stroke: stroke,
+            name: name,
+          )
+          content(name + ".content", text(..label-style, g.label), anchor: "west")
+        }
+      }
     }
 
     // With end labels off, still mark where the struct ends: the last byte's

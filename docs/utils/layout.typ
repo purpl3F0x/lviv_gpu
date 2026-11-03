@@ -22,6 +22,7 @@
         kind: f.kind,
         label: f.label,
         fill: f.fill,
+        used: f.at("used", default: none),
         start: f.start,
         size: size,
         height: calc.max(min-height, calc.min(max-height, raw)),

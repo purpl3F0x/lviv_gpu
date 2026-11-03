@@ -27,6 +27,7 @@
       end: end,
       label: d.label,
       fill: d.at("fill", default: none),
+      used: d.at("used", default: none),
     ))
 
     cursor = calc.max(cursor, end + 1)

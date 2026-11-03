@@ -19,7 +19,7 @@
 #
 # No PS clock reaches the PL; the PS's pl_resetn0 (inverted) resets the DDR controller, and every
 # clock's reset block waits for its calibration. ddr4_0 takes the board interfaces, which place
-# the clock and memory pins, with the SODIMM's own part (ddr4_2400_samy.csv). The texture caches
+# the clock and memory pins, with the SODIMM's own part (ddr4_samsung_d_die.csv). The texture caches
 # reach the first 128 MiB of PL DDR (gpu_0's TEXTURE_WINDOW, 0); the L2 and ddr_xbar pass
 # addresses on as they are. ddr_xbar (ddr_xbar.sv: taxi's crossbar) arbitrates round robin, the L2
 # winning ties; the DDR controller answers in order. Every crossing between the clocks in gpu_top
@@ -71,16 +71,28 @@ set_property -dict [list \
 #
 
 # The SODIMM's part first: the board interfaces then lock it (the board's preset, bd/boards, has the
-# speed and input clock but no part); the extra clocks last, their choices following from those
+# speed and input clock but no part); the extra clocks last, their choices following from those.
+# DDR4-2666, past the SODIMM's 2400 limit for DIMMs: as its eight x8 components (CL19), with
+# 3334 ps the input period nearest the board's 300 MHz
 set ddr4 [create_bd_cell -type ip -vlnv [ip_vlnv ddr4] ddr4_0]
-set sodimm [file join [file dirname [file normalize [info script]]] ddr4_2400_samy.csv]
+set sodimm [file join [file dirname [file normalize [info script]]] ddr4_samsung_d_die.csv]
 set_property -dict [list \
-    CONFIG.C0.DDR4_TimePeriod {833} \
-    CONFIG.C0.DDR4_InputClockPeriod {3331} \
-    CONFIG.C0.DDR4_MemoryType {SODIMMs} \
+    CONFIG.C0.DDR4_TimePeriod {750} \
+    CONFIG.C0.DDR4_InputClockPeriod {3334} \
+    CONFIG.C0.DDR4_MemoryType {Components} \
+    CONFIG.C0.DDR4_DataWidth {64} \
     CONFIG.C0.DDR4_isCustom {true} \
     CONFIG.C0.DDR4_CustomParts $sodimm \
-    CONFIG.C0.DDR4_MemoryPart {SAMY2400}] $ddr4
+    CONFIG.C0.DDR4_MemoryPart {SAMSUNG_2666}] $ddr4
+# Or DDR4-2400, its rated speed (CL17, a 300 MHz UI clock), with preset.xml's 2400 values:
+# set_property -dict [list \
+#     CONFIG.C0.DDR4_TimePeriod {833} \
+#     CONFIG.C0.DDR4_InputClockPeriod {3331} \
+#     CONFIG.C0.DDR4_MemoryType {Components} \
+#     CONFIG.C0.DDR4_DataWidth {64} \
+#     CONFIG.C0.DDR4_isCustom {true} \
+#     CONFIG.C0.DDR4_CustomParts $sodimm \
+#     CONFIG.C0.DDR4_MemoryPart {SAMSUNG_2400}] $ddr4
 set_property -dict [list \
     CONFIG.C0_CLOCK_BOARD_INTERFACE {clk_300mhz} \
     CONFIG.C0_DDR4_BOARD_INTERFACE {ddr4_sdram} \
@@ -115,7 +127,7 @@ create_bd_cell -type module -reference ctrl_xbar_bd ctrl_xbar
 # Resets, one per clock, held until the DDR is calibrated
 #
 
-foreach clk {100 300 500} {
+foreach clk {100 333 500} {
   create_bd_cell -type ip -vlnv [ip_vlnv proc_sys_reset] rst_clk_$clk
   connect_bd_net [get_bd_pins ddr4_0/c0_ddr4_ui_clk_sync_rst] [get_bd_pins rst_clk_$clk/ext_reset_in]
 }
@@ -156,15 +168,25 @@ connect_bd_net -net clk_100 [get_bd_pins ddr4_0/addn_ui_clkout1] [get_bd_pins gp
 connect_bd_net [get_bd_pins rst_clk_100/peripheral_aresetn] [get_bd_pins gpu_0/lpd_rst_n] \
     [get_bd_pins L2Cache_0/axil_resetn] [get_bd_pins ctrl_xbar/aresetn]
 
-# clk_300: mem_clk (the DMAs, the frontend), the L2's DDR master, HP0, HP1, HPM1, ddr_xbar
+# clk_333: mem_clk (the DMAs, the frontend), the L2's DDR master, HP0, HP1, HPM1, ddr_xbar
 # and the DDR controller's AXI port
-connect_bd_net -net clk_300 [get_bd_pins ddr4_0/c0_ddr4_ui_clk] [get_bd_pins gpu_0/mem_clk] \
+connect_bd_net -net clk_333 [get_bd_pins ddr4_0/c0_ddr4_ui_clk] [get_bd_pins gpu_0/mem_clk] \
     [get_bd_pins L2Cache_0/mem_clk] [get_bd_pins $ps/saxihp0_fpd_aclk] \
     [get_bd_pins $ps/saxihp1_fpd_aclk] [get_bd_pins $ps/maxihpm1_fpd_aclk] \
-    [get_bd_pins ddr_xbar/aclk] [get_bd_pins rst_clk_300/slowest_sync_clk]
-connect_bd_net [get_bd_pins rst_clk_300/peripheral_aresetn] [get_bd_pins gpu_0/mem_rst_n] \
+    [get_bd_pins ddr_xbar/aclk] [get_bd_pins rst_clk_333/slowest_sync_clk]
+connect_bd_net [get_bd_pins rst_clk_333/peripheral_aresetn] [get_bd_pins gpu_0/mem_rst_n] \
     [get_bd_pins L2Cache_0/mem_resetn] [get_bd_pins ddr_xbar/aresetn] \
     [get_bd_pins ddr4_0/c0_ddr4_aresetn]
+
+# clk_300: mem_clk (the DMAs, the frontend), the L2's DDR master, HP0, HP1, HPM1, ddr_xbar
+# and the DDR controller's AXI port
+# connect_bd_net -net clk_300 [get_bd_pins ddr4_0/c0_ddr4_ui_clk] [get_bd_pins gpu_0/mem_clk] \
+#     [get_bd_pins L2Cache_0/mem_clk] [get_bd_pins $ps/saxihp0_fpd_aclk] \
+#     [get_bd_pins $ps/saxihp1_fpd_aclk] [get_bd_pins $ps/maxihpm1_fpd_aclk] \
+#     [get_bd_pins ddr_xbar/aclk] [get_bd_pins rst_clk_300/slowest_sync_clk]
+# connect_bd_net [get_bd_pins rst_clk_300/peripheral_aresetn] [get_bd_pins gpu_0/mem_rst_n] \
+#     [get_bd_pins L2Cache_0/mem_resetn] [get_bd_pins ddr_xbar/aresetn] \
+#     [get_bd_pins ddr4_0/c0_ddr4_aresetn]
 
 # clk_500: core_clk (the orchestrator, the threads), the L2
 connect_bd_net -net clk_500 [get_bd_pins ddr4_0/addn_ui_clkout2] [get_bd_pins gpu_0/core_clk] \

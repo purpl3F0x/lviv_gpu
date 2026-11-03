@@ -16,11 +16,15 @@
     <ip vendor="xilinx.com" library="ip" name="ddr4">
       <user_parameters>
         <!-- lviv_gpu: no part (the design's SODIMM, a custom part, set before this board interface)
-             and no extra clocks; its speed, DDR4-2400 -->
-        <user_parameter name="CONFIG.C0.DDR4_MemoryType" value="SODIMMs" />
+             and no extra clocks; its speed, DDR4-2666, as components (SODIMMs stop at 2400) -->
+        <user_parameter name="CONFIG.C0.DDR4_MemoryType" value="Components" />
         <user_parameter name="CONFIG.C0.DDR4_DataWidth" value="64" />
+        <user_parameter name="CONFIG.C0.DDR4_TimePeriod" value="750" />
+        <user_parameter name="CONFIG.C0.DDR4_InputClockPeriod" value="3334" />
+        <!-- DDR4-2400 (SAMSUNG_2400) instead:
         <user_parameter name="CONFIG.C0.DDR4_TimePeriod" value="833" />
         <user_parameter name="CONFIG.C0.DDR4_InputClockPeriod" value="3331" />
+        -->
       </user_parameters>
     </ip>
   </ip_preset>

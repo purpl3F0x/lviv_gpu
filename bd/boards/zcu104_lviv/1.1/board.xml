@@ -10,7 +10,7 @@
  License for the specific language governing permissions and limitations
  under the License. -->
 <!-- lviv_gpu: Xilinx's zcu104 1.1 as zcu104_lviv, its PL DDR4 SODIMM preset leaving the memory part
- to the design (bd/gpu_test: a DDR4-2400 SODIMM, ddr4_2400_samy.csv) -->
+ to the design (bd/gpu_test: a DDR4-2400 SODIMM, ddr4_samsung_d_die.csv) -->
 <board schema_version="2.2" vendor="xilinx.com" name="zcu104_lviv" display_name="Zynq UltraScale+ ZCU104 (lviv_gpu)" url="www.xilinx.com/zcu104" preset_file="preset.xml">
  
   <images>

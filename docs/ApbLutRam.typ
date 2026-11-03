@@ -3,10 +3,6 @@
 #import "utils/struct.typ": bytes, struct
 
 
-#set page(paper: "a4")
-
-
-
 = Texture LUT
 #v(1em)
 

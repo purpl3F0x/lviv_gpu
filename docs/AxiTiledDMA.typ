@@ -1,11 +1,6 @@
-
 #import "@local/circuiteria:0.2.1": *
 #import "@preview/splash:0.5.0": gruvbox, google
 #import "utils/regspec.typ": reg_spec
-
-
-#set page(paper: "a4")
-
 
 
 = 2D Tiled DMA

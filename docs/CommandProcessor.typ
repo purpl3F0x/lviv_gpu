@@ -3,10 +3,6 @@
 #import "utils/regspec.typ": reg_spec
 
 
-#set page(paper: "a4")
-
-
-
 = Command Processor
 #v(1em)
 

@@ -3,10 +3,6 @@
 #import "utils/addrmap.typ": addr_map
 
 
-#set page(paper: "a4")
-
-
-
 = AXI4 to APB Crossbar
 #v(1em)
 

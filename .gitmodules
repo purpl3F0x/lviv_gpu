@@ -16,3 +16,6 @@
 [submodule "rtl/third_party/taxi"]
 	path = rtl/third_party/taxi
 	url = https://github.com/fpganinja/taxi
+[submodule "docs/utils/circuiteria"]
+	path = docs/utils/circuiteria
+	url = https://github.com/purpl3F0x/circuiteria-mirror

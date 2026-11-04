@@ -6,7 +6,7 @@
 = Command Processor
 #v(1em)
 
-The  purpose of the *CommandProcessor*  is to offload the CPU from the task of managing the rendering pipeline, doing in hardware what the CPU's driver otherwise would do for every tile. The CPU still sets the frame up (the DMAs' frame registers and interrupt masks, the buffer clears and the first tile's box) and then writes the frame size and START. From there the command processor sequences the tiles as a second master on the APB crossbar (`m_axi`), using single-beat writes, one at a time. It never reads over the bus: it follows the units through their interrupt and idle signals.
+The  purpose of the *CommandProcessor*  is to offload the CPU from the task of managing the rendering pipeline, doing in hardware what the CPU's driver otherwise would do for every tile. The CPU still sets the frame up (the DMAs' frame registers and interrupt masks, the buffer clears and the first tile's box) and then writes the frame size (as its last pixel, SIZE) and START. From there the command processor sequences the tiles as a second master on the APB crossbar (`m_axi`), using single-beat writes, one at a time. It never reads over the bus: it follows the units through their interrupt and idle signals.
 
 For every tile it starts the visibility DMA, then waits until every unit of the pipeline (the triangle path, the front-end, the orchestrator and the threads) has finished working, for a number of consecutive cycles. It then starts the tile DMA to write-back the tile data, while also clearing the Z-Buffers before processing to the next tile.
 

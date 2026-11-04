@@ -60,7 +60,7 @@ object CommandProcessor {
   val causeTileDma = 2 // the tile DMA's error
   val causeBus =
     3 // an error response to one of the command processor's own accesses
-  val causeSize = 4 // WIDTH or HEIGHT 0, or more than maxTiles tiles
+  val causeSize = 4 // more than maxTiles tiles
 
   // The units' registers it writes, from their regif maps (sdk/include/generated/<Name>/*.h).
   val intRaw = 0x70 // both DMAs' RFMS4 block: INT_RAW, write 1 to clear
@@ -170,7 +170,7 @@ class CommandProcessor(
     RO,
     doc =
       "Why it stopped: 1 visibility DMA error, 2 tile DMA error, 3 error response to a register " +
-        "access, 4 WIDTH or HEIGHT 0 or too many tiles"
+        s"access, 4 more than ${config.maxTiles} tiles"
   )
   val TILE = REG_STATUS.fieldAt(
     pos = 8,
@@ -189,10 +189,11 @@ class CommandProcessor(
         "START. Not changed while BUSY"
   )
 
-  val REG_SIZE = busif.newRegAt(address = 0x0c, doc = "Frame size")
-  val WIDTH =
-    REG_SIZE.field(UInt(16 bits), RW, resetValue = 0, doc = "Pixels per row")
-  val HEIGHT = REG_SIZE.field(UInt(16 bits), RW, resetValue = 0, doc = "Rows")
+  val REG_SIZE = busif.newRegAt(address = 0x0c, doc = "Frame size, as its last pixel")
+  val LAST_X =
+    REG_SIZE.field(UInt(16 bits), RW, resetValue = 0, doc = "The last column: width - 1")
+  val LAST_Y =
+    REG_SIZE.field(UInt(16 bits), RW, resetValue = 0, doc = "The last row: height - 1")
 
   val REG_FRAME_CYCLES = busif.newRegAt(address = 0x10, doc = "Frame cycles")
   val FRAME_CYCLES = REG_FRAME_CYCLES.field(
@@ -337,26 +338,27 @@ class CommandProcessor(
       UInt(log2Up(config.settleCycles.max(config.idleCycles) + 1) bits)
     ) init (0)
 
+    // The frame's last tile across and down: its last pixel's. More than maxTiles tiles: a last
+    // tile row past the largest its last tile column allows (a table, no multiply)
     val tileSize = 1 << config.tileShift
-    val tilesXNext =
-      ((WIDTH.resize(17 bits) + (tileSize - 1)) >> config.tileShift)
-        .resize(10 bits)
-    val tilesYNext =
-      ((HEIGHT.resize(17 bits) + (tileSize - 1)) >> config.tileShift)
-        .resize(10 bits)
-    val badSize =
-      tilesXNext === 0 || tilesYNext === 0 || (tilesXNext * tilesYNext) > config.maxTiles
+    val lastTileXNext = LAST_X >> config.tileShift
+    val lastTileYNext = LAST_Y >> config.tileShift
+    val maxLastTileY = Vec((0 until config.maxTiles).map { x =>
+      U(config.maxTiles / (x + 1) - 1, config.tileIndexWidth bits)
+    })
+    val lastTileYAllowed =
+      maxLastTileY(lastTileXNext.resize(config.tileIndexWidth bits)).resize(lastTileYNext.getWidth bits)
+    val badSize = lastTileXNext >= config.maxTiles || lastTileYNext > lastTileYAllowed
 
     val busy = RegInit(False)
     val finished = False // the frame finished, this cycle
     val failed = False // the frame stopped, or did not start, this cycle
     val cause = Reg(UInt(3 bits)) init (causeNone)
-    val tilesX, tilesY = Reg(UInt(config.tileIndexWidth + 1 bits)) init (1)
+    val lastTileX, lastTileY = Reg(UInt(config.tileIndexWidth bits)) init (0)
     val tileX, tileY = Reg(UInt(config.tileIndexWidth bits)) init (0)
     val tile = Reg(UInt(config.tileIndexWidth bits)) init (0)
-    val lastX = tileX.resize(config.tileIndexWidth + 1 bits) === tilesX - 1
-    val lastTile =
-      lastX && tileY.resize(config.tileIndexWidth + 1 bits) === tilesY - 1
+    val lastX = tileX === lastTileX
+    val lastTile = lastX && tileY === lastTileY
     val cycles = Reg(UInt(32 bits)) init (0)
     val item = Reg(UInt(4 bits)) init (0) // in the write list being sent
     when(busy)(cycles := cycles + 1)
@@ -385,10 +387,10 @@ class CommandProcessor(
     // The tile's box: from its first pixel to its last, or the frame's when the tile runs past it
     def boxStart(index: UInt): UInt =
       (index @@ U(0, config.tileShift bits)).resize(16 bits)
-    def boxEnd(index: UInt, size: UInt): UInt = {
+    def boxEnd(index: UInt, last: UInt): UInt = {
       val tileEnd =
         (index @@ U(tileSize - 1, config.tileShift bits)).resize(16 bits)
-      Mux(tileEnd < size - 1, tileEnd, size - 1)
+      Mux(tileEnd < last, tileEnd, last)
     }
 
     val visStartWrite = Vec(write(visBase + visCtrl, visCtrlStart))
@@ -402,8 +404,8 @@ class CommandProcessor(
         Seq(
           write(frontendBase + frontendBbMinX, boxStart(nextX).asBits),
           write(frontendBase + frontendBbMinY, boxStart(nextY).asBits),
-          write(frontendBase + frontendBbMaxX, boxEnd(nextX, WIDTH).asBits),
-          write(frontendBase + frontendBbMaxY, boxEnd(nextY, HEIGHT).asBits)
+          write(frontendBase + frontendBbMaxX, boxEnd(nextX, LAST_X).asBits),
+          write(frontendBase + frontendBbMaxY, boxEnd(nextY, LAST_Y).asBits)
         )
     )
 
@@ -450,8 +452,8 @@ class CommandProcessor(
             busy := True
             cause := causeNone
             cycles := 0
-            tilesX := tilesXNext.resized
-            tilesY := tilesYNext.resized
+            lastTileX := lastTileXNext.resized
+            lastTileY := lastTileYNext.resized
             tileX := 0
             tileY := 0
             tile := 0

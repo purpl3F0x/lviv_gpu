@@ -451,7 +451,8 @@ static gpu_status_t cp_frame(const gpu_t *gpu, const gpu_frame_t *frame, uint32_
             return cleared;
     }
     gpu_set_tile(gpu, frame, 0, 0);
-    cp_write_reg(gpu, CP_REG_SIZE, frame->height << CP_REG_SIZE_HEIGHT_SHIFT | frame->width);
+    // The frame's last pixel (gpu_frame: neither side 0)
+    cp_write_reg(gpu, CP_REG_SIZE, (frame->height - 1) << CP_REG_SIZE_LAST_Y_SHIFT | (frame->width - 1));
 
     const uint32_t vis_irqs = gpu->irq_count[GPU_IRQ_VIS_DMA], tile_irqs = gpu->irq_count[GPU_IRQ_TILE_DMA];
     cp_write_reg(gpu, CP_REG_CTRL, BIT(CP_REG_CTRL_START_SHIFT));

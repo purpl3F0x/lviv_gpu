@@ -13,7 +13,7 @@ import gpu_types_pkg::*;
 //      first pixel to its last, or the screen's), run the visibility DMA over the visibility
 //      buffer, wait for the core to go idle, run the tile DMA
 //   4. the same frame from the command processor (MODE 1, one START): its checks first (START
-//      ignored in MODE 0, a size of 0, MODE kept while busy, SOFT_RESET mid-frame), then the frame,
+//      ignored in MODE 0, too many tiles, MODE kept while busy, SOFT_RESET mid-frame), then the frame,
 //      which must end with the tile DMA's frame_done and give the per-tile frame's image (rows
 //      past the screen: the clear color, as BB_MAX clips them)
 //   5. a second write-back of the first tile must read the clear color everywhere
@@ -886,7 +886,7 @@ module tb_gpu_top;
     axi_write(FrontendBbMinY, 32'h0);
     axi_write(FrontendBbMaxX, box_end(0, TILE_SIZE_X, Width));
     axi_write(FrontendBbMaxY, box_end(0, TILE_SIZE_Y, Height));
-    axi_write(CpSize, {16'(Height), 16'(Width)});
+    axi_write(CpSize, {16'(Height - 1), 16'(Width - 1)});  // the last pixel
   endtask
 
   task automatic cp_checks();
@@ -899,12 +899,17 @@ module tb_gpu_top;
     repeat (20) @(posedge lpd_clk);
     expect_cp(32'h7, 32'h0, "after START in MODE 0");
 
-    // A size of 0: ERROR, CAUSE 4, at once
+    // More than 64 tiles: ERROR, CAUSE 4, at once. 5 x 13 tiles (the size's table), and a row of
+    // more than 64
     axi_write(CpMode, 32'h1);
-    axi_write(CpSize, 32'h0);
+    axi_write(CpSize, {16'(13 * TILE_SIZE_Y - 1), 16'(5 * TILE_SIZE_X - 1)});
     axi_write(CpCtrl, 32'h1);
     cp_wait_stopped(status);
-    expect_cp(32'h77, 32'h44, "after START with a size of 0");
+    expect_cp(32'h77, 32'h44, "after START with 5 x 13 tiles");
+    axi_write(CpSize, {16'(TILE_SIZE_Y - 1), 16'hFFFF});
+    axi_write(CpCtrl, 32'h1);
+    cp_wait_stopped(status);
+    expect_cp(32'h77, 32'h44, "after START with 512 x 1 tiles");
 
     // Mid-frame: MODE kept, then SOFT_RESET back to idle
     monitor_on = 1'b0;
@@ -925,7 +930,7 @@ module tb_gpu_top;
     wait_bits(TileStatus, 32'h1, 32'h0, "tile DMA BUSY after SOFT_RESET");
     wait_core_idle();
     monitor_on = 1'b1;
-    $display("[%0t] command processor: START in MODE 0, size 0, MODE while busy, SOFT_RESET",
+    $display("[%0t] command processor: START in MODE 0, too many tiles, MODE while busy, SOFT_RESET",
              $time);
   endtask
 

@@ -20,7 +20,8 @@ extern "C"
 {
 #endif
 
-// The output's size: any standard 60 Hz mode (1280 x 720, 1920 x 1080, ...); dp_init fails on another.
+// The output's size from dp_init on: any standard 60 Hz mode (1280 x 720, 1920 x 1080, ...); dp_init
+// fails on another. dp_set_mode changes it.
 #define DP_WIDTH 1280
 #define DP_HEIGHT 720
 
@@ -34,6 +35,12 @@ extern "C"
 // caller before dp_present. Connects the DP and DPDMA interrupts to gic, which must be initialized;
 // trains the link if a monitor is already plugged in. Returns 0, or -1 on failure.
 int dp_init(XScuGic *gic, uint32_t *const frames[DP_FRAMES], uint32_t stride);
+
+// The output at width x height, 60 Hz (a standard mode, as DP_WIDTH x DP_HEIGHT), from frames laid
+// out as dp_init's for it: the DPDMA stopped, the link trained again and the stream restarted at the
+// mode (a few hundred milliseconds, with a monitor in). frames[0], drawn first, is shown, the others
+// free for dp_back. Returns 0, or -1 if there is no such mode (the mode so far kept).
+int dp_set_mode(int width, int height, uint32_t *const frames[DP_FRAMES], uint32_t stride);
 
 // The frame buffer to draw the next frame into, neither on the screen nor on its way there: the
 // frame drawn last instead when it is still waiting to be sent (dropped). Never waits.

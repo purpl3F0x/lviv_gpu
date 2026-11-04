@@ -33,8 +33,9 @@ static union {
 } dpdma_block __attribute__((aligned(DP_MMU_BLOCK)));
 static XDpDma *const dpdma = &dpdma_block.instance;
 
-static XVidC_VideoMode mode; // DP_WIDTH x DP_HEIGHT at 60 Hz
-static int dma_started;      // the DPDMA reads the frame from the first stream on, connected or not
+static XVidC_VideoMode mode; // width x height at 60 Hz: dp_init's, or dp_set_mode's
+static int width = DP_WIDTH, height = DP_HEIGHT;
+static int dma_started; // the DPDMA's channel given its first frame (start), read from then on, connected or not
 static volatile int stream_on;
 
 // The frame buffers, and by their index: the one the DPDMA reads, the one it takes at the next
@@ -169,6 +170,19 @@ static void set_graphics_csc(u32 base)
         XAVBuf_WriteReg(base, XAVBUF_V_BLEND_IN2CSC_COEFF0 + 4 * i, i == 2 || i == 4 || i == 6 ? DP_CSC_ONE : 0);
 }
 
+// The frame buffers for width x height, frames[0] the one shown first, none on its way
+static void set_frames(uint32_t *const frames[DP_FRAMES], uint32_t stride)
+{
+    frame_buffer.Stride = stride;
+    frame_buffer.LineSize = (u32)width * DP_BYTES_PER_PIXEL;
+    frame_buffer.Size = stride * (u32)height;
+    for (int f = 0; f < DP_FRAMES; f++)
+        buffers[f] = frames[f];
+    screen = 0;
+    queued = ready = drawn = -1;
+    frame_buffer.Address = (u64)(uintptr_t)buffers[screen];
+}
+
 int dp_init(XScuGic *gic, uint32_t *const frames[DP_FRAMES], uint32_t stride)
 {
     XDpPsu_Config *dp_config = XDpPsu_LookupConfig(XPAR_XDPPSU_0_BASEADDR);
@@ -200,13 +214,7 @@ int dp_init(XScuGic *gic, uint32_t *const frames[DP_FRAMES], uint32_t stride)
     // Pixel clock from the PS's video PLL (set per stream, XAVBuf_SetPixelClock).
     XAVBuf_SetAudioVideoClkSrc(&avbuf, XAVBUF_PS_CLK, XAVBUF_PS_CLK);
     XAVBuf_SoftReset(&avbuf);
-
-    frame_buffer.Stride = stride;
-    frame_buffer.LineSize = DP_WIDTH * DP_BYTES_PER_PIXEL;
-    frame_buffer.Size = stride * DP_HEIGHT;
-    for (int f = 0; f < DP_FRAMES; f++)
-        buffers[f] = frames[f];
-    frame_buffer.Address = (u64)(uintptr_t)buffers[screen];
+    set_frames(frames, stride);
 
     // Hot-plug: HPD events (plugged in or pulled) and HPD pulses (the monitor asks for attention).
     // The DPDMA's vertical sync interrupt starts the frame (XDpDma_DisplayGfxFrameBuffer) and sends
@@ -229,6 +237,33 @@ int dp_init(XScuGic *gic, uint32_t *const frames[DP_FRAMES], uint32_t stride)
         start();
     }
     XDpPsu_WriteReg(dp_config->BaseAddr, XDPPSU_INTR_EN, XDPPSU_INTR_HPD_IRQ_MASK | XDPPSU_INTR_HPD_EVENT_MASK);
+    return 0;
+}
+
+int dp_set_mode(int w, int h, uint32_t *const frames[DP_FRAMES], uint32_t stride)
+{
+    const XVidC_VideoMode m = XVidC_GetVideoModeId(w, h, XVIDC_FR_60HZ, FALSE);
+    if (m == XVIDC_VM_NOT_SUPPORTED)
+        return -1;
+    // Not started again from the hot-plug interrupt meanwhile
+    const u32 base = dp_tx.Config.BaseAddr, hpd = XDPPSU_INTR_HPD_IRQ_MASK | XDPPSU_INTR_HPD_EVENT_MASK;
+    XDpPsu_WriteReg(base, XDPPSU_INTR_DIS, hpd);
+    // The channel stopped (its reads done), given its first frame again once the stream runs at the
+    // new mode (start): none from the old one's vertical syncs
+    const u32 daif = interrupts_off();
+    if (dma_started)
+        XDpDma_SetChannelState(dpdma, GraphicsChan, XDPDMA_DISABLE);
+    dpdma->Gfx.Channel.Current = NULL;
+    dpdma->Gfx.TriggerStatus = XDPDMA_TRIGGER_DONE;
+    dma_started = 0;
+    mode = m;
+    width = w;
+    height = h;
+    set_frames(frames, stride);
+    interrupts_restore(daif);
+    if (XDpPsu_IsConnected(&dp_tx))
+        start();
+    XDpPsu_WriteReg(base, XDPPSU_INTR_EN, hpd);
     return 0;
 }
 
@@ -346,18 +381,19 @@ static void start(void)
         if (status != XST_SUCCESS)
             continue;
 
+        start_stream();
+        // The channel's first frame, taken at a vertical sync of the stream just started
         if (!dma_started)
         {
             XDpDma_DisplayGfxFrameBuffer(dpdma, &frame_buffer);
             dma_started = 1;
         }
-        start_stream();
         if (XDpPsu_CheckLinkStatus(&dp_tx, dp_tx.LinkConfig.LaneCount) == XST_SUCCESS)
         {
             // Link rate codes are in 0.27 Gb/s per lane.
             const int rate = dp_tx.LinkConfig.LinkRate * 27;
             xil_printf("DisplayPort: %d lane(s) at %d.%02d Gb/s, %d x %d at 60 Hz\r\n", dp_tx.LinkConfig.LaneCount,
-                       rate / 100, rate % 100, DP_WIDTH, DP_HEIGHT);
+                       rate / 100, rate % 100, width, height);
             stream_on = 1;
             return;
         }

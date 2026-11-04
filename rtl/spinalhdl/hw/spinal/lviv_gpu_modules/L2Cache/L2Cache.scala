@@ -826,20 +826,23 @@ class L2Cache(val c: L2CacheConfig, memClockDomain: ClockDomain = null, axilCloc
     val upper = Mem(UInt(32 bits), K) // CYCLES' 32, the others' 24 (and 8 unseen)
     upper.addAttribute("ram_style", "distributed")
 
+    // One index walks the counters, a counter a clock: zeroing the RAM, then taking carries. It is
+    // back before a counter carries again (85 clocks at the soonest)
+    require(K * ((N - 1) max 1) <= 256, "a counter would carry again before the scan comes back")
     val clearing = RegInit(True)
-    val clearIdx = Reg(UInt(idxBits bits)) init (0)
+    val scanIdx = Reg(UInt(idxBits bits)) init (0)
+    val scanLast = scanIdx === K - 1
+    scanIdx := Mux(scanLast, U(0, idxBits bits), scanIdx + 1)
+    when(clearing && scanLast) { clearing := False }
     when(clearPulse) {
       clearing := True
-      clearIdx := 0
+      scanIdx := 0
     }
     CNT_CLEAR := clearing
 
-    // Low Performance counter - pack MSB's to RAM. A counter carries again 85 clocks later at the soonest: no hazard
-    val pending = carry.asBits
-    val pickOh = OHMasking.first(pending)
-    val pick = !clearing && pending.orR
-    val p1Valid = RegNext(pick) init (False)
-    val p1Idx = RegNext(OHToUInt(pickOh).resize(idxBits))
+    // Low Performance counter - pack MSB's to RAM
+    val p1Valid = RegNext(!clearing && carry(scanIdx)) init (False)
+    val p1Idx = RegNext(scanIdx)
     val p2Valid = RegNext(p1Valid && !clearing) init (False)
     val p2Idx = RegNext(p1Idx)
     val p2Upper = RegNext(upper.readAsync(p1Idx))
@@ -852,24 +855,19 @@ class L2Cache(val c: L2CacheConfig, memClockDomain: ClockDomain = null, axilCloc
     p2Sum.addAttribute("use_dsp", "yes")
     p3Upper.addAttribute("use_dsp", "yes")
     upper.write(
-      address = Mux(clearing, clearIdx, p3Idx),
+      address = Mux(clearing, scanIdx, p3Idx),
       data = p3Upper,
       enable = clearing || p3Valid
     )
     for (i <- 0 until K) {
       val sum = low(i).resize(9) + inc(i).resize(9)
-      val picked = pick && pickOh(i)
       when(clearing) {
         low(i) := 0
         carry(i) := False
       } otherwise {
         when(enable) { low(i) := sum(7 downto 0) }
-        carry(i) := (carry(i) && !picked) || (enable && sum(8))
+        carry(i) := (carry(i) && scanIdx =/= i) || (enable && sum(8))
       }
-    }
-    when(clearing) {
-      clearIdx := clearIdx + 1
-      when(clearIdx === K - 1) { clearing := False }
     }
 
     // A counter register read: the counter's RAM word and low byte, at the bus address (CYCLES'

@@ -12,7 +12,7 @@ A round-robin arbiter serves commands from the L1 caches. Ports asking for the s
 
 The cache runs on `core_clk`, the DDR master on `mem_clk` and the AXI4-Lite register interface (`s_axil`) on `ctrl_clk`, with the DDR read path crossing through LUTRAM FIFOs. 
 
-A number of Low Overhead Performance Counters (LOPCs) are implemented in the cache, so it's performance can be assessed at runtime.
+A number of Low Overhead Performance Counters are implemented in the cache, so it's performance can be assessed at runtime.
 
 #v(2em)
 

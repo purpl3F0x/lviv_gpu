@@ -12,7 +12,7 @@ For every tile it starts the visibility DMA, then waits until every unit of the 
 
 The command processor runs on the crossbar's clock, while the signals it watches come from the `mem_clk` and `core_clk` domains; each crosses through its own synchroniser before they are combined.
 
-A number of Low Overhead Performance Counters (LOPCs) are implemented in the command processor, so it's performance can be assessed at runtime.
+A number of Low Overhead Performance Counters are implemented in the command processor, so it's performance can be assessed at runtime.
 
 #v(2em)
 

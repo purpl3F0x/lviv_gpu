@@ -228,7 +228,7 @@ int lviv_gl_init(gpu_t *gpu, int width, int height, void *frame_memory, size_t f
                                       .spot_cos_cutoff = -1.0f,
                                       .constant_attenuation = 1.0f};
     gl.lights[0].diffuse = gl.lights[0].specular = (lviv_vec3_t){1, 1, 1};
-    gl.state.material = (lviv_material_t){{0.2f, 0.2f, 0.2f}, {0.8f, 0.8f, 0.8f}, {0, 0, 0}, {0, 0, 0}, 0.0f};
+    gl.state.material = (lviv_material_t){{0.2f, 0.2f, 0.2f}, {0.8f, 0.8f, 0.8f}, {0, 0, 0}, {0, 0, 0}, 0.0f, 1.0f};
     gl.state.global_ambient = (lviv_vec3_t){0.2f, 0.2f, 0.2f};
     gl.normal = (lviv_vec3_t){0, 0, 1};
     gl.color = 0xFFFFFFFFu;
@@ -999,9 +999,11 @@ void glMaterialfv(GLenum face, GLenum pname, const GLfloat *params)
         break;
     case GL_DIFFUSE:
         m->diffuse = rgb(params);
+        m->alpha = params[3];
         break;
     case GL_AMBIENT_AND_DIFFUSE:
         m->ambient = m->diffuse = rgb(params);
+        m->alpha = params[3];
         break;
     case GL_SPECULAR:
         m->specular = rgb(params);

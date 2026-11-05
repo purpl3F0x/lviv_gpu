@@ -60,6 +60,7 @@ struct gltf_scene
         fm::fvec4 ambient, diffuse, specular, emission;
         float shininess;
         bool double_sided;
+        bool blended; // glTF's BLEND
         int texture = -1; // its base color's, in textures; -1: none
     };
 
@@ -165,6 +166,9 @@ void set_material(gltf_scene::primitive &p, const fastgltf::Material &m)
     p.ambient[3] = p.diffuse[3] = p.specular[3] = p.emission[3] = 1.0f;
     p.shininess = std::min(2.0f / (alpha * alpha) - 2.0f, 128.0f);
     p.double_sided = m.doubleSided;
+    p.blended = m.alphaMode == fastgltf::AlphaMode::Blend;
+    if (p.blended)
+        p.diffuse[3] = base[3];
 }
 
 bool gl_mode(fastgltf::PrimitiveType type, GLenum &mode)
@@ -590,6 +594,10 @@ gltf_scene_t *gltf_scene_load(const void *data, size_t size, char *error, size_t
         return fail(error, error_size, "no triangles");
     }
 
+    // Blended ones last, over what they cover
+    std::stable_partition(scene->primitives.begin(), scene->primitives.end(),
+                          [](const gltf_scene::primitive &p) { return !p.blended; });
+
     // The bounding box in world space
     float lo[3] = {INFINITY, INFINITY, INFINITY}, hi[3] = {-INFINITY, -INFINITY, -INFINITY};
     for (const gltf_scene::primitive &p : scene->primitives)
@@ -755,6 +763,7 @@ void gltf_scene_setup(gltf_scene_t *scene, int width, int height)
     glDepthFunc(GL_LESS);
     glDisable(GL_TEXTURE_2D);
     glDisable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnableClientState(GL_VERTEX_ARRAY);
     glDisableClientState(GL_COLOR_ARRAY);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -797,6 +806,16 @@ void gltf_scene_draw(const gltf_scene_t *scene, float angle)
             glDisable(GL_CULL_FACE);
         else
             glEnable(GL_CULL_FACE);
+        if (p.blended)
+        {
+            glEnable(GL_BLEND);
+            glDepthFunc(GL_LEQUAL); // they write z too: coincident layers must pass
+        }
+        else
+        {
+            glDisable(GL_BLEND);
+            glDepthFunc(GL_LESS);
+        }
         glVertexPointer(3, GL_FLOAT, 0, p.positions.data());
         if (p.normals.empty())
         {

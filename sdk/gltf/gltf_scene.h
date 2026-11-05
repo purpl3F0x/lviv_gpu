@@ -3,8 +3,9 @@
 // embedded (data: URIs); their metallic-roughness materials as GL's fixed-function ones, with their
 // base color textures (the GPU's own texels where scripts/gltf_swizzle.py added them to the file,
 // copied as they are; else the PNG or JPEG in the file, decoded by sdk/third_party/stb's stb_image
-// and swizzled; with KHR_texture_transform: GL_MODULATE, the lit color times the texture); the
-// scene's first camera;
+// and swizzled; with KHR_texture_transform: GL_MODULATE, the lit color times the texture); BLEND
+// materials blended, after the others, MASK ones opaque (the GPU has no alpha test); the scene's
+// first camera;
 // its KHR_lights_punctual lights, up to GL's eight, as GL's: point and spot lights falling off with
 // the square of the distance as glTF has them (not a light's range), or by the GL attenuation the
 // file's extras give (gl_attenuation_constant_linear_quadratic), spot lights' cones as GL's

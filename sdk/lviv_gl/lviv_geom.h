@@ -7,8 +7,8 @@
 //
 // A triangle is culled and binned as it comes, as the GPU sees it, in its frontend's fixed point:
 // dropped if its area there is 0, sent to the tiles its bounding box overlaps (clamped to the
-// frame), less those an earlier triangle covers wholly and in front of it (lrz). Only triangles in
-// a tile at all are kept, in the order they came.
+// frame), less those an earlier opaque triangle covers wholly and in front of it (lrz). Only
+// triangles in a tile at all are kept, in the order they came.
 #pragma once
 
 #include <stdint.h>
@@ -85,7 +85,7 @@ typedef struct
 typedef struct
 {
     lviv_vec3_t ambient, diffuse, specular, emissive;
-    float shininess;
+    float shininess, alpha; // alpha: the diffuse's, the lit color's
 } lviv_material_t;
 
 typedef enum

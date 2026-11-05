@@ -212,7 +212,8 @@ static uint32_t light(const transforms_t &x, const lviv_state_t &s, const lviv_v
     const uint32_t r = (uint8_t)(clamp01(c.x) * 255.0f);
     const uint32_t gr = (uint8_t)(clamp01(c.y) * 255.0f);
     const uint32_t b = (uint8_t)(clamp01(c.z) * 255.0f);
-    return 0xFF000000u | r << 16 | gr << 8 | b;
+    const uint32_t a = (uint8_t)(clamp01(m.alpha) * 255.0f);
+    return a << 24 | r << 16 | gr << 8 | b;
 }
 
 // The vertex in clip space, with its own color: lit later, if at all
@@ -370,7 +371,7 @@ static uint64_t bin(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t
             for (int c = 0; c < 4 && covers; c++)
                 covers = edge(q[1], q[2], corners[c]) >= 0 && edge(q[2], q[0], corners[c]) >= 0 &&
                          edge(q[0], q[1], corners[c]) >= 0;
-            if (covers)
+            if (covers && s.blend == 1u << GPU_SFACTOR_OP_SHIFT) // not one seen through
                 g.lrz[tile] = std::fmin(g.lrz[tile], max_z);
         }
     }

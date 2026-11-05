@@ -40,7 +40,7 @@ module tb_gpu_top;
   localparam logic [31:0] VbBase = 32'h0000_1000;
   localparam logic [31:0] TriBase = 32'h0000_8000;
   localparam logic [31:0] ImgBase = 32'h0002_0000;  // 128 KiB aligned, as the tile DMA takes BASE
-  localparam int VbAddrW = 16, TriAddrW = 18, ImgAddrW = 22, TexAddrW = 16;
+  localparam int VbAddrW = 18, TriAddrW = 18, ImgAddrW = 22, TexAddrW = 16;
   localparam logic [31:0] TextureWindow = 32'h3800_0000;  // gpu_top's TEXTURE_WINDOW
   localparam int MaxTriangles = ((1 << TriAddrW) - int'(TriBase)) / TriangleStride;
 
@@ -54,8 +54,8 @@ module tb_gpu_top;
   localparam logic [11:0] TileCur = 12'hF1C, TileIrqRaw = 12'hF74, TileIrqClear = 12'hF70;
   localparam logic [11:0] TileClearValue = 12'hF28, VisIrqRaw = 12'hFF0, VisTileCount = 12'hFB8;
   // The visibility DMA's PERF and stall counters (busy first); CTRL's CNT_CLEAR is bit 4
-  localparam logic [11:0] VisPerf = 12'hFB4, VisCounters = 12'hFC0;
-  localparam int VisCounterCount = 6;
+  localparam logic [11:0] VisPerf = 12'hFB4, VisCounters = 12'hFC0, VisStatVis = 12'hFA4;
+  localparam int VisCounterCount = 7;
   localparam logic [11:0] FrontendBbMaxX = 12'h80C, FrontendBbMaxY = 12'h810;
   localparam logic [11:0] CpCtrl = 12'h400, CpStatus = 12'h404, CpMode = 12'h408;
   localparam logic [11:0] CpSize = 12'h40C, CpCycles = 12'h410;
@@ -496,11 +496,15 @@ module tb_gpu_top;
         u_tri_ram.mem[addr[TriAddrW-1:6]][8*addr[5:0]+:8] = value;
       end
     end
-    // One 64-bit tile mask per triangle, two per 128-bit word.
-    for (int t = 0; t < triangles; t += 2) begin
-      addr = VbBase + 32'(8 * t);
-      u_vb_ram.mem[addr[VbAddrW-1:4]] = {t + 1 < triangles ? tile_mask[t+1] : 64'd0, tile_mask[t]};
-    end
+    // The visibility bitmap: a 4 KiB chunk a tile (the scenes fit in one), 128 triangles a word,
+    // noise past the last one.
+    for (int tile = 0; tile < TilesX * TilesY; tile++)
+      for (int t = 0; t < triangles; t += 128) begin
+        logic [127:0] bits;
+        for (int b = 0; b < 128; b++) bits[b] = t + b < triangles ? tile_mask[t+b][tile] : 1'($urandom());
+        addr = VbBase + 32'(tile * 4096 + t / 128 * 16);
+        u_vb_ram.mem[addr[VbAddrW-1:4]] = bits;
+      end
   endtask
 
   // -------------------------------------------------------------------------
@@ -575,16 +579,21 @@ module tb_gpu_top;
     if (errors <= 20) $display("[%0t] ERROR: %s", $time, msg);
   endfunction
 
-  // +TRACE: every DataMover command (as the visibility DMA issued it) and status.
+  // Every DataMover command's fields (PG022), and +TRACE: every command as the visibility DMA issued
+  // it and status.
   bit trace;
   initial trace = $test$plusargs("TRACE");
 
   always @(posedge mem_clk) begin
-    if (trace && dut.vis_cmd_tvalid && dut.vis_cmd_tready)
-      $display("[%0t] command: address %08h, %0d bytes (%0d triangles), EOF %0d, DRR %0d", $time,
-               dut.vis_cmd_tdata[63:32], dut.vis_cmd_tdata[22:0],
-               dut.vis_cmd_tdata[22:0] / TriangleStride, dut.vis_cmd_tdata[30],
-               dut.vis_cmd_tdata[31]);
+    if (dut.vis_cmd_tvalid && dut.vis_cmd_tready) begin
+      if (!dut.vis_cmd_tdata[23] || dut.vis_cmd_tdata[31:24] != '0 || dut.vis_cmd_tdata[71:68] != '0 ||
+          dut.vis_cmd_tdata[22:0] == '0 || dut.vis_cmd_tdata[22:0] % TriangleStride != 0)
+        error($sformatf("DataMover command %018h", dut.vis_cmd_tdata));
+      if (trace)
+        $display("[%0t] command: tag %0d, address %08h, %0d bytes (%0d triangles)", $time,
+                 dut.vis_cmd_tdata[67:64], dut.vis_cmd_tdata[63:32], dut.vis_cmd_tdata[22:0],
+                 dut.vis_cmd_tdata[22:0] / TriangleStride);
+    end
     if (trace && dut.dm_sts_tvalid && dut.dm_sts_tready)
       $display("[%0t] status: %02h", $time, dut.dm_sts_tdata);
   end
@@ -714,7 +723,7 @@ module tb_gpu_top;
 
   task automatic render_tile(input int tx, input int ty);
     int tile;
-    logic [31:0] perf;
+    logic [31:0] perf, visible;
     tile = ty * TilesX + tx;
     open_tile(tile);
 
@@ -729,6 +738,9 @@ module tb_gpu_top;
     axi_write(VisTriBase, TriBase);
     axi_write(VisTriCount, triangles);
     axi_write(VisTileIndex, tile);
+    axi_write(VisTileCount, TilesX * TilesY);
+    expect_read(VisVbBase, 32'hFFFF_FFFF, VbBase, "visibility DMA VB_BASE");
+    expect_read(VisTileCount, 32'hFF, 32'(TilesX * TilesY), "visibility DMA TILE_COUNT");
     axi_write(VisStatus, 32'h2);  // DONE left by an earlier tile or frame cleared
     axi_write(VisCtrl, 32'h1);  // START
     wait_bits(VisStatus, 32'h2, 32'h2, "visibility DMA DONE");
@@ -736,6 +748,9 @@ module tb_gpu_top;
     axi_write(VisStatus, 32'h2);  // clear DONE
     axi_read(VisPerf, perf);
     vis_perf_sum += perf;
+    axi_read(VisStatVis, visible);
+    if (int'(visible) != tile_order.size())
+      error($sformatf("tile %0d: STAT_VIS %0d, expected %0d", tile, visible, tile_order.size()));
 
     wait_core_idle();
     if (received != tile_order.size())
@@ -754,7 +769,8 @@ module tb_gpu_top;
     $display("[%0t] visibility DMA: busy %0d, waiting for visibility %0d, commands %0d,",
              $time, count[0], count[1], count[2]);
     $display("[%0t]   retire %0d;", $time, count[3]);
-    $display("[%0t]   triangles starved %0d, held by the core %0d", $time, count[4], count[5]);
+    $display("[%0t]   triangles starved %0d, held by the core %0d; %0d commands", $time, count[4],
+             count[5], count[6]);
     if (longint'(count[0]) != vis_perf_sum)
       error($sformatf("visibility DMA busy %0d, its tiles' PERF %0d", count[0], vis_perf_sum));
     if (longint'(count[1]) + count[2] + count[3] > count[0] || count[4] > count[0])

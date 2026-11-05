@@ -54,11 +54,16 @@ static int write_hex(const gpu_frame_t *frame)
     FILE *out = fopen(out_path, "w");
     if (!out)
         return -1;
+    const uint32_t gpu_tile = 128;
+    const uint32_t tiles = (frame->width + gpu_tile - 1) / gpu_tile * ((frame->height + gpu_tile - 1) / gpu_tile);
     for (uint32_t t = 0; t < frame->triangle_count; t++)
     {
         uint32_t words[GPU_TRIANGLE_BYTES / 4];
         memcpy(words, &frame->triangles[t], sizeof words);
-        fprintf(out, "%016llx", (unsigned long long)frame->visibility[t]);
+        uint64_t mask = 0;
+        for (uint32_t tile = 0; tile < tiles; tile++)
+            mask |= (uint64_t)gpu_frame_visible(frame, tiles, tile, t) << tile;
+        fprintf(out, "%016llx", (unsigned long long)mask);
         for (int w = 0; w < GPU_TRIANGLE_BYTES / 4; w++)
             fprintf(out, " %08x", words[w]);
         fprintf(out, "\n");

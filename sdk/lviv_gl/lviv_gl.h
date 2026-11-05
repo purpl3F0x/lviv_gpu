@@ -1,6 +1,6 @@
 // lviv_gl: a subset of OpenGL 1.x for the GPU of gpu_top, in three layers: this API (gl_api.c), the
 // transform and data building (lviv_geom.cpp, C++ on GLM behind the C interface of lviv_geom.h:
-// vertices to the GPU's triangle records and tile masks) and the GPU driver (sdk/src/gpu.c). The API
+// vertices to the GPU's triangle records and visibility) and the GPU driver (sdk/src/gpu.c). The API
 // is C, for C and C++ applications.
 //
 // The names, types and enum values are OpenGL's, so OpenGL 1.x code ports as it is, within these
@@ -173,7 +173,8 @@ typedef void GLvoid;
 #define GL_RGBA 0x1908
 #define GL_BGRA 0x80E1
 
-// The frame memory a triangle takes: its record (gpu_triangle_t) and its tile mask
+// The frame memory a triangle takes: its record (gpu_triangle_t) and at most this of the visibility
+// bitmap (64 tiles)
 #define LVIV_GL_TRIANGLE_BYTES (GPU_TRIANGLE_BYTES + 8)
 
 // The platform: a context for gpu, frames of width x height pixels, their triangles in frame_memory:

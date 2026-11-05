@@ -42,7 +42,7 @@ import spinal.lib.fsm._
 case class CommandProcessorConfig(
     tileShift: Int = 7, // tiles of 128 x 128 pixels
     threads: Int = 4,
-    maxTiles: Int = 64, // bits in a triangle's visibility word
+    maxTiles: Int = 64, // the visibility DMA's TILE_COUNT
     // After the visibility DMA's done: this many cycles, then every unit empty this many cycles in a
     // row.
     settleCycles: Int = 8,

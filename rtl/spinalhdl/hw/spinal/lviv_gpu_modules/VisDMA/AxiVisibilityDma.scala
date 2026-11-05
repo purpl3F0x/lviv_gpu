@@ -13,44 +13,30 @@ import spinal.lib.fsm._
 // =============================================================================
 case class AxiVisibilityDmaConfig(
     addressWidth: Int = 32, // Address width (32 up to 64 bits)
-    axiDataWidth: Int = 128, // AXI4 Read Master data width (>= 64 bits, e.g. 64, 128, 256)
-    bttWidth: Int = 23, // DataMover BTT (Bytes To Transfer) width (up to 23 bits)
-    maxTiles: Int = 64, // Tiles a frame can have (TILE_COUNT up to this): bits of the visibility word
-    vbWordBits: Int = 64, // Visibility buffer word width (64 bits: 60 bits grid + 4 bits padding)
+    axiDataWidth: Int = 128, // AXI4 Read Master data width (a power of 2): visibility bits a beat
+    bttWidth: Int = 19, // DataMover BTT (Bytes To Transfer) width (up to 23 bits)
+    defaultBttLimit: Int = 4096, // BTT_LIMIT's reset value, triangles a command
+    maxTiles: Int = 64, // Tiles a frame can have (TILE_COUNT up to this)
     triangleSizeBytes: Int = 96, // Triangle data footprint in bytes (96 B: odd triangles start 32 B into a 64 B beat)
-    maxBurstLength: Int = 256, // Max AXI4 Read burst beats (1..256)
     maxOutstandingReads: Int = 8, // Max outstanding AXI4 Read address transactions
     cmdFifoDepth: Int = 64, // Depth of DataMover command FIFO (64 entries reduces backpressure)
     stsFifoDepth: Int = 4, // Depth of DataMover status FIFO (4 entries since consumed 1 per clock)
-    vbFifoDepth: Int = 256, // Depth of visibility read decoupling FIFO (512 entries fits in BRAM)
-    useAutoAdvance: Boolean = true, // Support automatic tile index advancing (0..TILE_COUNT-1)
-    trianglesPerCycle: Int = 2 // Process 2 triangles per clock cycle (600 MTris/s @ 300MHz)
+    vbFifoDepth: Int = 256, // Depth of the FIFO of beats with an edge
+    useAutoAdvance: Boolean = true // Support automatic tile index advancing (0..TILE_COUNT-1)
 ) {
-  require(maxTiles >= 1 && maxTiles <= vbWordBits, s"maxTiles ($maxTiles) must be 1 to vbWordBits ($vbWordBits)")
+  require(maxTiles >= 1, s"maxTiles ($maxTiles) must be at least 1")
   val tileIndexWidth: Int = log2Up(maxTiles)
   val tileCountWidth: Int = log2Up(maxTiles + 1)
-  require(axiDataWidth >= vbWordBits, s"axiDataWidth ($axiDataWidth) must be >= vbWordBits ($vbWordBits)")
-  require(isPow2(axiDataWidth), "axiDataWidth must be a power of 2 (e.g. 64, 128, 256)")
-  require(
-    axiDataWidth % vbWordBits == 0,
-    s"axiDataWidth ($axiDataWidth) must be a multiple of vbWordBits ($vbWordBits)"
-  )
+  require(isPow2(axiDataWidth) && axiDataWidth >= 128, "axiDataWidth must be a power of 2, at least 128")
   require(addressWidth >= 32 && addressWidth <= 64, "addressWidth must be between 32 and 64 bits")
   require(triangleSizeBytes > 0 && triangleSizeBytes % 32 == 0, "triangleSizeBytes must be a multiple of 32")
-  require(maxBurstLength >= 1 && maxBurstLength <= 256, "maxBurstLength must be between 1 and 256 beats")
   require(cmdFifoDepth >= 4 && isPow2(cmdFifoDepth), "cmdFifoDepth must be a power of 2 >= 4")
   require(stsFifoDepth >= 4 && isPow2(stsFifoDepth), "stsFifoDepth must be a power of 2 >= 4")
-  require(vbFifoDepth >= 4 && isPow2(vbFifoDepth), "vbFifoDepth must be a power of 2 >= 4")
-  require(
-    vbFifoDepth >= maxBurstLength,
-    s"vbFifoDepth ($vbFifoDepth) must be >= maxBurstLength ($maxBurstLength) to guarantee full burst absorption"
-  )
+  require(vbFifoDepth >= 32 && isPow2(vbFifoDepth), "vbFifoDepth must be a power of 2 >= 32")
   require(
     bttWidth >= 8 && bttWidth <= 23,
     s"bttWidth ($bttWidth) must be between 8 and 23 bits (Xilinx DataMover limit)"
   )
-
-  val wordsPerBeat: Int = axiDataWidth / vbWordBits
 
   // Triangle sizes are multiples of 32 B, so triangle addresses are carried in 32 B units
   val triAlignBytes: Int = 32
@@ -59,13 +45,29 @@ case class AxiVisibilityDmaConfig(
   val triWordAddrWidth: Int = addressWidth - triAlignShift // Address truncated by triAlignShift bits
   val axiBytesPerBeat: Int = axiDataWidth / 8 // 16 bytes for 128-bit
   val axiBeatShift: Int = log2Up(axiBytesPerBeat) // 4 bits for 16 bytes
-  val vbBytesPerBeat: Int = axiBytesPerBeat
-  val vbBeatShift: Int = axiBeatShift
-  val vbWordAddrWidth: Int = addressWidth - axiBeatShift // Address truncated by axiBeatShift bits
+
+  // The visibility buffer: each tile's bits, one per triangle, in 4 KiB chunks: chunk c of tile t
+  // is 4 KiB page c * TILE_COUNT + t from VB_BASE
+  val chunkShift: Int = 12
+  val trianglesPerBeat: Int = axiDataWidth
+  val chunkBeats: Int = (1 << chunkShift) / axiBytesPerBeat // 256 for 128-bit
+  val triIndexWidth: Int = (addressWidth - log2Up(triangleSizeBytes) + 1) min 32 // 26: 4 GiB of 96 B triangles
+  val beatIndexWidth: Int = triIndexWidth - log2Up(trianglesPerBeat)
+  val chunkIndexWidth: Int = beatIndexWidth - log2Up(chunkBeats)
+
+  // The edges of a beat, in groups: a group's turn, then an edge's in it, are two short loops
+  val edgeGroupBits: Int = 8
+  val edgeGroups: Int = trianglesPerBeat / edgeGroupBits
+  val vbFifoMargin: Int = 8 // Entries left free: the beats on their way when R's ready falls
 
   // Maximum triangles in a single BTT transfer: count * triangleSizeBytes must fit in bttWidth bits
-  val maxBttTriangles: BigInt = ((BigInt(1) << bttWidth) - 1) / triangleSizeBytes // 87381 for 96 B @ 23 bits
-  val bttTriCountWidth: Int = log2Up(maxBttTriangles + 1) // 17 bits for 96 B @ 23 bits
+  val maxBttTriangles: Int = ((1 << bttWidth) - 1) / triangleSizeBytes // 5461 for 96 B @ 19 bits
+  val bttTriCountWidth: Int = log2Up(maxBttTriangles + 1) // 13 bits for 96 B @ 19 bits
+  val bttUnitsWidth: Int = bttTriCountWidth + log2Up(triUnits + 1) // count * triUnits
+  require(
+    defaultBttLimit >= 1 && defaultBttLimit <= maxBttTriangles,
+    s"defaultBttLimit ($defaultBttLimit) must be between 1 and $maxBttTriangles"
+  )
 
   // AMD / Xilinx LogiCORE IP AXI DataMover (PG022) Command Width
   // 72 bits for 32-bit address, 104 bits for 64-bit address
@@ -93,10 +95,38 @@ case class AxiVisibilityDmaConfig(
 // =============================================================================
 // Internal Compact Command Representation for DataMover FIFO
 // =============================================================================
-case class DataMoverCmdCompact(triWordAddrWidth: Int, bttTriCountWidth: Int) extends Bundle {
-  val triWordAddr = UInt(triWordAddrWidth bits) // Truncated triangle address (byte address >> alignment shift)
-  val triCount = UInt(bttTriCountWidth bits) // Triangle count (BTT = triCount * triangle size)
+case class DataMoverCmdCompact(c: AxiVisibilityDmaConfig) extends Bundle {
+  val triWordAddr = UInt(c.triWordAddrWidth bits) // Truncated triangle address (byte address >> alignment shift)
+  val bttUnits = UInt(c.bttUnitsWidth bits) // BTT in 32 B units (triangle count * triUnits)
   val tag = Bits(4 bits)
+}
+
+// =============================================================================
+// The visibility scan's bundles
+// =============================================================================
+// A beat with an edge, in vbFifo
+case class VisBeat(c: AxiVisibilityDmaConfig) extends Bundle {
+  val edges = Bits(c.trianglesPerBeat bits) // bit i: triangle i and the one before it differ
+  val groups = Bits(c.edgeGroups bits) // the groups of edges with one
+  val index = UInt(c.beatIndexWidth bits)
+  val last = Bool() // the tile's last beat
+}
+
+// A run's first triangle or the one past its last, or the end of the tile's bits
+case class VisEdge(c: AxiVisibilityDmaConfig) extends Bundle {
+  val triangle = UInt(c.triIndexWidth bits)
+  val end = Bool()
+}
+
+case class VisRun(c: AxiVisibilityDmaConfig) extends Bundle {
+  val length = UInt(c.triIndexWidth bits)
+  val offset = UInt(c.triWordAddrWidth bits) // from TRI_BASE
+}
+
+case class VisRunAddress(c: AxiVisibilityDmaConfig) extends Bundle {
+  val length = UInt(c.triIndexWidth bits)
+  val triWordAddr = UInt(c.triWordAddrWidth bits)
+  val over = Bool() // past BTT_LIMIT
 }
 
 // =============================================================================
@@ -223,6 +253,7 @@ class AxiVisibilityDma(
 
   // Internal hardware status signals
   val dmaBusy = RegInit(False)
+  val draining = RegInit(False) // after SOFT_RESET
   val axiReadError = RegInit(False)
   val dmErrorFlag = RegInit(False)
   val dmLastStsReg = Reg(Bits(8 bits)) init (0)
@@ -258,14 +289,15 @@ class AxiVisibilityDma(
   AXI_ERR_FLAG := axiReadError
   DM_ERR_FLAG := dmErrorFlag
 
-  // 0x08: VB_BASE_ADDR_LOW (8-byte aligned, bits [2:0] reserved/ignored)
-  val REG_VB_LOW = busif.newRegAt(address = 0x08, doc = "Visibility Buffer Base Address [31:0] (8-byte aligned)")
-  REG_VB_LOW.reserved(config.vbBeatShift bits)
+  // 0x08: VB_BASE_ADDR_LOW (4 KiB aligned, the bits below reserved/ignored)
+  val REG_VB_LOW = busif.newRegAt(address = 0x08, doc = "Visibility Buffer Base Address [31:0] (4 KiB aligned)")
+  REG_VB_LOW.reserved(config.chunkShift bits)
   val VB_BASE_LOW = REG_VB_LOW.field(
-    UInt((32 - config.vbBeatShift) bits),
+    UInt((32 - config.chunkShift) bits),
     RW,
     resetValue = 0,
-    doc = "Visibility Buffer Base Address [31:3]"
+    doc = s"Visibility Buffer Base Address [31:${config.chunkShift}]: chunk c of tile t is 4 KiB page " +
+      "c * TILE_COUNT + t from here"
   )
 
   // 0x0C: VB_BASE_ADDR_HIGH
@@ -292,12 +324,12 @@ class AxiVisibilityDma(
     REG_TRI_HIGH.field(UInt(32 bits), RW, resetValue = 0, doc = "Upper 32 bits of Triangle Geometry Base Address")
 
   // 0x18: TRI_COUNT (N)
-  val REG_TRI_COUNT = busif.newRegAt(address = 0x18, doc = "Triangle Count (N elements)")
+  val REG_TRI_COUNT = busif.newRegAt(address = 0x18, doc = "Triangle Count (N)")
   val TRI_COUNT = REG_TRI_COUNT.field(
     UInt(32 bits),
     RW,
     resetValue = 0,
-    doc = "Total number of triangle visibility elements to evaluate"
+    doc = "Triangles in the frame: the bits of each tile's visibility"
   )
 
   // 0x1C: TILE_INDEX
@@ -306,7 +338,7 @@ class AxiVisibilityDma(
     UInt(config.tileIndexWidth bits),
     RW,
     resetValue = 0,
-    doc = s"Tile selection bit index (0..${config.maxTiles - 1}) in ${config.vbWordBits}-bit visibility word"
+    doc = s"The tile to scan (0..${config.maxTiles - 1})"
   )
 
   // 0x20: BTT_LIMIT (triangle count; BTT bytes = count * triangleSizeBytes)
@@ -314,8 +346,9 @@ class AxiVisibilityDma(
   val BTT_LIMIT_TRI = REG_BTT_LIMIT.field(
     UInt(config.bttTriCountWidth bits),
     RW,
-    resetValue = config.maxBttTriangles,
-    doc = s"Max triangles per command (BTT = count * ${config.triangleSizeBytes} B; 0 = ${config.maxBttTriangles})"
+    resetValue = config.defaultBttLimit,
+    doc = s"Max triangles per command (BTT = count * ${config.triangleSizeBytes} B; 0 or past " +
+      s"${config.maxBttTriangles}: ${config.maxBttTriangles})"
   )
 
   // 0x24: STAT_VIS_COUNT
@@ -344,27 +377,26 @@ class AxiVisibilityDma(
   PERF_CYCLES := cycleCounter
 
   // 0x38: TILE_COUNT
-  val TILE_COUNT =
-    if (config.useAutoAdvance) {
-      val REG_TILE_COUNT = busif.newRegAt(address = 0x38, doc = "Tiles in the frame (auto-advance)")
-      REG_TILE_COUNT.field(
-        UInt(config.tileCountWidth bits),
-        RW,
-        resetValue = config.maxTiles,
-        doc = s"Tiles in the frame (1..${config.maxTiles}): with AUTO_ADV_EN, the done of tile TILE_COUNT - 1 " +
-          "sets FRAME_DONE and TILE_INDEX back to 0"
-      )
-    } else null
+  val REG_TILE_COUNT = busif.newRegAt(address = 0x38, doc = "Tiles in the frame")
+  val TILE_COUNT = REG_TILE_COUNT.field(
+    UInt(config.tileCountWidth bits),
+    RW,
+    resetValue = config.maxTiles,
+    doc = s"Tiles in the frame (1..${config.maxTiles}), the visibility buffer's interleave: with AUTO_ADV_EN, the " +
+      "done of tile TILE_COUNT - 1 sets FRAME_DONE and TILE_INDEX back to 0"
+  )
 
-  // 0x40 - 0x54: stall counters, cycles summed over tiles and frames until CTRL.CNT_CLEAR (they wrap)
+  // 0x40 - 0x58: stall counters, cycles summed over tiles and frames until CTRL.CNT_CLEAR (they wrap),
+  // and the commands issued
   val counterBase = 0x40
   val counterDefs = Seq(
     "CNT_BUSY" -> "Busy on a tile",
-    "CNT_VB_WAIT" -> "Filtering, no visibility word yet",
+    "CNT_VB_WAIT" -> "Scanning, nothing to scan and no visibility beat coming in",
     "CNT_CMD_WAIT" -> "A command, the DataMover's queue full",
     "CNT_RETIRE_WAIT" -> "All commands out, their triangles still on their way",
     "CNT_TRI_STARVED" -> "Triangles in flight, no beat from the DataMover",
-    "CNT_TRI_BACKPRESSURE" -> "A triangle the core does not take"
+    "CNT_TRI_BACKPRESSURE" -> "A triangle the core does not take",
+    "CNT_CMDS" -> "DataMover commands issued"
   )
   val cntValue = UInt(32 bits) // the counter at the bus's read address
   for (((name, doc), i) <- counterDefs.zipWithIndex) {
@@ -406,14 +438,13 @@ class AxiVisibilityDma(
   busif.accept(CHeaderGenerator("axi_visibility_dma_regmap", "AXI_VISIBILITY_DMA"))
   busif.accept(JsonGenerator("axi_visibility_dma_regmap"))
 
-  // Full base addresses truncated by alignment (zeros implicitly appended)
-  val fullVbWordAddr = UInt(config.vbWordAddrWidth bits)
+  // Base addresses truncated by alignment (zeros implicitly appended)
+  val fullVbPage = UInt(config.addressWidth - config.chunkShift bits)
   if (config.addressWidth > 32) {
-    fullVbWordAddr := (VB_BASE_HIGH @@ VB_BASE_LOW).resized
+    fullVbPage := (VB_BASE_HIGH @@ VB_BASE_LOW).resized
   } else {
-    fullVbWordAddr := VB_BASE_LOW.resized
+    fullVbPage := VB_BASE_LOW.resized
   }
-  val fullVbBaseAddr = fullVbWordAddr @@ U(0, config.vbBeatShift bits)
 
   val fullTriWordAddr = UInt(config.triWordAddrWidth bits)
   if (config.addressWidth > 32) {
@@ -421,6 +452,16 @@ class AxiVisibilityDma(
   } else {
     fullTriWordAddr := TRI_BASE_LOW.resized
   }
+
+  // From TRI_COUNT, set before START: the tile's last beat and chunk, its last chunk's length, and
+  // the triangles of the last beat (0: all of it)
+  val triCountZero = RegNext(TRI_COUNT === 0) init (True)
+  val lastBeatIndex = RegNext(
+    ((TRI_COUNT.resize(config.triIndexWidth) - 1) >> log2Up(config.trianglesPerBeat)).resize(config.beatIndexWidth)
+  )
+  val lastChunk = (lastBeatIndex >> log2Up(config.chunkBeats)).resize(config.chunkIndexWidth)
+  val lastChunkBeats = lastBeatIndex(log2Up(config.chunkBeats) - 1 downto 0) // less 1
+  val tailTriangles = TRI_COUNT(log2Up(config.trianglesPerBeat) - 1 downto 0)
 
   // Discrete status & interrupt outputs
   val rawBits = INTR.RAW.readBits
@@ -438,54 +479,25 @@ class AxiVisibilityDma(
     cycleCounter := cycleCounter + 1
   }
 
-  // Active tile index (latched upon START and held constant across entire triangle stream)
-  val activeTileIdx = Reg(UInt(config.tileIndexWidth bits)) init (0)
-
   // ===========================================================================
-  // 2. AXI READ BOUNDARY BUFFER & VISIBILITY FILTER (aclk domain)
-  // Step 1: Buffer the entire incoming AXI beat (128/512 bits) in an input register slice (m2sPipe).
-  //         Captures all bits at the physical boundary into flip-flops, breaking timing paths.
-  // Step 2: Feed buffered data into the 64:1 multiplexer to extract 1 bit per triangle.
-  // Step 3: Push only the 1-bit per triangle (wordsPerBeat bits) into vbFifo.
+  // 2. VISIBILITY READS (aclk domain)
+  // A tile's chunks, a burst each, TILE_COUNT pages apart: nothing to multiply, no boundary to
+  // cross. AR leaves from flops, and its ready goes no further than two.
   // ===========================================================================
-  val rBuffered = io.m_axi_vb.r.m2sPipe()
-
-  val visBitsIn = Bits(config.wordsPerBeat bits)
-  for (k <- 0 until config.wordsPerBeat) {
-    visBitsIn(k) := rBuffered.payload.data(k * config.vbWordBits + activeTileIdx)
-  }
-
-  val vbFifo = StreamFifo(
-    dataType = Bits(config.wordsPerBeat bits),
-    depth = config.vbFifoDepth
-  )
-
-  vbFifo.io.push.valid := rBuffered.valid
-  vbFifo.io.push.payload := visBitsIn
-  rBuffered.ready := vbFifo.io.push.ready
-
-  // ===========================================================================
-  // 3. AXI4 READ MASTER ENGINE (aclk domain)
-  // Splits N 64-bit element reads into bursts, respecting 4KB DRAM boundaries
-  // ===========================================================================
-  val arAddrReg = Reg(UInt(config.addressWidth bits)) init (0)
-  val arBeatsRemaining = Reg(UInt(32 bits)) init (0)
-  val rBeatsRemaining = Reg(UInt(32 bits)) init (0)
+  val arValid = RegInit(False)
+  val arPage = Reg(UInt(config.addressWidth - config.chunkShift bits)) init (0)
+  val arLen = Reg(UInt(log2Up(config.chunkBeats) bits)) init (0)
+  val arChunk = Reg(UInt(config.chunkIndexWidth bits)) init (0)
+  val arFinal = RegInit(False) // the next chunk is the tile's last
+  val arPending = RegInit(False)
+  val arFired = RegNext(io.m_axi_vb.ar.fire) init (False)
+  val arStop = SOFT_RESET || draining
   val outstandingReads = Reg(UInt(log2Up(config.maxOutstandingReads + 1) bits)) init (0)
 
-  // 4KB boundary calculation for visibility buffer reads: address bits [11:0] cannot cross 4096 bytes
-  val bytesTo4KbBoundary = U(4096, 13 bits) - arAddrReg(11 downto 0).resize(13)
-  val beatsTo4KbBoundary = (bytesTo4KbBoundary >> config.vbBeatShift).resize(16)
-  val maxBurstBeats = U(config.maxBurstLength, 16 bits)
-
-  val currentBurstLen = UInt(16 bits)
-  currentBurstLen := arBeatsRemaining.min(beatsTo4KbBoundary.resized).min(maxBurstBeats.resized).resized
-
-  val canIssueAr = (arBeatsRemaining > 0) && (outstandingReads < config.maxOutstandingReads)
-  io.m_axi_vb.ar.valid := canIssueAr && dmaBusy
-  io.m_axi_vb.ar.addr := arAddrReg
-  io.m_axi_vb.ar.len := (currentBurstLen - 1).resized
-  io.m_axi_vb.ar.size := U(config.vbBeatShift, 3 bits)
+  io.m_axi_vb.ar.valid := arValid
+  io.m_axi_vb.ar.addr := arPage @@ U(0, config.chunkShift bits)
+  io.m_axi_vb.ar.len := arLen.resized
+  io.m_axi_vb.ar.size := U(config.axiBeatShift, 3 bits)
   io.m_axi_vb.ar.burst := Axi4.burst.INCR
   io.m_axi_vb.ar.id := 0
   if (config.getAxi4ReadConfig.useRegion) io.m_axi_vb.ar.region.clearAll()
@@ -494,40 +506,80 @@ class AxiVisibilityDma(
   if (config.getAxi4ReadConfig.useProt) io.m_axi_vb.ar.prot.clearAll()
   if (config.getAxi4ReadConfig.useQos) io.m_axi_vb.ar.qos.clearAll()
 
-  val arFire = io.m_axi_vb.ar.fire
-  val rFire = io.m_axi_vb.r.fire
-  val rLast = io.m_axi_vb.r.last
-
-  when(arFire) {
-    val burstBytes = currentBurstLen << config.vbBeatShift
-    arAddrReg := arAddrReg + burstBytes.resized
-    arBeatsRemaining := arBeatsRemaining - currentBurstLen.resized
+  when(io.m_axi_vb.ar.ready) { arValid := False }
+  when(arFired) {
+    arPage := arPage + TILE_COUNT.resized
+    arChunk := arChunk + 1
+    arFinal := arChunk + 1 === lastChunk
+    arPending := !arFinal
   }
+  when(arPending && !arValid && !arFired && !arStop && outstandingReads =/= config.maxOutstandingReads) {
+    arValid := True
+    arLen := arFinal ? lastChunkBeats | U(config.chunkBeats - 1).resized
+  }
+  when(arStop) { arPending := False }
 
-  when(arFire && !(rFire && rLast)) {
+  // ===========================================================================
+  // 3. EDGES (aclk domain)
+  // Free running from the pins, R's ready falling before vbFifo can fill. A beat turns into its
+  // edges: a run is what lies between two, so a beat with none, empty or inside a run, ends here,
+  // a beat a clock. That is nearly all of them; the rest wait in vbFifo for the scan.
+  // ===========================================================================
+  val rReady = RegInit(False)
+  io.m_axi_vb.r.ready := rReady
+  val rValid = RegNext(io.m_axi_vb.r.fire) init (False)
+  val rData = RegNext(io.m_axi_vb.r.data)
+  val rLast = RegNext(io.m_axi_vb.r.last)
+  val rResp = RegNext(io.m_axi_vb.r.resp)
+
+  when(arFired && !(rValid && rLast)) {
     outstandingReads := outstandingReads + 1
-  }.elsewhen(!arFire && (rFire && rLast)) {
+  }.elsewhen(!arFired && (rValid && rLast)) {
     outstandingReads := outstandingReads - 1
   }
 
-  when(rFire) {
-    rBeatsRemaining := rBeatsRemaining - 1
-    when(io.m_axi_vb.r.resp === Axi4.resp.SLVERR || io.m_axi_vb.r.resp === Axi4.resp.DECERR) {
+  when(rValid) {
+    when(rResp === Axi4.resp.SLVERR || rResp === Axi4.resp.DECERR) {
       axiReadError := True
       ERROR := True
       intrError := True
     }
   }
 
+  val rIndex = Reg(UInt(config.beatIndexWidth bits)) init (0)
+  val rLastBit = RegInit(False) // of the previous beat
+  when(rValid) {
+    rIndex := rIndex + 1
+    rLastBit := rData.msb
+  }
+
+  val rBeat = VisBeat(config)
+  rBeat.edges := rData ^ (rData(config.trianglesPerBeat - 2 downto 0) ## rLastBit)
+  val rGroups = rBeat.edges.subdivideIn(config.edgeGroupBits bits)
+  for (i <- 0 until config.edgeGroups) rBeat.groups(i) := rGroups(i).orR
+  rBeat.index := rIndex
+  rBeat.last := rIndex === lastBeatIndex
+
+  val edgesValid = RegNext(rValid && !draining) init (False)
+  val edgesBeat = RegNext(rBeat)
+  val edgesAny = RegNext(rBeat.groups.orR)
+
+  // The tile's last beat goes in without an edge too: its end is what closes a last run
+  val vbFifo = StreamFifo(VisBeat(config), config.vbFifoDepth, forFMax = true)
+  vbFifo.io.flush := draining
+  vbFifo.io.push.valid := edgesValid && (edgesAny || edgesBeat.last)
+  vbFifo.io.push.payload := edgesBeat
+  rReady := draining || vbFifo.io.availability > config.vbFifoMargin
+
   // ===========================================================================
   // 4. COMPACT COMMAND STREAM & CONFIGURABLE CLOCK FIFO
   // Stores only (triWordAddr, triCount, tag) in the FIFO.
   // ===========================================================================
-  val cmdStreamInternal = Stream(DataMoverCmdCompact(config.triWordAddrWidth, config.bttTriCountWidth))
+  val cmdStreamInternal = Stream(DataMoverCmdCompact(config))
 
   val cmdStreamOut = if (isDualClock) {
     val cc = StreamFifoCC(
-      dataType = DataMoverCmdCompact(config.triWordAddrWidth, config.bttTriCountWidth),
+      dataType = DataMoverCmdCompact(config),
       depth = config.cmdFifoDepth,
       pushClock = clockDomain,
       popClock = dmClock
@@ -536,8 +588,9 @@ class AxiVisibilityDma(
     cc.io.pop
   } else {
     val sync = StreamFifo(
-      dataType = DataMoverCmdCompact(config.triWordAddrWidth, config.bttTriCountWidth),
-      depth = config.cmdFifoDepth
+      dataType = DataMoverCmdCompact(config),
+      depth = config.cmdFifoDepth,
+      forFMax = true
     )
     sync.io.push <> cmdStreamInternal
     sync.io.pop
@@ -554,28 +607,23 @@ class AxiVisibilityDma(
 
   // Format AMD/Xilinx DataMover MM2S command packet at output port (dmClock domain)
   val dmArea = new ClockingArea(dmClock) {
+    // Flops both ways: half a command a clock is far more than the DataMover takes
+    val cmd = cmdStreamOut.halfPipe()
     val cmdPayload = Bits(config.cmdWidth bits)
     cmdPayload := 0
 
-    // Reconstruct full BTT bytes: (triCount * triUnits) << triAlignShift = triCount * triangleSizeBytes
-    val bttUnits = mulConst(cmdStreamOut.payload.triCount, config.triUnits)
-    val bttBytes = (bttUnits @@ U(0, config.triAlignShift bits)).resize(config.bttWidth)
+    // BTT bytes: triCount * triUnits << triAlignShift = triCount * triangleSizeBytes
+    val bttBytes = (cmd.payload.bttUnits @@ U(0, config.triAlignShift bits)).resize(config.bttWidth)
     cmdPayload(config.bttWidth - 1 downto 0) := bttBytes.asBits
 
     // [23] Type: 1 = INCR burst
     cmdPayload(23) := True
-    // [27:24] DSA: Stream alignment offset
-    cmdPayload(27 downto 24) := 0
-    // [28] EOF: Not used (tied False)
-    cmdPayload(28) := False
-    // [29] DRR: Data Realignment Engine disabled. SADDR is the exact triangle address; with 96 B
-    // triangles, runs starting on an odd triangle begin 32 B into a 64 B beat (consumer realigns)
-    cmdPayload(29) := False
-    // [31:30] TAG: echo tag
-    cmdPayload(31 downto 30) := cmdStreamOut.payload.tag(1 downto 0)
+    // [29:24] DSA, [30] EOF and [31] DRR stay 0: no Data Realignment Engine. SADDR is the exact
+    // triangle address; with 96 B triangles, runs starting on an odd triangle begin 32 B into a
+    // 64 B beat (consumer realigns)
 
     // Reconstruct full byte address: (triWordAddr << triAlignShift)
-    val startByteAddr = cmdStreamOut.payload.triWordAddr @@ U(0, config.triAlignShift bits)
+    val startByteAddr = cmd.payload.triWordAddr @@ U(0, config.triAlignShift bits)
     if (config.addressWidth <= 32) {
       // [63:32] SADDR: 32-bit Starting Address
       cmdPayload(63 downto 32) := startByteAddr.resize(32).asBits
@@ -584,9 +632,12 @@ class AxiVisibilityDma(
       cmdPayload(32 + config.addressWidth - 1 downto 32) := startByteAddr.asBits
     }
 
-    io.m_axis_datamover_cmd.valid := cmdStreamOut.valid
+    // TAG, past SADDR: echo tag
+    cmdPayload(config.cmdWidth - 5 downto config.cmdWidth - 8) := cmd.payload.tag
+
+    io.m_axis_datamover_cmd.valid := cmd.valid
     io.m_axis_datamover_cmd.payload := cmdPayload
-    cmdStreamOut.ready := io.m_axis_datamover_cmd.ready
+    cmd.ready := io.m_axis_datamover_cmd.ready
   }
 
   // ===========================================================================
@@ -634,109 +685,168 @@ class AxiVisibilityDma(
   }
 
   // ===========================================================================
-  // 6. VISIBILITY FILTER & UNCHUNKED BTT AGGREGATOR (aclk domain)
-  // Continually aggregates contiguous visible triangles; only limited by BTT!
+  // 6. VISIBILITY SCAN: EDGES TO RUNS TO COMMANDS (aclk domain)
+  //
+  //   vbFifo -> beat -> group -> window -> edge -> run -> address -> commands
+  //
+  // A beat's groups with an edge, lowest first, then a group's edges: an edge a clock, two to a
+  // run. Each loop is a few bits long, where one over a whole beat would be a 128-bit carry chain.
+  // Runs are measured from their edges, so a beat inside a run costs nothing here.
   // ===========================================================================
-  // Note: activeTileIdx declared above vbFifo
-  val triCounter = Reg(UInt(32 bits)) init (0)
-  val shadowTriCount = Reg(UInt(32 bits)) init (0)
-  // Running addresses (triAlignBytes units) of triIdx0 / triIdx1, advanced together with triCounter.
-  // Replaces base + idx * triangleSizeBytes: no multiplier or base adder in the filter loop.
-  val triAddr0 = Reg(UInt(config.triWordAddrWidth bits)) init (0)
-  val triAddr1 = Reg(UInt(config.triWordAddrWidth bits)) init (0)
-  val shadowMaxTriangles = Reg(UInt(config.bttTriCountWidth bits)) init (config.maxBttTriangles)
-  val tagCounter = Reg(UInt(4 bits)) init (0)
-
-  // Aggregation state variables
-  val runActive = RegInit(False)
-  val runStartWord = Reg(UInt(config.triWordAddrWidth bits)) init (0)
-  val runLength = Reg(UInt(config.bttTriCountWidth bits)) init (0)
-
-  // 1-bit visibility signals for 2 triangles per cycle
-  val isParallel2 = (config.trianglesPerCycle == 2) && (config.wordsPerBeat >= 2)
-
-  val triIdx0 = triCounter
-  val triIdx1 = triCounter + 1
-  val isValid0 = (triIdx0 < shadowTriCount)
-  val isValid1 = (triIdx1 < shadowTriCount)
-
-  val rawV0 = vbFifo.io.pop.payload(0)
-  val rawV1 = if (config.wordsPerBeat >= 2) vbFifo.io.pop.payload(1) else False
-
-  // Mask v1 if beyond shadowTriCount (odd triangle count on last beat)
-  val v0 = rawV0 && isValid0
-  val v1 = rawV1 && isValid1
-
-  val isLastBeat = (triCounter + 2 >= shadowTriCount)
-  val isLastTri1 = (triIdx1 === (shadowTriCount - 1))
-  val stepCount = Mux(isValid1, U(2, 32 bits), U(1, 32 bits))
-  val stepUnits = Mux(
-    isValid1,
-    U(2 * config.triUnits, config.triWordAddrWidth bits),
-    U(config.triUnits, config.triWordAddrWidth bits)
-  )
-
-  // Advance triangle index and running addresses by one beat (1 or 2 triangles)
-  def advancePair(): Unit = {
-    triCounter := triCounter + stepCount
-    triAddr0 := triAddr0 + stepUnits
-    triAddr1 := triAddr1 + stepUnits
-  }
-
-  // Advance triangle index and running addresses by one triangle (serial mode)
-  def advanceOne(): Unit = {
-    triCounter := triCounter + 1
-    triAddr0 := triAddr0 + config.triUnits
-    triAddr1 := triAddr1 + config.triUnits
-  }
-
-  // Sub-word slicer when trianglesPerCycle == 1 and wordsPerBeat > 1
-  val sliceIdx = Reg(UInt(log2Up(config.wordsPerBeat max 2) bits)) init (0)
-
-  // 1-bit visibility indicator for the single-triangle engine
-  val isVisible = if (config.wordsPerBeat == 1) {
-    vbFifo.io.pop.payload(0)
-  } else {
-    vbFifo.io.pop.payload(sliceIdx.resize(log2Up(config.wordsPerBeat)))
-  }
-
-  val isLastTri = (triCounter === (shadowTriCount - 1))
-  val curTriWordAddr = triAddr0
-
-  // Step pulse to advance to next triangle (used only when !isParallel2)
-  val triStep = False
-
-  // Default stream controls:
-  vbFifo.io.pop.ready := False
-  cmdStreamInternal.valid := False
-  cmdStreamInternal.payload.triWordAddr := runStartWord
-  cmdStreamInternal.payload.triCount := runLength
-  cmdStreamInternal.payload.tag := tagCounter.asBits
-
-  def pushCmd(addr: UInt, count: UInt): Unit = {
-    cmdStreamInternal.valid := True
-    cmdStreamInternal.payload.triWordAddr := addr
-    cmdStreamInternal.payload.triCount := count
-    cmdStreamInternal.payload.tag := tagCounter.asBits
-  }
-
   object FilterState extends SpinalEnum {
-    val IDLE, FILTER_STREAM, FLUSH_STALL, WAIT_RETIRE, ADVANCE_TILE = newElement()
+    val IDLE, FILTER_STREAM, WAIT_RETIRE, ADVANCE_TILE, DRAIN = newElement()
   }
   val filterState = RegInit(FilterState.IDLE)
 
+  val tagCounter = Reg(UInt(4 bits)) init (0)
+
+  // Shadowed at START: BTT_LIMIT, 0 and past the BTT's reach the hardware's maximum
+  val maxBttTriangles = U(config.maxBttTriangles, config.bttTriCountWidth bits)
+  val bttLimit = (BTT_LIMIT_TRI === 0 || BTT_LIMIT_TRI > maxBttTriangles) ? maxBttTriangles | BTT_LIMIT_TRI
+  val shadowMaxTriangles = Reg(UInt(config.bttTriCountWidth bits)) init (config.defaultBttLimit)
+  val shadowMaxUnits = RegNext(mulConst(shadowMaxTriangles, config.triUnits).resize(config.triWordAddrWidth))
+
+  // The beat, until its edges are out
+  val beatValid = RegInit(False)
+  val beat = Reg(VisBeat(config))
+  vbFifo.io.pop.ready := !beatValid
+  when(vbFifo.io.pop.fire) {
+    beatValid := True
+    beat := vbFifo.io.pop.payload
+  }
+
+  // Its next group with an edge
+  val groupFirst = OHMasking.first(beat.groups)
+  val group = Stream(UInt(log2Up(config.edgeGroups) bits))
+  group.valid := beatValid && beat.groups =/= 0
+  group.payload := OHToUInt(groupFirst)
+  when(group.fire) { beat.groups := beat.groups & ~groupFirst }
+  val groupStage = group.m2sPipe(flush = draining)
+
+  // The group's edges. In the last beat, those past TRI_COUNT are dropped: their bits mean nothing
+  val window = Reg(Bits(config.edgeGroupBits bits)) init (0)
+  val windowGroup = Reg(UInt(log2Up(config.edgeGroups) bits)) init (0)
+  val windowEmpty = window === 0
+  val beatGroups = beat.edges.subdivideIn(config.edgeGroupBits bits)
+
+  val tailGroup = tailTriangles(tailTriangles.high downto log2Up(config.edgeGroupBits))
+  val tailBit = tailTriangles(log2Up(config.edgeGroupBits) - 1 downto 0)
+  val keepAll = !beat.last || tailTriangles === 0 || groupStage.payload < tailGroup
+  val keepSome = groupStage.payload === tailGroup
+  val tailKeep = ~(B(config.edgeGroupBits bits, default -> True) |<< tailBit)
+  val windowKeep = Bits(config.edgeGroupBits bits)
+  for (i <- 0 until config.edgeGroupBits) windowKeep(i) := keepAll || (keepSome && tailKeep(i))
+
+  groupStage.ready := windowEmpty
+  when(groupStage.fire) {
+    window := beatGroups(groupStage.payload) & windowKeep
+    windowGroup := groupStage.payload
+  }
+
+  // An edge, or once the last beat is done the end of the tile's bits, at TRI_COUNT
+  val beatDone = RegInit(False)
+  beatDone := beatValid && beat.groups === 0 && !groupStage.valid && windowEmpty
+
+  val windowFirst = OHMasking.first(window)
+  val edge = Stream(VisEdge(config))
+  edge.valid := !windowEmpty || (beatDone && beat.last)
+  edge.payload.end := windowEmpty
+  edge.payload.triangle := windowEmpty ? TRI_COUNT.resize(config.triIndexWidth) |
+    (beat.index @@ windowGroup @@ OHToUInt(windowFirst))
+  when(edge.fire && !windowEmpty) { window := window & ~windowFirst }
+  when(beatDone && (!beat.last || edge.ready)) {
+    beatValid := False
+    beatDone := False
+  }
+  val edgeStage = edge.m2sPipe(flush = draining)
+
+  // Edges in pairs: a run, its length and where it starts
+  val runOpen = RegInit(False)
+  val runStart = Reg(UInt(config.triIndexWidth bits)) init (0)
+  val scanEnded = RegInit(False)
+
+  val run = Stream(VisRun(config))
+  run.valid := edgeStage.valid && runOpen
+  run.payload.length := edgeStage.payload.triangle - runStart
+  run.payload.offset := mulConst(runStart, config.triUnits).resized
+  edgeStage.ready := !runOpen || run.ready
+  when(edgeStage.fire) {
+    runOpen := !runOpen && !edgeStage.payload.end
+    when(!runOpen) { runStart := edgeStage.payload.triangle }
+    when(edgeStage.payload.end) { scanEnded := True }
+  }
+  val runStage = run.m2sPipe(flush = draining)
+
+  when(runStage.fire) {
+    statVisCount := statVisCount + runStage.payload.length.resized
+  }
+
+  val runAddress = Stream(VisRunAddress(config))
+  runAddress.arbitrationFrom(runStage)
+  runAddress.payload.length := runStage.payload.length
+  runAddress.payload.triWordAddr := fullTriWordAddr + runStage.payload.offset
+  runAddress.payload.over := runStage.payload.length > shadowMaxTriangles
+  val addressStage = runAddress.m2sPipe(flush = draining)
+
+  // Commands: a run past BTT_LIMIT leaves a limit at a time
+  val cmdBusy = RegInit(False)
+  val cmdCheck = RegInit(False) // what's left is back to compare
+  val cmdOver = RegInit(False)
+  val cmdLeft = Reg(UInt(config.triIndexWidth bits)) init (0)
+  val cmdWord = Reg(UInt(config.triWordAddrWidth bits)) init (0)
+
+  addressStage.ready := !cmdBusy
+  when(addressStage.fire) {
+    cmdBusy := True
+    cmdOver := addressStage.payload.over
+    cmdLeft := addressStage.payload.length
+    cmdWord := addressStage.payload.triWordAddr
+  }
+
+  val cmdCount = cmdOver ? shadowMaxTriangles | cmdLeft.resize(config.bttTriCountWidth)
+  cmdStreamInternal.valid := cmdBusy && !cmdCheck
+  cmdStreamInternal.payload.triWordAddr := cmdWord
+  cmdStreamInternal.payload.bttUnits := mulConst(cmdCount, config.triUnits).resized
+  cmdStreamInternal.payload.tag := tagCounter.asBits
+
+  when(cmdStreamInternal.fire) {
+    statCmdCount := statCmdCount + 1
+    tagCounter := tagCounter + 1
+    when(cmdOver) {
+      cmdCheck := True
+      cmdLeft := cmdLeft - shadowMaxTriangles
+      cmdWord := cmdWord + shadowMaxUnits
+    }.otherwise {
+      cmdBusy := False
+    }
+  }
+  when(cmdCheck) {
+    cmdCheck := False
+    cmdOver := cmdLeft > shadowMaxTriangles
+  }
+
+  val runBusy = edgeStage.valid || runStage.valid || addressStage.valid || cmdBusy
+  val scanBusy = vbFifo.io.pop.valid || beatValid || runBusy
+  val retired = RegNext(statStsCount === statCmdCount) init (True)
+
+  when(draining) {
+    beatValid := False
+    beatDone := False
+    window := 0
+    runOpen := False
+    scanEnded := False
+    cmdBusy := False
+    cmdCheck := False
+  }
+
   when(SOFT_RESET) {
-    filterState := FilterState.IDLE
-    dmaBusy := False
+    filterState := FilterState.DRAIN
+    draining := True
     axiReadError := False
     dmErrorFlag := False
     statVisCount := 0
     statCmdCount := 0
     statStsCount := 0
-    runActive := False
-    runLength := 0
-    outstandingReads := 0
-    sliceIdx := 0
   }.otherwise {
     switch(filterState) {
       is(FilterState.IDLE) {
@@ -753,297 +863,32 @@ class AxiVisibilityDma(
           statCmdCount := 0
           statStsCount := 0
           tagCounter := 0
-          runActive := False
-          runLength := 0
-          sliceIdx := 0
+          shadowMaxTriangles := bttLimit
+          rIndex := 0
+          rLastBit := False
+          scanEnded := False
 
-          activeTileIdx := TILE_INDEX
-          shadowTriCount := TRI_COUNT
-          triAddr0 := fullTriWordAddr
-          triAddr1 := fullTriWordAddr + config.triUnits
-
-          // Sizing limitation is ONLY the BTT capacity
-          shadowMaxTriangles := (BTT_LIMIT_TRI === 0) ? U(
-            config.maxBttTriangles,
-            config.bttTriCountWidth bits
-          ) | BTT_LIMIT_TRI
-
-          // Setup AXI4 Visibility Buffer Reader
-          arAddrReg := fullVbBaseAddr
-          val beatShift = log2Up(config.wordsPerBeat)
-          val totalBeats = UInt(32 bits)
-          if (config.wordsPerBeat == 1) {
-            totalBeats := TRI_COUNT
-          } else {
-            totalBeats := ((TRI_COUNT + (config.wordsPerBeat - 1)) >> beatShift).resized
-          }
-          arBeatsRemaining := totalBeats
-          rBeatsRemaining := totalBeats
-          triCounter := 0
-
-          when(TRI_COUNT === 0) {
+          when(triCountZero) {
             filterState := FilterState.ADVANCE_TILE
           }.otherwise {
+            arPage := fullVbPage + TILE_INDEX.resized
+            arChunk := 0
+            arFinal := lastChunk === 0
+            arPending := True
             filterState := FilterState.FILTER_STREAM
           }
         }
       }
 
       is(FilterState.FILTER_STREAM) {
-        when(vbFifo.io.pop.valid) {
-          if (isParallel2) {
-            switch(v0 ## v1) {
-              // ---------------------------------------------------------------
-              // Case 00: Both triangles invisible
-              // ---------------------------------------------------------------
-              is(B"00") {
-                when(runActive) {
-                  pushCmd(runStartWord, runLength)
-                  when(cmdStreamInternal.ready) {
-                    statCmdCount := statCmdCount + 1
-                    tagCounter := tagCounter + 1
-                    runActive := False
-                    runLength := 0
-                    vbFifo.io.pop.ready := True
-                    advancePair()
-                    when(isLastBeat) {
-                      filterState := FilterState.WAIT_RETIRE
-                    }
-                  }
-                }.otherwise {
-                  vbFifo.io.pop.ready := True
-                  advancePair()
-                  when(isLastBeat) {
-                    filterState := FilterState.WAIT_RETIRE
-                  }
-                }
-              }
-
-              // ---------------------------------------------------------------
-              // Case 01: v0 invisible, v1 visible (starts new run at triIdx1)
-              // Note: If N is odd, v1 is masked to False, so this case cannot occur
-              // ---------------------------------------------------------------
-              is(B"01") {
-                when(runActive) {
-                  pushCmd(runStartWord, runLength)
-                  when(cmdStreamInternal.ready) {
-                    statCmdCount := statCmdCount + 1
-                    tagCounter := tagCounter + 1
-                    when(isLastTri1) {
-                      // v1 is also last: flush previous run, next cycle flushes v1
-                      runActive := False
-                      runLength := 0
-                    }.otherwise {
-                      runActive := True
-                      runStartWord := triAddr1
-                      runLength := 1
-                      statVisCount := statVisCount + 1
-                      vbFifo.io.pop.ready := True
-                      advancePair()
-                    }
-                  }
-                }.otherwise {
-                  when(isLastTri1) {
-                    pushCmd(triAddr1, 1)
-                    when(cmdStreamInternal.ready) {
-                      statCmdCount := statCmdCount + 1
-                      tagCounter := tagCounter + 1
-                      statVisCount := statVisCount + 1
-                      vbFifo.io.pop.ready := True
-                      advancePair()
-                      filterState := FilterState.WAIT_RETIRE
-                    }
-                  }.otherwise {
-                    runActive := True
-                    runStartWord := triAddr1
-                    runLength := 1
-                    statVisCount := statVisCount + 1
-                    vbFifo.io.pop.ready := True
-                    advancePair()
-                  }
-                }
-              }
-
-              // ---------------------------------------------------------------
-              // Case 10: v0 visible, v1 invisible (run ends at v0)
-              // ---------------------------------------------------------------
-              is(B"10") {
-                when(runActive) {
-                  val canExtend = (runLength < shadowMaxTriangles)
-                  when(canExtend) {
-                    val totalRun = (runLength + 1).resize(config.bttTriCountWidth)
-                    pushCmd(runStartWord, totalRun)
-                    when(cmdStreamInternal.ready) {
-                      statCmdCount := statCmdCount + 1
-                      tagCounter := tagCounter + 1
-                      statVisCount := statVisCount + 1
-                      runActive := False
-                      runLength := 0
-                      vbFifo.io.pop.ready := True
-                      advancePair()
-                      when(isLastBeat) {
-                        filterState := FilterState.WAIT_RETIRE
-                      }
-                    }
-                  }.otherwise {
-                    pushCmd(runStartWord, runLength)
-                    when(cmdStreamInternal.ready) {
-                      statCmdCount := statCmdCount + 1
-                      tagCounter := tagCounter + 1
-                      runActive := False
-                      runLength := 0
-                    }
-                  }
-                }.otherwise {
-                  pushCmd(triAddr0, 1)
-                  when(cmdStreamInternal.ready) {
-                    statCmdCount := statCmdCount + 1
-                    tagCounter := tagCounter + 1
-                    statVisCount := statVisCount + 1
-                    vbFifo.io.pop.ready := True
-                    advancePair()
-                    when(isLastBeat) {
-                      filterState := FilterState.WAIT_RETIRE
-                    }
-                  }
-                }
-              }
-
-              // ---------------------------------------------------------------
-              // Case 11: Both v0 and v1 visible!
-              // ---------------------------------------------------------------
-              is(B"11") {
-                when(runActive) {
-                  val canExtend2 = (runLength + 2 <= shadowMaxTriangles)
-
-                  when(canExtend2) {
-                    when(isLastTri1) {
-                      val totalRun = (runLength + 2).resize(config.bttTriCountWidth)
-                      pushCmd(runStartWord, totalRun)
-                      when(cmdStreamInternal.ready) {
-                        statCmdCount := statCmdCount + 1
-                        tagCounter := tagCounter + 1
-                        statVisCount := statVisCount + 2
-                        runActive := False
-                        runLength := 0
-                        vbFifo.io.pop.ready := True
-                        advancePair()
-                        filterState := FilterState.WAIT_RETIRE
-                      }
-                    }.otherwise {
-                      runLength := runLength + 2
-                      statVisCount := statVisCount + 2
-                      vbFifo.io.pop.ready := True
-                      advancePair()
-                    }
-                  }.otherwise {
-                    // Current run cannot fit 2 more triangles; flush current run first
-                    pushCmd(runStartWord, runLength)
-                    when(cmdStreamInternal.ready) {
-                      statCmdCount := statCmdCount + 1
-                      tagCounter := tagCounter + 1
-                      runActive := False
-                      runLength := 0
-                    }
-                  }
-                }.otherwise {
-                  when(isLastTri1) {
-                    pushCmd(triAddr0, 2)
-                    when(cmdStreamInternal.ready) {
-                      statCmdCount := statCmdCount + 1
-                      tagCounter := tagCounter + 1
-                      statVisCount := statVisCount + 2
-                      vbFifo.io.pop.ready := True
-                      advancePair()
-                      filterState := FilterState.WAIT_RETIRE
-                    }
-                  }.otherwise {
-                    runActive := True
-                    runStartWord := triAddr0
-                    runLength := 2
-                    statVisCount := statVisCount + 2
-                    vbFifo.io.pop.ready := True
-                    advancePair()
-                  }
-                }
-              }
-            }
-          } else {
-            // Serialized 1 triangle per clock cycle
-            when(isVisible) {
-              when(!runActive) {
-                when(isLastTri) {
-                  pushCmd(curTriWordAddr, 1)
-                  when(cmdStreamInternal.ready) {
-                    triStep := True
-                    statCmdCount := statCmdCount + 1
-                    tagCounter := tagCounter + 1
-                    filterState := FilterState.WAIT_RETIRE
-                  }
-                }.otherwise {
-                  runActive := True
-                  runStartWord := curTriWordAddr
-                  runLength := 1
-                  triStep := True
-                }
-              }.otherwise {
-                val canExtend = (runLength < shadowMaxTriangles)
-                when(canExtend) {
-                  when(isLastTri) {
-                    val totalRunLen = (runLength + 1).resize(config.bttTriCountWidth)
-                    pushCmd(runStartWord, totalRunLen)
-                    when(cmdStreamInternal.ready) {
-                      triStep := True
-                      statCmdCount := statCmdCount + 1
-                      tagCounter := tagCounter + 1
-                      runActive := False
-                      filterState := FilterState.WAIT_RETIRE
-                    }
-                  }.otherwise {
-                    runLength := runLength + 1
-                    triStep := True
-                  }
-                }.otherwise {
-                  pushCmd(runStartWord, runLength)
-                  when(cmdStreamInternal.ready) {
-                    statCmdCount := statCmdCount + 1
-                    tagCounter := tagCounter + 1
-                    runActive := False
-                    filterState := FilterState.FLUSH_STALL
-                  }
-                }
-              }
-            }.otherwise {
-              when(runActive) {
-                pushCmd(runStartWord, runLength)
-                when(cmdStreamInternal.ready) {
-                  triStep := True
-                  statCmdCount := statCmdCount + 1
-                  tagCounter := tagCounter + 1
-                  runActive := False
-                  when(isLastTri) {
-                    filterState := FilterState.WAIT_RETIRE
-                  }
-                }
-              }.otherwise {
-                triStep := True
-                when(isLastTri) {
-                  filterState := FilterState.WAIT_RETIRE
-                }
-              }
-            }
-          }
+        when(scanEnded && !runBusy) {
+          filterState := FilterState.WAIT_RETIRE
         }
-      }
-
-      // Intermediate cycle after pushing a full block to cleanly start next run
-      is(FilterState.FLUSH_STALL) {
-        filterState := FilterState.FILTER_STREAM
       }
 
       // Wait until all issued DataMover commands have been acknowledged via status stream
       is(FilterState.WAIT_RETIRE) {
-        when(statStsCount === statCmdCount) {
+        when(retired) {
           filterState := FilterState.ADVANCE_TILE
         }
       }
@@ -1073,30 +918,13 @@ class AxiVisibilityDma(
 
         filterState := FilterState.IDLE
       }
-    }
 
-    // Triangle step & FIFO pop logic (only for 1-triangle-per-clock mode)
-    if (!isParallel2) {
-      if (config.wordsPerBeat == 1) {
-        when(triStep) {
-          vbFifo.io.pop.ready := True
-          advanceOne()
-          when(isVisible) {
-            statVisCount := statVisCount + 1
-          }
-        }
-      } else {
-        when(triStep) {
-          advanceOne()
-          when(isVisible) {
-            statVisCount := statVisCount + 1
-          }
-          when(sliceIdx === (config.wordsPerBeat - 1) || isLastTri) {
-            vbFifo.io.pop.ready := True
-            sliceIdx := 0
-          }.otherwise {
-            sliceIdx := sliceIdx + 1
-          }
+      // After SOFT_RESET: the reads in flight still answer
+      is(FilterState.DRAIN) {
+        when(!arValid && !arFired && outstandingReads === 0 && !rValid) {
+          dmaBusy := False
+          draining := False
+          filterState := FilterState.IDLE
         }
       }
     }
@@ -1109,12 +937,13 @@ class AxiVisibilityDma(
   val stall = new Area {
     val events = Seq(
       dmaBusy,
-      filterState === FilterState.FILTER_STREAM && !vbFifo.io.pop.valid,
+      filterState === FilterState.FILTER_STREAM && !rValid && !edgesValid && !scanBusy,
       cmdStreamInternal.valid && !cmdStreamInternal.ready,
       filterState === FilterState.WAIT_RETIRE,
-      statStsCount =/= statCmdCount && !io.tri_stream_valid, // commands out without their status
-      io.core_stall
-    )
+      !retired && !io.tri_stream_valid, // commands out without their status
+      io.core_stall,
+      cmdStreamInternal.fire
+    ).map(event => RegNext(event) init (False))
     val K = events.size
     val idxBits = log2Up(K)
     val low = Vec.fill(K)(Reg(UInt(8 bits)) init (0))
@@ -1122,45 +951,47 @@ class AxiVisibilityDma(
     val upper = Mem(UInt(24 bits), 1 << idxBits)
     upper.addAttribute("ram_style", "distributed")
 
-    // CNT_CLEAR, and reset: the RAM zeroed a word a clock
+    // One index walks the counters, a counter a clock: zeroing the RAM, then taking carries. It is
+    // back before a counter carries again (256 clocks at the soonest)
     val clearing = RegInit(True)
-    val clearIdx = Reg(UInt(idxBits bits)) init (0)
+    val scanIdx = Reg(UInt(idxBits bits)) init (0)
+    val scanLast = scanIdx === K - 1
+    scanIdx := Mux(scanLast, U(0, idxBits bits), scanIdx + 1)
+    when(clearing && scanLast) { clearing := False }
     when(CNT_CLEAR) {
       clearing := True
-      clearIdx := 0
-    }.elsewhen(clearing) {
-      clearIdx := clearIdx + 1
-      when(clearIdx === K - 1) { clearing := False }
+      scanIdx := 0
     }
 
-    // A carry picked, its word read and incremented, then written. A counter carries again 256
-    // clocks later at the soonest: no hazard
-    val pickOh = OHMasking.first(carry.asBits)
-    val pick = !clearing && carry.asBits.orR
-    val p1Valid = RegNext(pick) init (False)
-    val p1Idx = RegNext(OHToUInt(pickOh).resize(idxBits))
+    val p1Valid = RegNext(!clearing && carry(scanIdx)) init (False)
+    val p1Idx = RegNext(scanIdx)
     val p2Valid = RegNext(p1Valid && !clearing) init (False)
     val p2Idx = RegNext(p1Idx)
-    val p2Sum = RegNext(upper.readAsync(p1Idx) + 1)
+    val p2Upper = RegNext(upper.readAsync(p1Idx))
+    val p3Valid = RegNext(p2Valid && !clearing) init (False)
+    val p3Idx = RegNext(p2Idx)
+    val p3Upper = Reg(UInt(24 bits)) init (0)
+    p3Upper := p2Upper + 1
+    when(CNT_CLEAR || clearing) { p3Upper := 0 }
     upper.write(
-      address = Mux(clearing, clearIdx, p2Idx),
-      data = Mux(clearing, U(0, 24 bits), p2Sum),
-      enable = clearing || p2Valid
+      address = Mux(clearing, scanIdx, p3Idx),
+      data = p3Upper,
+      enable = clearing || p3Valid
     )
     for (i <- 0 until K) {
       val sum = low(i).resize(9) + events(i).asUInt.resize(9)
-      when(clearing || CNT_CLEAR) {
+      when(clearing) {
         low(i) := 0
         carry(i) := False
-      }.otherwise {
+      } otherwise {
         low(i) := sum(7 downto 0)
-        carry(i) := (carry(i) && !(pick && pickOh(i))) || sum(8)
+        carry(i) := (carry(i) && scanIdx =/= i) || sum(8)
       }
     }
 
     // A counter register read: its RAM word and low byte, at the bus address. Exact a few clocks
     // after the DMA stops, once its last carries are in
-    val rdIdx = ((busif.readAddress() - counterBase) >> 2).resize(idxBits)
+    val rdIdx = busif.readAddress()(idxBits + 1 downto 2)
     cntValue := upper.readAsync(rdIdx) @@ low(rdIdx)
   }
 }
@@ -1172,16 +1003,15 @@ object AxiVisibilityDmaVerilog {
   def main(args: Array[String]): Unit = {
     val config = AxiVisibilityDmaConfig(
       addressWidth = 32,
-      axiDataWidth = 128, // 128-bit AXI Read Master (configurable >= 64 bits)
-      bttWidth = 23, // Configurable up to 23 bits
+      axiDataWidth = 128, // 128-bit AXI Read Master: 128 triangles a clock
+      bttWidth = 19, // Configurable up to 23 bits
+      defaultBttLimit = 4096,
       maxTiles = 64,
-      vbWordBits = 64,
       triangleSizeBytes = 96,
-      maxBurstLength = 256,
       maxOutstandingReads = 8,
       cmdFifoDepth = 64,
       stsFifoDepth = 4,
-      vbFifoDepth = 512, // >= maxBurstLength
+      vbFifoDepth = 512,
       useAutoAdvance = true
     )
 

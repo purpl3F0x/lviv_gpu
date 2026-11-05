@@ -1,5 +1,5 @@
 // lviv_gl's transform and data building, between the GL API and the GPU driver: object-space
-// triangles in, the GPU's frame data out (gpu_triangle_t records and their tile masks, as the
+// triangles in, the GPU's frame data out (gpu_triangle_t records and their visibility bitmap, as the
 // visibility DMA reads them), and the matrices of GL's matrix calls. Ported from dv/raster_sw:
 // GeometryEngine (vertex transform, lighting, clipping, viewport) and Rasterizer's binning (tile
 // masks, low-resolution z) and record packing. C++ on GLM (lviv_geom.cpp, sdk/third_party/glm)
@@ -123,7 +123,7 @@ typedef struct
 typedef struct
 {
     gpu_triangle_t *triangles; // capacity of them, 32-byte aligned
-    uint64_t *visibility;      // their tile masks, 16-byte aligned
+    uint64_t *visibility;      // their bitmap (GPU_VISIBILITY_CHUNK), 4 KiB aligned
     uint32_t capacity, count;
     uint32_t dropped; // triangles in a tile that did not fit
     int width, height, tiles_x, tiles_y;

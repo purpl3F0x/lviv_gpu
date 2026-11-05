@@ -1,6 +1,8 @@
 // lviv_geom.h's C interface, in C++ on GLM.
 #include "lviv_geom.h"
 
+#include "gpu.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -403,6 +405,15 @@ static uint64_t place(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex
     return mask;
 }
 
+static inline void zero_line(void *line)
+{
+#ifdef __aarch64__
+    __asm__ volatile("dc zva, %0" : : "r"(line) : "memory");
+#else
+    std::memset(line, 0, 64);
+#endif
+}
+
 static void record(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t *v, uint64_t mask)
 {
     gpu_triangle_t *t = &g.triangles[g.count];
@@ -415,7 +426,21 @@ static void record(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t 
     t->texture_function = s.texture_function;
     t->blend = s.blend;
     t->depth_func = s.depth_func;
-    g.visibility[g.count++] = mask;
+
+    // Its word in tile 0's chunk, a page from each tile's to the next; the bitmap's lines are zeroed
+    // as they are reached
+    const uint32_t i = g.count++, bit = i % GPU_VISIBILITY_CHUNK;
+    const size_t tiles = (size_t)g.tiles_x * g.tiles_y;
+    char *word = reinterpret_cast<char *>(g.visibility) + ((i / GPU_VISIBILITY_CHUNK * tiles) << GPU_VISIBILITY_PAGE_SHIFT) +
+                 bit / 64 * sizeof(uint64_t);
+    if (bit % 512 == 0)
+        for (size_t tile = 0; tile < tiles; tile++)
+            zero_line(word + (tile << GPU_VISIBILITY_PAGE_SHIFT));
+    for (; mask; mask &= mask - 1)
+    {
+        const size_t tile = (size_t)__builtin_ctzll(mask);
+        *reinterpret_cast<uint64_t *>(word + (tile << GPU_VISIBILITY_PAGE_SHIFT)) |= uint64_t(1) << (bit % 64);
+    }
 }
 
 void lviv_geom_triangle(lviv_geom_t *g, const lviv_state_t *s, const lviv_vertex_t *v0, const lviv_vertex_t *v1,

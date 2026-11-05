@@ -194,10 +194,13 @@ int lviv_gl_init(gpu_t *gpu, int width, int height, void *frame_memory, size_t f
     gl.gpu = gpu;
     gl.width = width;
     gl.height = height;
-    const size_t n = frame_bytes / LVIV_GL_TRIANGLE_BYTES;
+    // The records, then their bitmap from the next page; the spare, a part chunk's bits and that page
+    const size_t spare = ((size_t)LVIV_MAX_TILES + 1) << GPU_VISIBILITY_PAGE_SHIFT;
+    const size_t n = frame_bytes > spare ? (frame_bytes - spare) / LVIV_GL_TRIANGLE_BYTES : 0;
     gl.capacity = n > UINT32_MAX ? UINT32_MAX : (uint32_t)n;
     gl.triangles = frame_memory;
-    gl.visibility = (uint64_t *)(gl.triangles + gl.capacity);
+    const size_t page = (size_t)1 << GPU_VISIBILITY_PAGE_SHIFT;
+    gl.visibility = (uint64_t *)(((uintptr_t)(gl.triangles + gl.capacity) + page - 1) & ~(uintptr_t)(page - 1));
     if (gl.capacity == 0 || lviv_geom_begin(&gl.geom, gl.triangles, gl.visibility, gl.capacity, width, height) != 0)
         return -1;
 

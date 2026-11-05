@@ -71,23 +71,43 @@ typedef enum
 // A frame's alignment: the tile DMA ignores BASE's bits 16..0 (AxiTileDma.scala, the tile's origin)
 #define GPU_FRAME_ALIGN (128u << 10)
 
+// A frame's visibility: a bit per triangle per tile, in 4 KiB chunks, every tile's first chunk
+// first. Triangle i's bit in tile t is bit i % GPU_VISIBILITY_CHUNK of the bitmap's 4 KiB page
+// i / GPU_VISIBILITY_CHUNK * tiles + t.
+#define GPU_VISIBILITY_CHUNK 32768u // triangles
+#define GPU_VISIBILITY_PAGE_SHIFT 12
+
 // What a frame is drawn from, and where it goes, in memory the GPU's masters reach (PS DDR below
 // 4 GiB). They do not see the CPU's caches: gpu_frame flushes the triangles and their visibility
-// words from them, and the frame must be memory the CPU does not cache (Xil_SetTlbAttributes
+// from them, and the frame must be memory the CPU does not cache (Xil_SetTlbAttributes
 // NORM_NONCACHE on its 2 MiB blocks), or kept out of its caches by the caller. With PL DDR
 // (GPU_PL_DDR), gpu_frame copies the triangles there, to the same address, by the GDMA.
 typedef struct
 {
     const gpu_triangle_t *triangles; // GPU_TRIANGLE_BYTES each, 32-byte aligned
-    const uint64_t *visibility;      // per triangle, bit t set if it touches tile t; 16-byte aligned
+    const uint64_t *visibility;      // the bitmap, GPU_VISIBILITY_CHUNK's; 4 KiB aligned
     uint32_t triangle_count;
     uint32_t *frame;        // ARGB, GPU_FRAME_ALIGN aligned, rows to the end of the last row of tiles
     uint32_t stride;        // bytes per frame row, a multiple of 512
     uint32_t width, height; // pixels; at most 64 tiles, tile t (t % tiles across, t / tiles across)
     uint32_t clear_color;   // ARGB, where no triangle draws
-    // The triangles and visibility words as the last frame sent them: not flushed or copied again
+    // The triangles and visibility as the last frame sent them: not flushed or copied again
     int triangles_unchanged;
 } gpu_frame_t;
+
+// The visibility bitmap's bytes for this many triangles.
+static inline size_t gpu_visibility_bytes(uint32_t triangles, uint32_t tiles)
+{
+    return (((size_t)triangles + GPU_VISIBILITY_CHUNK - 1) / GPU_VISIBILITY_CHUNK * tiles) << GPU_VISIBILITY_PAGE_SHIFT;
+}
+
+// Whether triangle i touches a tile, the frame having tiles of them.
+static inline int gpu_frame_visible(const gpu_frame_t *frame, uint32_t tiles, uint32_t tile, uint32_t i)
+{
+    const size_t page = (size_t)(i / GPU_VISIBILITY_CHUNK) * tiles + tile;
+    const uint32_t bit = i % GPU_VISIBILITY_CHUNK;
+    return (frame->visibility[(page << (GPU_VISIBILITY_PAGE_SHIFT - 3)) + bit / 64] >> (bit % 64)) & 1;
+}
 
 // Tiles across and down a frame.
 uint32_t gpu_tiles_x(const gpu_frame_t *frame);
@@ -116,11 +136,12 @@ uint32_t gpu_tile_dma_cycles(const gpu_t *gpu);
 typedef struct
 {
     uint32_t busy;             // working on a tile
-    uint32_t vb_wait;          // filtering, no visibility word yet
+    uint32_t vb_wait;          // scanning, no visibility coming in
     uint32_t cmd_wait;         // a command, the DataMover's queue full
     uint32_t retire_wait;      // all commands out, their triangles still on their way
     uint32_t tri_starved;      // triangles in flight, no beat from the DataMover
     uint32_t tri_backpressure; // a triangle the core does not take
+    uint32_t commands;         // DataMover commands issued, not cycles
 } gpu_vis_dma_counters_t;
 
 void gpu_vis_dma_counters(const gpu_t *gpu, gpu_vis_dma_counters_t *counters);

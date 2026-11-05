@@ -79,11 +79,11 @@ static _Alignas(64) uint32_t tile_color[TILE * TILE];
 static _Alignas(64) float tile_z[TILE * TILE];
 
 // Each tile's triangles, from bin_start[tile] to bin_start[tile + 1] in binned (an entry for each
-// tile a triangle's box takes); the visibility bit of its GPU tile
+// tile a triangle's box takes); its GPU tile
 static uint32_t *binned;     // on the heap: room_for
 static uint32_t binned_room; // its entries
 static uint32_t bin_start[TILES + 1], bin_fill[TILES];
-static uint64_t bin_bit[TILES];
+static uint32_t bin_gpu_tile[TILES];
 
 // Pixels, first to last
 typedef struct
@@ -854,13 +854,14 @@ gpu_status_t sw_raster_frame(const gpu_frame_t *frame)
 {
     const uint32_t gpu_across = (frame->width + GPU_TILE - 1) / GPU_TILE;
     const uint32_t gpu_down = (frame->height + GPU_TILE - 1) / GPU_TILE;
-    if (gpu_across == 0 || gpu_down == 0 || gpu_across * gpu_down > GPU_TILES)
+    const uint32_t gpu_tiles = gpu_across * gpu_down;
+    if (gpu_across == 0 || gpu_down == 0 || gpu_tiles > GPU_TILES)
         return GPU_BAD_SIZE;
     const int width = (int)frame->width, height = (int)frame->height;
     const int across = (width + TILE - 1) / TILE, tiles = across * ((height + TILE - 1) / TILE);
     for (int i = 0; i < tiles; i++)
     {
-        bin_bit[i] = (uint64_t)1 << (i / across * TILE / GPU_TILE * (int)gpu_across + i % across * TILE / GPU_TILE);
+        bin_gpu_tile[i] = i / across * TILE / GPU_TILE * (int)gpu_across + i % across * TILE / GPU_TILE;
         bin_fill[i] = 0;
     }
 
@@ -871,7 +872,7 @@ gpu_status_t sw_raster_frame(const gpu_frame_t *frame)
         if (tile_box(&frame->triangles[t], width, height, &b))
             for (int ty = b.y0; ty <= b.y1; ty++)
                 for (int tx = b.x0; tx <= b.x1; tx++)
-                    bin_fill[ty * across + tx] += (frame->visibility[t] & bin_bit[ty * across + tx]) != 0;
+                    bin_fill[ty * across + tx] += gpu_frame_visible(frame, gpu_tiles, bin_gpu_tile[ty * across + tx], t);
     }
     uint32_t total = 0;
     for (int i = 0; i < tiles; i++)
@@ -892,7 +893,7 @@ gpu_status_t sw_raster_frame(const gpu_frame_t *frame)
                     for (int tx = b.x0; tx <= b.x1; tx++)
                     {
                         const int i = ty * across + tx;
-                        if (frame->visibility[t] & bin_bit[i])
+                        if (gpu_frame_visible(frame, gpu_tiles, bin_gpu_tile[i], t))
                             binned[bin_start[i] + bin_fill[i]++] = t;
                     }
         }
@@ -921,7 +922,7 @@ gpu_status_t sw_raster_frame(const gpu_frame_t *frame)
                 add_triangle(&frame->triangles[binned[k]], &box, width, height);
         else
             for (uint32_t t = 0; t < frame->triangle_count; t++)
-                if (frame->visibility[t] & bin_bit[i])
+                if (gpu_frame_visible(frame, gpu_tiles, bin_gpu_tile[i], t))
                     add_triangle(&frame->triangles[t], &box, width, height);
 #if SW_LANES
         flush(&box);

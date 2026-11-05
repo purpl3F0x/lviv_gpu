@@ -34,7 +34,7 @@
 
 #define GPU_THREADS 4
 #define GPU_TILE_SIZE 128
-#define GPU_MAX_TILES 64 // bits in a triangle's visibility word
+#define GPU_MAX_TILES 64 // the visibility DMA's TILE_COUNT
 
 // Textures: up to 128 (a triangle's tex_id), square, up to 2048 x 2048 (size code: log2 of the
 // width). The texture caches reach the 128 MiB from GPU_TEXTURE_WINDOW, gpu_top's TEXTURE_WINDOW

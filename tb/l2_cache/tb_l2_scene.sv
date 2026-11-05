@@ -36,10 +36,11 @@ module tb_l2_scene;
   localparam logic [11:0] FrontendBbMinX = 12'h804, FrontendBbMinY = 12'h808;
   localparam logic [11:0] FrontendBbMaxX = 12'h80C, FrontendBbMaxY = 12'h810;
   localparam logic [11:0] VisVbBase = 12'hF88, VisTriBase = 12'hF90, VisTriCount = 12'hF98;
-  localparam logic [11:0] VisTileIndex = 12'hF9C, VisIrqRaw = 12'hFC0, VisTileCount = 12'hFB8;
+  localparam logic [11:0] VisTileIndex = 12'hF9C, VisIrqRaw = 12'hFF0, VisTileCount = 12'hFB8;
+  localparam logic [11:0] VisCtrl = 12'hF80, VisCounters = 12'hFC0;
   localparam logic [11:0] TileCtrl = 12'hF00, TileStatus = 12'hF04, TileBase = 12'hF08;
   localparam logic [11:0] TileStride = 12'hF10, TileTilesX = 12'hF14, TileTilesY = 12'hF18;
-  localparam logic [11:0] TileIrqClear = 12'hF40, TileClearValue = 12'hF28;
+  localparam logic [11:0] TileIrqClear = 12'hF70, TileClearValue = 12'hF28;
   localparam logic [11:0] CpCtrl = 12'h400, CpStatus = 12'h404, CpMode = 12'h408;
   localparam logic [11:0] CpSize = 12'h40C, CpCycles = 12'h410;
 
@@ -225,7 +226,7 @@ module tb_l2_scene;
   );
 
   // -------------------------------------------------------------------------
-  // Memories: visibility words, triangles, image (as tb_gpu_top's), textures
+  // Memories: visibility bitmap, triangles, image (as tb_gpu_top's), textures
   // -------------------------------------------------------------------------
 
   axi_ram #(
@@ -660,8 +661,13 @@ module tb_l2_scene;
 
   int triangles;
 
-  // Per line, the visibility word, then the record as 24 words in memory order; straight into the
-  // memories
+  // Triangle t's word of the tile's visibility
+  function automatic logic [31:0] visibility_word(input int tile, input int t);
+    return VbBase + 32'((t / 32768 * TilesX * TilesY + tile) * 4096 + t % 32768 / 128 * 16);
+  endfunction
+
+  // Per line, the tile mask, then the record as 24 words in memory order; straight into the
+  // memories, the mask's bits to their tiles' 4 KiB chunks. Noise past the last triangle.
   task automatic load_scene(input string path);
     int fd;
     logic [63:0] mask;
@@ -672,8 +678,10 @@ module tb_l2_scene;
     while ($fscanf(fd, "%h", mask) == 1) begin
       if (triangles == MaxTriangles)
         $fatal(1, "scene %s: more than %0d triangles", path, MaxTriangles);
-      a = VbBase + 32'(8 * triangles);
-      u_vb_ram.mem[a[VbAddrW-1:4]][64*a[3]+:64] = mask;
+      for (int tile = 0; tile < TilesX * TilesY; tile++) begin
+        a = visibility_word(tile, triangles);
+        u_vb_ram.mem[a[VbAddrW-1:4]][triangles % 128] = mask[tile];
+      end
       for (int w = 0; w < 24; w++) begin
         if ($fscanf(fd, "%h", word) != 1)
           $fatal(1, "scene %s: triangle %0d is short", path, triangles);
@@ -683,6 +691,11 @@ module tb_l2_scene;
       triangles++;
     end
     $fclose(fd);
+    if (triangles % 128 != 0)
+      for (int tile = 0; tile < TilesX * TilesY; tile++) begin
+        a = visibility_word(tile, triangles);
+        for (int b = triangles % 128; b < 128; b++) u_vb_ram.mem[a[VbAddrW-1:4]][b] = 1'($urandom());
+      end
     $display("scene %s: %0d triangles", path, triangles);
   endtask
 
@@ -799,7 +812,7 @@ module tb_l2_scene;
     axi_write(FrontendBbMinY, 32'h0);
     axi_write(FrontendBbMaxX, box_end(0, TILE_SIZE_X, Width));
     axi_write(FrontendBbMaxY, box_end(0, TILE_SIZE_Y, Height));
-    axi_write(CpSize, {16'(Height), 16'(Width)});
+    axi_write(CpSize, {16'(Height - 1), 16'(Width - 1)});  // the last pixel
   endtask
 
   function automatic logic [31:0] image_pixel(input int x, input int y);
@@ -857,6 +870,15 @@ module tb_l2_scene;
       $fatal(1, "command processor: STATUS %08h after the frame", status);
     $display("[%0t] %s frame: %0d command processor cycles (%0.1f us)", $time, tag, cycles,
              cycles * lpd_ns / 1000.0);
+    repeat (16) @(posedge lpd_clk);
+    begin
+      logic [31:0] vis[7];
+      for (int i = 0; i < 7; i++) axi_read(12'(VisCounters + 4 * i), vis[i]);
+      $display("visibility DMA: busy %0d, waiting for visibility %0d, commands %0d, retire %0d;",
+               vis[0], vis[1], vis[2], vis[3]);
+      $display("  triangles starved %0d, held by the core %0d; %0d commands", vis[4], vis[5], vis[6]);
+      axi_write(VisCtrl, 32'h10);  // CNT_CLEAR
+    end
 
     all_reads = 0;
     all_first = 0;

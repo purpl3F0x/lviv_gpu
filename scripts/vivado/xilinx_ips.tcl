@@ -123,7 +123,7 @@ set_property -dict [list \
     CONFIG.c_enable_s2mm {0} \
     CONFIG.c_m_axi_mm2s_data_width {512} \
     CONFIG.c_m_axis_mm2s_tdata_width {512} \
-    CONFIG.c_mm2s_btt_used {23} \
+    CONFIG.c_mm2s_btt_used {19} \
     CONFIG.c_mm2s_burst_size {16} \
     CONFIG.c_mm2s_addr_pipe_depth {8} \
     CONFIG.c_include_mm2s_dre {false}] [get_ips xil_triangle_datamover]

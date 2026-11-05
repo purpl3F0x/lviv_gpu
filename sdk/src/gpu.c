@@ -73,6 +73,7 @@ void gpu_vis_dma_counters(const gpu_t *gpu, gpu_vis_dma_counters_t *counters)
     counters->retire_wait = vis_dma_read_reg(gpu, AXI_VISIBILITY_DMA_REG_CNT_RETIRE_WAIT);
     counters->tri_starved = vis_dma_read_reg(gpu, AXI_VISIBILITY_DMA_REG_CNT_TRI_STARVED);
     counters->tri_backpressure = vis_dma_read_reg(gpu, AXI_VISIBILITY_DMA_REG_CNT_TRI_BACKPRESSURE);
+    counters->commands = vis_dma_read_reg(gpu, AXI_VISIBILITY_DMA_REG_CNT_CMDS);
 }
 
 void gpu_vis_dma_counters_clear(const gpu_t *gpu)
@@ -328,6 +329,7 @@ gpu_status_t gpu_stream_tile(const gpu_t *gpu, const gpu_frame_t *frame, uint32_
     vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_TRI_HIGH, (uint32_t)((uint64_t)(uintptr_t)frame->triangles >> 32));
     vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_TRI_COUNT, frame->triangle_count);
     vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_TILE_IDX, tile & AXI_VISIBILITY_DMA_REG_TILE_IDX_TILE_INDEX_MASK);
+    vis_dma_write_reg(gpu, AXI_VISIBILITY_DMA_REG_TILE_COUNT, gpu_tiles_x(frame) * gpu_tiles_y(frame));
     vis_dma_write_reg(gpu, GPU_INT_RAW, GPU_INT_DONE); // one left behind, e.g. by the command processor
     const uint32_t irqs = gpu->irq_count[GPU_IRQ_VIS_DMA];
     // START alone: also clears IRQ_ENABLE and AUTO_ADV_EN, so the tile index is only the one written.
@@ -506,7 +508,7 @@ gpu_status_t gpu_frame(gpu_t *gpu, const gpu_frame_t *frame, uint32_t *failed_ti
     {
         if (to_gpu(frame->triangles, (size_t)frame->triangle_count * GPU_TRIANGLE_BYTES) != 0)
             return GPU_COPY_ERROR;
-        Xil_DCacheFlushRange((UINTPTR)frame->visibility, frame->triangle_count * sizeof(uint64_t));
+        Xil_DCacheFlushRange((UINTPTR)frame->visibility, gpu_visibility_bytes(frame->triangle_count, tiles_x * tiles_y));
     }
 
     gpu_status_t status =

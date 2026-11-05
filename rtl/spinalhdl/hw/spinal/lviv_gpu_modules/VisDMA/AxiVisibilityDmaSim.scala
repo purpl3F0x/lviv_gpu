@@ -6,32 +6,26 @@ import spinal.lib._
 import spinal.lib.bus.amba4.axi._
 import spinal.lib.bus.amba3.apb._
 import scala.collection.mutable
+import scala.util.Random
 
 // =============================================================================
 // SpinalHDL Simulation Memory Model for Axi4ReadOnly Interface
+// An address never written reads as noise: a read in the wrong place shows up in the commands
 // =============================================================================
-class AxiReadOnlyMemorySim(axi: Axi4ReadOnly, clockDomain: ClockDomain) {
+class AxiReadOnlyMemorySim(axi: Axi4ReadOnly, clockDomain: ClockDomain, rng: Random, dataWidth: Int) {
   val memory = mutable.Map[Long, BigInt]()
+  var gapPercent = 0 // of the clocks: no R beat, and AR not ready
+  var bursts = 0
 
   case class ArTransaction(addr: Long, len: Int, size: Int, id: Int)
   val arQueue = mutable.Queue[ArTransaction]()
 
-  def setWord64(addr: Long, data: BigInt, axiDataWidth: Int = 128): Unit = {
-    val bytesPerBeat = axiDataWidth / 8
-    val beatAddr = addr & ~(bytesPerBeat - 1L)
-    val offsetInBeat = (addr - beatAddr).toInt
-    val sliceShift = offsetInBeat * 8
-    val sliceMask = BigInt("FFFFFFFFFFFFFFFF", 16) << sliceShift
-    val current = memory.getOrElse(beatAddr, BigInt(0))
-    val updated = (current & ~sliceMask) | ((data & BigInt("FFFFFFFFFFFFFFFF", 16)) << sliceShift)
-    memory(beatAddr) = updated
-    memory(addr) = data
-  }
+  def setBeat(addr: Long, data: BigInt): Unit = memory(addr) = data
 
   def start(): Unit = {
-    // AR Channel
+    // AR Channel: every burst is one chunk, or the start of the last one
     fork {
-      axi.ar.ready #= true
+      axi.ar.ready #= false
       while (true) {
         clockDomain.waitSampling()
         if (axi.ar.valid.toBoolean && axi.ar.ready.toBoolean) {
@@ -39,8 +33,13 @@ class AxiReadOnlyMemorySim(axi: Axi4ReadOnly, clockDomain: ClockDomain) {
           val len = axi.ar.payload.len.toInt
           val size = axi.ar.payload.size.toInt
           val id = axi.ar.payload.id.toInt
+          assert(addr % 4096 == 0, f"AR 0x$addr%08X is not on a chunk")
+          assert((len + 1) << size <= 4096, f"AR 0x$addr%08X of ${len + 1} beats leaves its chunk")
+          assert(1 << size == dataWidth / 8, s"AR of size $size")
           arQueue.enqueue(ArTransaction(addr, len, size, id))
+          bursts += 1
         }
+        axi.ar.ready #= rng.nextInt(100) >= gapPercent
       }
     }
 
@@ -52,34 +51,32 @@ class AxiReadOnlyMemorySim(axi: Axi4ReadOnly, clockDomain: ClockDomain) {
 
       while (true) {
         clockDomain.waitSampling()
+        val valid = axi.r.valid.toBoolean
+        val ready = axi.r.ready.toBoolean
 
+        if (valid && ready) {
+          if (beatIndex == currentAr.len) {
+            currentAr = null
+          } else {
+            beatIndex += 1
+          }
+        }
         if (currentAr == null && arQueue.nonEmpty) {
           currentAr = arQueue.dequeue()
           beatIndex = 0
         }
 
-        if (currentAr != null) {
-          val bytesPerBeat = 1 << currentAr.size
-          val beatAddr = currentAr.addr + (beatIndex * bytesPerBeat)
-          val rdata = memory.getOrElse(beatAddr, BigInt(0))
-          val isLast = (beatIndex == currentAr.len)
-
-          axi.r.valid #= true
-          axi.r.payload.data #= rdata
-          axi.r.payload.id #= currentAr.id
-          axi.r.payload.resp #= 0 // OKAY
-          axi.r.payload.last #= isLast
-
-          if (axi.r.ready.toBoolean) {
-            if (isLast) {
-              currentAr = null
-              beatIndex = 0
-            } else {
-              beatIndex += 1
-            }
+        if (!(valid && !ready)) {
+          if (currentAr != null && rng.nextInt(100) >= gapPercent) {
+            val beatAddr = currentAr.addr + (beatIndex.toLong << currentAr.size)
+            axi.r.valid #= true
+            axi.r.payload.data #= memory.getOrElse(beatAddr, BigInt(dataWidth, rng))
+            axi.r.payload.id #= currentAr.id
+            axi.r.payload.resp #= 0 // OKAY
+            axi.r.payload.last #= (beatIndex == currentAr.len)
+          } else {
+            axi.r.valid #= false
           }
-        } else {
-          axi.r.valid #= false
         }
       }
     }
@@ -93,6 +90,7 @@ class SimDataMoverResponder(
     cmdStream: Stream[Bits],
     stsStream: Stream[Bits],
     clockDomain: ClockDomain,
+    rng: Random,
     addressWidth: Int = 32
 ) {
   case class ReceivedCmd(
@@ -104,27 +102,29 @@ class SimDataMoverResponder(
 
   val receivedCommands = mutable.ArrayBuffer[ReceivedCmd]()
   val stsQueue = mutable.Queue[(Int, Boolean)]()
+  var gapPercent = 0 // of the clocks: no command taken, no status offered
+  var stalled = false // no command taken at all
 
   def start(): Unit = {
-    // Consume Commands
+    // Consume Commands, PG022's fields: BTT [22:0], Type [23], DSA [29:24], EOF [30], DRR [31],
+    // SADDR past them, TAG [3:0] past that
     fork {
-      cmdStream.ready #= true
+      cmdStream.ready #= false
       while (true) {
         clockDomain.waitSampling()
         if (cmdStream.valid.toBoolean && cmdStream.ready.toBoolean) {
           val raw = cmdStream.payload.toBigInt
           val btt = (raw & 0x7fffff).toLong
-          val tag = ((raw >> 30) & 0x3).toInt
-          val saddr = if (addressWidth <= 32) {
-            ((raw >> 32) & 0xffffffffL).toLong
-          } else {
-            ((raw >> 32) & 0xffffffffffffffffL).toLong
-          }
+          val saddr = ((raw >> 32) & ((BigInt(1) << addressWidth) - 1)).toLong
+          val tag = ((raw >> (32 + addressWidth)) & 0xf).toInt
+          assert(raw.testBit(23), "Command with Type 0 (FIXED)")
+          assert(((raw >> 24) & 0xff) == 0, "Command with DSA, EOF or DRR set")
+          assert((raw >> (32 + addressWidth + 4)) == 0, "Command with reserved bits set")
 
-          val cmd = ReceivedCmd(btt, tag, saddr, raw)
-          receivedCommands += cmd
+          receivedCommands += ReceivedCmd(btt, tag, saddr, raw)
           stsQueue.enqueue((tag, false)) // Normal OKAY response
         }
+        cmdStream.ready #= !stalled && rng.nextInt(100) >= gapPercent
       }
     }
 
@@ -133,18 +133,18 @@ class SimDataMoverResponder(
       stsStream.valid #= false
       while (true) {
         clockDomain.waitSampling()
-        if (stsQueue.nonEmpty) {
-          val (tag, isError) = stsQueue.head
-          val stsByte = if (!isError) (0x80 | (tag & 0xf)) else (0x40 | (tag & 0xf))
-
-          stsStream.valid #= true
-          stsStream.payload #= stsByte
-
-          if (stsStream.ready.toBoolean) {
-            stsQueue.dequeue()
+        val valid = stsStream.valid.toBoolean
+        if (valid && stsStream.ready.toBoolean) {
+          stsQueue.dequeue()
+        }
+        if (!(valid && !stsStream.ready.toBoolean)) {
+          if (stsQueue.nonEmpty && rng.nextInt(100) >= gapPercent) {
+            val (tag, isError) = stsQueue.head
+            stsStream.valid #= true
+            stsStream.payload #= (if (!isError) 0x80 | (tag & 0xf) else 0x40 | (tag & 0xf))
+          } else {
+            stsStream.valid #= false
           }
-        } else {
-          stsStream.valid #= false
         }
       }
     }
@@ -157,20 +157,24 @@ class SimDataMoverResponder(
 object AxiVisibilityDmaSim extends App {
   val config = AxiVisibilityDmaConfig(
     addressWidth = 32,
-    axiDataWidth = 128, // 128-bit AXI Read Master (configurable >= 64 bits)
-    bttWidth = 23, // 23-bit configurable BTT
+    axiDataWidth = 128, // 128-bit AXI Read Master
+    bttWidth = 19,
+    defaultBttLimit = 4096,
     maxTiles = 64,
-    vbWordBits = 64,
     triangleSizeBytes = 96, // 96 B triangles: odd triangles start 32 B into a 64 B beat
-    maxBurstLength = 64,
     maxOutstandingReads = 4,
-    cmdFifoDepth = 64,
+    cmdFifoDepth = 16, // Small, to reach their full cases
     stsFifoDepth = 4,
-    vbFifoDepth = 64, // >= maxBurstLength
+    vbFifoDepth = 32,
     useAutoAdvance = true
   )
 
   val triBytes = config.triangleSizeBytes
+  val rng = new Random(0x51a7)
+
+  // CTRL: START, IRQ_ENABLE, AUTO_ADV_EN
+  val StartCpu = 0x01L
+  val StartAuto = 0x0dL
 
   val simConfig = SimConfig
     .withConfig(
@@ -186,11 +190,12 @@ object AxiVisibilityDmaSim extends App {
     dut.io.core_stall #= false
 
     val apbDriver = new SimApbDriver(dut.io.s_apb, dut.clockDomain)
-    val vbMemory = new AxiReadOnlyMemorySim(dut.io.m_axi_vb, dut.clockDomain)
+    val vbMemory = new AxiReadOnlyMemorySim(dut.io.m_axi_vb, dut.clockDomain, rng, config.axiDataWidth)
     val dmResponder = new SimDataMoverResponder(
       cmdStream = dut.io.m_axis_datamover_cmd,
       stsStream = dut.io.s_axis_datamover_sts,
       clockDomain = dut.clockDomain,
+      rng = rng,
       addressWidth = config.addressWidth
     )
 
@@ -199,6 +204,77 @@ object AxiVisibilityDmaSim extends App {
     dmResponder.start()
 
     dut.clockDomain.waitSampling(5)
+
+    val vbBaseAddr = 0x40000000L
+    val triBaseAddr = 0x80000000L
+
+    // Tile `tile`'s bits in their chunks: noise past N, in the last beat too
+    def writeTile(base: Long, tile: Int, tiles: Int, n: Int, visible: Int => Boolean): Unit = {
+      val beats = (n + 127) / 128
+      for (k <- 0 until beats) {
+        var data = BigInt(0)
+        for (bit <- 0 until config.trianglesPerBeat) {
+          val triangle = k * config.trianglesPerBeat + bit
+          if (if (triangle < n) visible(triangle) else rng.nextBoolean()) data = data.setBit(bit)
+        }
+        val page = (k / config.chunkBeats) * tiles + tile
+        vbMemory.setBeat(base + (page.toLong << 12) + (k % config.chunkBeats) * 16L, data)
+      }
+    }
+
+    // The maximal runs of [0, N), each split greedily: (first triangle, triangles)
+    def expectedCommands(n: Int, visible: Int => Boolean, limit: Int): Seq[(Int, Int)] = {
+      val commands = mutable.ArrayBuffer[(Int, Int)]()
+      var i = 0
+      while (i < n) {
+        if (visible(i)) {
+          var end = i
+          while (end < n && visible(end)) end += 1
+          var from = i
+          while (end - from > limit) {
+            commands += ((from, limit))
+            from += limit
+          }
+          commands += ((from, end - from))
+          i = end
+        } else {
+          i += 1
+        }
+      }
+      commands.toSeq
+    }
+
+    def waitDone(what: String): Unit = {
+      var timeout = 400000
+      while ((apbDriver.read(0x04) & 0x02) == 0 && timeout > 0) {
+        dut.clockDomain.waitSampling(5)
+        timeout -= 1
+      }
+      assert(timeout > 0, s"Timeout waiting for $what")
+    }
+
+    def clearDone(): Unit = {
+      apbDriver.write(0x04, 0x1a) // DONE, IRQ_STATUS, FRAME_DONE
+      apbDriver.write(0x70, 0x07) // INTR_INT_RAW W1C (done, error, frame_done) drives io.irq
+      dut.clockDomain.waitSampling(2)
+    }
+
+    // What the DMA issued for a tile, against the reference; the tags count from 0
+    def checkTile(what: String, expected: Seq[(Int, Int)], visibleCount: Long, triBase: Long): Unit = {
+      val commands = dmResponder.receivedCommands
+      assert(commands.size == expected.size, s"$what: ${commands.size} commands, expected ${expected.size}")
+      for ((((start, count), cmd), idx) <- expected.zip(commands).zipWithIndex) {
+        val expAddr = triBase + start.toLong * triBytes
+        assert(cmd.saddr == expAddr, f"$what: cmd $idx SADDR 0x${cmd.saddr}%08X, expected 0x$expAddr%08X")
+        assert(cmd.btt == count.toLong * triBytes, s"$what: cmd $idx BTT ${cmd.btt}, expected ${count * triBytes}")
+        assert(cmd.tag == idx % 16, s"$what: cmd $idx tag ${cmd.tag}")
+      }
+      assert(apbDriver.read(0x24) == visibleCount, s"$what: STAT_VIS ${apbDriver.read(0x24)}, expected $visibleCount")
+      assert(apbDriver.read(0x28) == expected.size, s"$what: STAT_CMD ${apbDriver.read(0x28)}")
+      assert(apbDriver.read(0x2c) == expected.size, s"$what: STAT_STS ${apbDriver.read(0x2c)}")
+      assert((apbDriver.read(0x04) & 0x60) == 0, s"$what: an error flag is set")
+      dmResponder.receivedCommands.clear()
+    }
 
     println("=================================================================")
     println("Test 1: Register Read / Write and Address Alignment Checking")
@@ -215,103 +291,46 @@ object AxiVisibilityDmaSim extends App {
       "Error: aligned TRI_BASE_LOW bits lost!"
     )
 
-    // Visibility Buffer Base Address = 0x4000_2000 (lower 4 bits are 0 for 128-bit)
-    apbDriver.write(0x08, 0x4000200fL)
+    // Visibility Buffer Base Address: 4 KiB aligned
+    apbDriver.write(0x08, 0x40002fffL)
     val readVbLow = apbDriver.read(0x08)
-    println(f"Wrote VB_BASE_LOW: 0x4000200F, Read Back: 0x$readVbLow%08X (Lower 4 bits must be 0 for 128-bit AXI)")
-    assert((readVbLow & 0x0f) == 0, "Error: lower 4 bits of VB_BASE_LOW were not ignored!")
+    println(f"Wrote VB_BASE_LOW: 0x40002FFF, Read Back: 0x$readVbLow%08X (Lower 12 bits must be 0)")
+    assert(readVbLow == 0x40002000L, "Error: lower 12 bits of VB_BASE_LOW were not ignored!")
+
+    assert(apbDriver.read(0x20) == config.defaultBttLimit, "Error: BTT_LIMIT's reset value!")
+    assert(apbDriver.read(0x38) == config.maxTiles, "Error: TILE_COUNT's reset value!")
 
     // Check ready pin is high when idle
     assert(dut.io.ready.toBoolean, "Error: engine ready output must be true when idle!")
 
     println("=================================================================")
-    println("Test 2: Visibility Filtering & Unchunked BTT Aggregation (Tile 0)")
+    println("Test 2: Visibility Filtering & Run Merging (Tile 0)")
     println("=================================================================")
     val N = 16
-    val vbBaseAddr = 0x40000000L
-    val triBaseAddr = 0x80000000L
-
-    // Check DataMover command: exact SADDR = triBase + startTri * triBytes, BTT = count * triBytes
-    def expectCmd(idx: Int, startTri: Int, count: Int): Unit = {
-      val cmd = dmResponder.receivedCommands(idx)
-      val expAddr = triBaseAddr + startTri.toLong * triBytes
-      assert(cmd.saddr == expAddr, f"Cmd $idx SADDR 0x${cmd.saddr}%08X != expected 0x$expAddr%08X (tri $startTri)")
-      assert(cmd.btt == count.toLong * triBytes, f"Cmd $idx BTT ${cmd.btt} != expected ${count * triBytes}")
-    }
-
+    val tiles = 8
     apbDriver.write(0x08, vbBaseAddr)
     apbDriver.write(0x10, triBaseAddr)
     apbDriver.write(0x18, N) // TRI_COUNT = 16
     apbDriver.write(0x1c, 0) // TILE_INDEX = 0
+    apbDriver.write(0x38, tiles)
 
-    // Visibility pattern for Tile 0 (bit 0), 96 B triangles:
-    // Tri 0..2: Visible (3 consecutive)  -> Cmd 0: Addr = 0x8000_0000, BTT = 3 * 96 = 288 bytes
-    // Tri 3:    Invisible
-    // Tri 4..5: Visible (2 consecutive)  -> Cmd 1: Addr = 0x8000_0180, BTT = 2 * 96 = 192 bytes
-    // Tri 6..7: Invisible
-    // Tri 8..12: Visible (5 consecutive) -> Unchunked! Merged into single BTT!
-    //           -> Cmd 2: Addr = 0x8000_0300, BTT = 5 * 96 = 480 bytes (Tri 8..12)
-    // Tri 13..14: Invisible
-    // Tri 15:   Visible (odd start)      -> Cmd 3: Addr = 0x8000_05A0 (32 B into a 64 B beat), BTT = 96 bytes
+    // Tri 0..2, 4..5, 8..12 and 15 (odd start, 32 B into a 64 B beat)
+    val visibleTile0 = Set(0, 1, 2, 4, 5, 8, 9, 10, 11, 12, 15)
+    writeTile(vbBaseAddr, 0, tiles, N, visibleTile0)
+    writeTile(vbBaseAddr, 1, tiles, N, Set(0, 1))
 
-    val visibilityMaskTile0 = Array(
-      true, true, true, // 0, 1, 2
-      false, // 3
-      true, true, // 4, 5
-      false, false, // 6, 7
-      true, true, true, true, true, // 8, 9, 10, 11, 12 (5 contiguous triangles!)
-      false, false, // 13, 14
-      true // 15
-    )
-
-    for (i <- 0 until N) {
-      var wordVal: BigInt = 0
-      if (visibilityMaskTile0(i)) {
-        wordVal |= 1 // bit 0 set
-      }
-      if (i < 2) {
-        wordVal |= 2 // bit 1 set for triangles 0 and 1
-      }
-      vbMemory.setWord64(vbBaseAddr + (i * 8), wordVal)
-    }
-
-    // Enable IRQ and Auto-Advance in CTRL (IRQ_EN=1, AUTO_ADV_EN=1): 0x0D
     println("Triggering START for Tile 0...")
-    apbDriver.write(0x00, 0x0d)
-
-    var timeout = 500
-    var done = false
-    while (!done && timeout > 0) {
-      dut.clockDomain.waitSampling(5)
-      val status = apbDriver.read(0x04)
-      done = (status & 0x02) != 0 // Bit 1 = DONE
-      timeout -= 1
-    }
-
-    assert(done, "Timeout waiting for DMA tile transfer completion!")
+    apbDriver.write(0x00, StartAuto)
+    waitDone("tile 0")
     println("Tile 0 transfer completed!")
 
     // Verify interrupt and ready
     assert(dut.io.irq.toBoolean, "Error: IRQ output must be high upon completion!")
     assert(dut.io.ready.toBoolean, "Error: ready output must be high when idle!")
 
-    // Read status counters
-    val visCount = apbDriver.read(0x24)
-    val cmdCount = apbDriver.read(0x28)
-    val stsCount = apbDriver.read(0x2c)
-    println(f"STAT_VIS: $visCount, STAT_CMD: $cmdCount, STAT_STS: $stsCount")
-    println("Verifying issued DataMover commands (Unchunked):")
-    for ((cmd, idx) <- dmResponder.receivedCommands.zipWithIndex) {
-      println(f"  Cmd $idx: Addr = 0x${cmd.saddr}%08X, BTT = ${cmd.btt} bytes (${cmd.btt / triBytes} triangles)")
-    }
-    assert(visCount == 11, f"Expected 11 visible triangles, got $visCount")
-    assert(cmdCount == 4, f"Expected 4 DataMover commands, got $cmdCount")
-    assert(stsCount == 4, f"Expected 4 DataMover status responses, got $stsCount")
-
-    expectCmd(0, startTri = 0, count = 3)
-    expectCmd(1, startTri = 4, count = 2)
-    expectCmd(2, startTri = 8, count = 5) // 5 triangles in a SINGLE command
-    expectCmd(3, startTri = 15, count = 1) // Odd triangle: half-aligned start
+    val testTwo = Seq((0, 3), (4, 2), (8, 5), (15, 1))
+    assert(expectedCommands(N, visibleTile0, 4096) == testTwo, "The reference disagrees with the test")
+    checkTile("Tile 0", testTwo, 11, triBaseAddr)
 
     println("=================================================================")
     println("Test 3: Tile Auto-Advancement to Tile 1")
@@ -320,141 +339,210 @@ object AxiVisibilityDmaSim extends App {
     println(f"Current TILE_INDEX after auto-advance: $curTileIdx (Expected 1)")
     assert(curTileIdx == 1, f"Expected TILE_INDEX == 1, got $curTileIdx")
 
-    // Clear DONE and IRQ (Write 1 to clear)
-    apbDriver.write(0x04, 0x0a)
-    apbDriver.write(0x70, 0x07) // INTR_INT_RAW W1C (done, error, frame_done) drives io.irq
-    dut.clockDomain.waitSampling(2)
+    clearDone()
     assert(!dut.io.irq.toBoolean, "Error: IRQ should be deasserted after W1C clear!")
 
-    dmResponder.receivedCommands.clear()
-
     println("Triggering START for Tile 1...")
-    apbDriver.write(0x00, 0x0d)
-
-    timeout = 500
-    done = false
-    while (!done && timeout > 0) {
-      dut.clockDomain.waitSampling(5)
-      val status = apbDriver.read(0x04)
-      done = (status & 0x02) != 0
-      timeout -= 1
-    }
-    assert(done, "Timeout waiting for Tile 1 transfer completion!")
-    println("Tile 1 transfer completed!")
-
-    val visCountTile1 = apbDriver.read(0x24)
-    val cmdCountTile1 = apbDriver.read(0x28)
-    println(f"Tile 1 STAT_VIS: $visCountTile1, STAT_CMD: $cmdCountTile1")
-    assert(visCountTile1 == 2, f"Expected 2 visible triangles in Tile 1, got $visCountTile1")
-    assert(cmdCountTile1 == 1, f"Expected 1 merged command in Tile 1, got $cmdCountTile1")
-    expectCmd(0, startTri = 0, count = 2)
-
-    val nextTileIdx = apbDriver.read(0x1c)
-    println(f"Current TILE_INDEX after second auto-advance: $nextTileIdx (Expected 2)")
-    assert(nextTileIdx == 2, f"Expected TILE_INDEX == 2, got $nextTileIdx")
+    apbDriver.write(0x00, StartAuto)
+    waitDone("tile 1")
+    checkTile("Tile 1", Seq((0, 2)), 2, triBaseAddr)
+    assert(apbDriver.read(0x1c) == 2, "Expected TILE_INDEX == 2")
 
     println("=================================================================")
-    println("Test 4: Odd Triangle Count (N = 13) with 128-bit AXI Master")
+    println("Test 4: Partial Last Beat (N = 13), the Noise Past It Ignored")
     println("=================================================================")
-    // Clear DONE and IRQ
-    apbDriver.write(0x04, 0x0a)
-    apbDriver.write(0x70, 0x07) // INTR_INT_RAW W1C (done, error, frame_done) drives io.irq
-    dut.clockDomain.waitSampling(2)
-
+    clearDone()
     val oddN = 13
     apbDriver.write(0x18, oddN) // TRI_COUNT = 13
-    dmResponder.receivedCommands.clear()
 
-    // Visibility pattern for Tile 2 (bit 2):
-    // Tri 0..1: Visible (2 consecutive)  -> Cmd 0: BTT = 2 * 96 = 192B
-    // Tri 2:    Invisible
-    // Tri 3..6: Visible (4 consecutive)  -> Cmd 1: Addr = base + 288 (odd start, half aligned), BTT = 384B
-    // Tri 7..11: Invisible
-    // Tri 12:   Visible (odd last tri)   -> Cmd 2: BTT = 1 * 96 = 96B
-    val visibilityMaskTile2 = Array(
-      true, true, // 0, 1
-      false, // 2
-      true, true, true, true, // 3, 4, 5, 6
-      false, false, false, false, false, // 7..11
-      true // 12 (last triangle)
-    )
-
-    for (i <- 0 until oddN) {
-      val wordVal: BigInt = if (visibilityMaskTile2(i)) (BigInt(1) << 2) else BigInt(0)
-      vbMemory.setWord64(vbBaseAddr + (i * 8), wordVal)
-    }
-
-    println("Triggering START for Tile 2 (Odd N = 13)...")
-    apbDriver.write(0x00, 0x0d)
-
-    timeout = 500
-    done = false
-    while (!done && timeout > 0) {
-      dut.clockDomain.waitSampling(5)
-      val status = apbDriver.read(0x04)
-      done = (status & 0x02) != 0
-      timeout -= 1
-    }
-    assert(done, "Timeout waiting for Tile 2 transfer completion!")
-    println("Tile 2 transfer completed!")
-
-    val visCountTile2 = apbDriver.read(0x24)
-    val cmdCountTile2 = apbDriver.read(0x28)
-    println(f"Tile 2 STAT_VIS: $visCountTile2, STAT_CMD: $cmdCountTile2")
-    assert(visCountTile2 == 7, f"Expected 7 visible triangles in Tile 2, got $visCountTile2")
-    assert(cmdCountTile2 == 3, f"Expected 3 commands in Tile 2, got $cmdCountTile2")
-    expectCmd(0, startTri = 0, count = 2)
-    expectCmd(1, startTri = 3, count = 4)
-    expectCmd(2, startTri = 12, count = 1)
-
-    val finalTileIdx = apbDriver.read(0x1c)
-    println(f"Current TILE_INDEX after third auto-advance: $finalTileIdx (Expected 3)")
-    assert(finalTileIdx == 3, f"Expected TILE_INDEX == 3, got $finalTileIdx")
+    // The last run reaches N: it closes there, whatever follows in the bits
+    writeTile(vbBaseAddr, 2, tiles, oddN, Set(0, 1, 3, 4, 5, 6, 12))
+    apbDriver.write(0x00, StartAuto)
+    waitDone("tile 2")
+    checkTile("Tile 2", Seq((0, 2), (3, 4), (12, 1)), 7, triBaseAddr)
+    assert(apbDriver.read(0x1c) == 3, "Expected TILE_INDEX == 3")
 
     println("=================================================================")
     println("Test 5: BTT_LIMIT = 2 triangles splits a 5-triangle run starting on an odd triangle")
     println("=================================================================")
-    apbDriver.write(0x04, 0x0a)
-    apbDriver.write(0x70, 0x07)
-    dut.clockDomain.waitSampling(2)
-
+    clearDone()
     val limitN = 8
-    val btlLimit = 2
-    val visibleTile3 = (1 to 5).toSet // Tri 1..5 visible on tile 3 (bit 3)
     apbDriver.write(0x18, limitN)
-    apbDriver.write(0x20, btlLimit) // BTT_LIMIT is a triangle count
-    dmResponder.receivedCommands.clear()
+    apbDriver.write(0x20, 2) // BTT_LIMIT is a triangle count
+    writeTile(vbBaseAddr, 3, tiles, limitN, Set(1, 2, 3, 4, 5))
+    apbDriver.write(0x00, StartAuto)
+    waitDone("tile 3")
+    checkTile("Tile 3", Seq((1, 2), (3, 2), (5, 1)), 5, triBaseAddr)
 
-    for (i <- 0 until limitN) {
-      val wordVal: BigInt = if (visibleTile3.contains(i)) (BigInt(1) << 3) else BigInt(0)
-      vbMemory.setWord64(vbBaseAddr + (i * 8), wordVal)
+    println("=================================================================")
+    println("Test 6: Randomized against a Software Reference")
+    println("=================================================================")
+    // Runs of random lengths, some past a beat or a chunk; density the share of visible ones
+    def randomRuns(n: Int, density: Double, meanRun: Int): Array[Boolean] = {
+      val bits = new Array[Boolean](n)
+      var i = 0
+      while (i < n) {
+        val length = 1 + rng.nextInt(2 * meanRun)
+        val gap = 1 + rng.nextInt((2 * meanRun * (1 - density) / density).toInt max 1)
+        for (j <- i until ((i + length) min n)) bits(j) = true
+        i += length + gap
+      }
+      bits
     }
 
-    apbDriver.write(0x00, 0x0d)
-    timeout = 500
-    done = false
-    while (!done && timeout > 0) {
+    def pattern(n: Int): (String, Array[Boolean]) = rng.nextInt(7) match {
+      case 0 => ("empty", new Array[Boolean](n))
+      case 1 => ("full", Array.fill(n)(true))
+      case 2 => ("0101", Array.tabulate(n)(_ % 2 == 1))
+      case 3 => ("sparse", randomRuns(n, 0.02, 20))
+      case 4 => ("short runs", randomRuns(n, 0.3, 3))
+      case 5 => ("past a beat", randomRuns(n, 0.5, 300))
+      case 6 => ("past a chunk", randomRuns(n, 0.8, 20000))
+    }
+
+    val sizes = Seq(1, 2, 7, 8, 9, 127, 128, 129, 255, 256, 257, 4096, 32767, 32768, 32769, 70000)
+    val tileCounts = Seq(1, 7, 60, 64)
+    val limits = Seq(0, 1, 3, 127, 128, 129, 300, config.defaultBttLimit, config.maxBttTriangles, 6000)
+    var cases = 0
+    var issued = 0L
+
+    for (round <- 0 until 80) {
+      val n = sizes(round % sizes.size)
+      val count = tileCounts(rng.nextInt(tileCounts.size))
+      // 4 KiB aligned, not 256 KiB: the tile's page is added, not concatenated
+      val base = vbBaseAddr + (rng.nextInt(1 << 12).toLong << 12)
+      val triBase = triBaseAddr + (rng.nextInt(1 << 16).toLong * config.triAlignBytes)
+      val (name, bits) = pattern(n)
+      val visible = bits.count(identity)
+      // Limits a full row would take thousands of commands with are for the short rows
+      val usable = limits.filter(l => n <= 4096 || l == 0 || l >= 128)
+      val requested = if (round % 3 == 0) config.defaultBttLimit else usable(rng.nextInt(usable.size))
+      val limit = if (requested == 0 || requested > config.maxBttTriangles) config.maxBttTriangles else requested
+      val gaps = if (round % 4 == 3) 30 else 0
+      vbMemory.gapPercent = gaps
+      dmResponder.gapPercent = gaps
+
+      apbDriver.write(0x08, base)
+      apbDriver.write(0x10, triBase)
+      apbDriver.write(0x18, n)
+      apbDriver.write(0x20, requested)
+      apbDriver.write(0x38, count)
+
+      val auto = round % 5 == 0 && n <= 4096
+      if (auto) {
+        // A frame: every tile in turn, the same bits, ending in FRAME_DONE and TILE_INDEX back at 0
+        apbDriver.write(0x1c, 0)
+        for (tile <- 0 until count) writeTile(base, tile, count, n, bits)
+        for (tile <- 0 until count) {
+          apbDriver.write(0x00, StartAuto)
+          waitDone(s"round $round tile $tile")
+          checkTile(s"round $round ($name, N $n, limit $limit, tile $tile of $count)",
+            expectedCommands(n, bits, limit), visible, triBase)
+          issued += expectedCommands(n, bits, limit).size
+          val status = apbDriver.read(0x04)
+          assert(((status & 0x10) != 0) == (tile == count - 1), s"FRAME_DONE at tile $tile of $count")
+          assert(apbDriver.read(0x1c) == (tile + 1) % count, "TILE_INDEX after the tile")
+          clearDone()
+        }
+      } else {
+        // CPU mode: a few tiles in any order, the others' bits noise
+        for (tile <- rng.shuffle((0 until count).toList).take(3)) {
+          writeTile(base, tile, count, n, bits)
+          apbDriver.write(0x1c, tile)
+          apbDriver.write(0x00, StartCpu)
+          waitDone(s"round $round tile $tile")
+          checkTile(s"round $round ($name, N $n, limit $limit, tile $tile of $count)",
+            expectedCommands(n, bits, limit), visible, triBase)
+          issued += expectedCommands(n, bits, limit).size
+          assert(apbDriver.read(0x1c) == tile, "TILE_INDEX moved in CPU mode")
+          clearDone()
+        }
+      }
+      vbMemory.memory.clear()
+      cases += 1
+    }
+    vbMemory.gapPercent = 0
+    dmResponder.gapPercent = 0
+    println(s"$cases cases, $issued commands")
+
+    println("=================================================================")
+    println("Test 7: Throughput")
+    println("=================================================================")
+    def perfOf(n: Int, visible: Int => Boolean): Long = {
+      writeTile(vbBaseAddr, 0, 1, n, visible)
+      apbDriver.write(0x08, vbBaseAddr)
+      apbDriver.write(0x10, triBaseAddr)
+      apbDriver.write(0x18, n)
+      apbDriver.write(0x1c, 0)
+      apbDriver.write(0x20, 0)
+      apbDriver.write(0x38, 1)
+      apbDriver.write(0x00, StartCpu)
+      waitDone("the throughput tile")
+      val perf = apbDriver.read(0x34)
+      dmResponder.receivedCommands.clear()
+      clearDone()
+      perf
+    }
+
+    apbDriver.write(0x00, 0x10) // CNT_CLEAR
+    dut.clockDomain.waitSampling(16)
+
+    val beats = 1000
+    val perfEmpty = perfOf(beats * 128, _ => false)
+    val perfFull = perfOf(beats * 128, _ => true)
+    val perfRuns = perfOf(beats * 128, i => i % 1280 < 16) // A run every 10 beats, in the sim's fast DataMover
+    println(s"$beats beats: empty $perfEmpty clocks, full $perfFull, a run every 10 beats $perfRuns")
+    assert(perfEmpty <= beats + 40, s"An empty tile took $perfEmpty clocks")
+    assert(perfFull <= beats + 80, s"A full tile took $perfFull clocks") // 24 commands
+    assert(perfRuns <= beats + 40 + (beats / 10) * 12, s"A tile of short runs took $perfRuns clocks")
+
+    println("=================================================================")
+    println("Test 8: Stall Counters")
+    println("=================================================================")
+    dut.clockDomain.waitSampling(32)
+    val busy = apbDriver.read(0x40)
+    val commands = apbDriver.read(0x58)
+    val expectedRuns = expectedCommands(beats * 128, _ => true, config.maxBttTriangles).size + beats / 10
+    println(s"CNT_BUSY $busy, CNT_CMDS $commands")
+    assert(busy == perfEmpty + perfFull + perfRuns, s"CNT_BUSY $busy, the tiles' PERF ${perfEmpty + perfFull + perfRuns}")
+    assert(commands == expectedRuns, s"CNT_CMDS $commands, expected $expectedRuns")
+    assert(apbDriver.read(0x44) + apbDriver.read(0x48) + apbDriver.read(0x4c) <= busy, "Waits past the busy cycles")
+    apbDriver.write(0x00, 0x10)
+    dut.clockDomain.waitSampling(16)
+    for (address <- 0x40 to 0x58 by 4) assert(apbDriver.read(address) == 0, f"Counter 0x$address%02X after CNT_CLEAR")
+
+    println("=================================================================")
+    println("Test 9: SOFT_RESET Mid-Tile")
+    println("=================================================================")
+    val resetN = 40000
+    dmResponder.stalled = true // Commands pile up: the scan and the reads stop part way
+    vbMemory.gapPercent = 20
+    writeTile(vbBaseAddr, 0, 1, resetN, i => i % 4 == 0)
+    apbDriver.write(0x18, resetN)
+    apbDriver.write(0x00, StartCpu)
+    dut.clockDomain.waitSampling(2000)
+    assert((apbDriver.read(0x04) & 0x01) != 0, "Expected the DMA busy on a stalled tile")
+    apbDriver.write(0x00, 0x02) // SOFT_RESET
+    var settle = 20000
+    while ((apbDriver.read(0x04) & 0x01) != 0 && settle > 0) {
       dut.clockDomain.waitSampling(5)
-      done = (apbDriver.read(0x04) & 0x02) != 0
-      timeout -= 1
+      settle -= 1
     }
-    assert(done, "Timeout waiting for Tile 3 transfer completion!")
+    assert(settle > 0, "SOFT_RESET left the DMA busy")
+    dmResponder.stalled = false
+    vbMemory.gapPercent = 0
+    dut.clockDomain.waitSampling(200)
+    dmResponder.receivedCommands.clear()
+    dmResponder.stsQueue.clear()
 
-    // Every command must be <= limit, triangle aligned, and together cover exactly the visible set in order
-    val covered = mutable.ArrayBuffer[Int]()
-    for ((cmd, idx) <- dmResponder.receivedCommands.zipWithIndex) {
-      val offset = cmd.saddr - triBaseAddr
-      println(f"  Cmd $idx: Addr = 0x${cmd.saddr}%08X (tri ${offset / triBytes}), BTT = ${cmd.btt} bytes")
-      assert(offset % triBytes == 0, f"Cmd $idx SADDR not on a triangle boundary")
-      assert(cmd.btt % triBytes == 0 && cmd.btt > 0, f"Cmd $idx BTT ${cmd.btt} not a multiple of $triBytes")
-      assert(cmd.btt / triBytes <= btlLimit, f"Cmd $idx exceeds BTT_LIMIT ($btlLimit triangles)")
-      covered ++= (offset / triBytes).toInt until (offset / triBytes + cmd.btt / triBytes).toInt
-    }
-    assert(
-      covered == visibleTile3.toSeq.sorted,
-      s"Commands cover triangles $covered, expected ${visibleTile3.toSeq.sorted}"
-    )
-    apbDriver.write(0x20, 0) // Restore BTT_LIMIT (0 = hardware max)
+    // The next tile is whole, with nothing of the last in it
+    clearDone()
+    val afterN = 1000
+    writeTile(vbBaseAddr, 0, 1, afterN, i => i % 100 < 10)
+    apbDriver.write(0x18, afterN)
+    apbDriver.write(0x00, StartCpu)
+    waitDone("the tile after SOFT_RESET")
+    checkTile("after SOFT_RESET", expectedCommands(afterN, i => i % 100 < 10, config.maxBttTriangles), 100, triBaseAddr)
 
     println("=================================================================")
     println("ALL TESTS PASSED SUCCESSFULLY!")

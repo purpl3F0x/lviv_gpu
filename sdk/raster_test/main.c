@@ -42,8 +42,7 @@
 #define GPU_BASEADDR GPU_CTRL_BASEADDR
 #endif
 
-// The GPU's frame, shown on the DP output as it is: at most 64 tiles, a bit each in a triangle's
-// visibility word.
+// The GPU's frame, shown on the DP output as it is.
 #define WIDTH 1280
 #define HEIGHT 720
 #define TILES_X (WIDTH / GPU_TILE_SIZE)
@@ -68,7 +67,7 @@
 #define FRAGMENT_COLOR 5
 
 _Static_assert(WIDTH == DP_WIDTH && HEIGHT == DP_HEIGHT, "the frame is shown as it is");
-_Static_assert(TILES <= 64, "more tiles than bits in a visibility word");
+_Static_assert(TILES <= GPU_MAX_TILES, "more tiles than the visibility DMA takes");
 
 typedef enum
 {
@@ -97,7 +96,7 @@ static const corner_t corners[3] = {
 };
 
 static gpu_triangle_t triangle __attribute__((aligned(64)));
-static uint64_t visibility __attribute__((aligned(64)));
+static uint64_t visibility[TILES][4096 / sizeof(uint64_t)] __attribute__((aligned(4096))); // a chunk a tile
 // The frame buffers the DP output takes turns with (dp.h): one on the screen, one on its way there,
 // one drawn into. The GPU writes them and the DPDMA reads them, both behind the CPU's caches: they
 // get 2 MiB blocks of their own (the standalone translation table's for DDR below 4 GiB), not cached
@@ -215,8 +214,8 @@ static void fill_test_pattern(uint32_t *p)
     }
 }
 
-// The record, colored as how says, and its visibility word from its bounding box (bit t set when
-// the box overlaps tile t), as a binner would produce. Returns the tiles it touches.
+// The record, colored as how says, and its visibility from its bounding box (set in tile t when the
+// box overlaps it), as a binner would produce. Returns the tiles it touches.
 static int build_triangle(shade_t how)
 {
     float x0 = corners[0].x, x1 = x0, y0 = corners[0].y, y1 = y0;
@@ -253,12 +252,13 @@ static int build_triangle(shade_t how)
     const int tx0 = (int)max_f(x0, 0) / GPU_TILE_SIZE, tx1 = (int)min_f(x1, WIDTH - 1) / GPU_TILE_SIZE;
     const int ty0 = (int)max_f(y0, 0) / GPU_TILE_SIZE, ty1 = (int)min_f(y1, HEIGHT - 1) / GPU_TILE_SIZE;
     int tiles = 0;
-    visibility = 0;
+    for (int t = 0; t < TILES; t++)
+        visibility[t][0] = 0;
     for (int ty = ty0; ty <= ty1; ty++)
     {
         for (int tx = tx0; tx <= tx1; tx++)
         {
-            visibility |= 1ull << (ty * TILES_X + tx);
+            visibility[ty * TILES_X + tx][0] = 1;
             tiles++;
         }
     }
@@ -316,7 +316,7 @@ static void draw_frame(void)
 {
     gpu_frame_t f = {
         .triangles = &triangle,
-        .visibility = &visibility,
+        .visibility = &visibility[0][0],
         .triangle_count = 1,
         .frame = dp_back(),
         .stride = STRIDE,

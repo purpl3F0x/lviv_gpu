@@ -8,7 +8,7 @@
 //                                                through a clock crossing each)
 //     (renders a frame on one START: the per-tile register writes as the crossbar's second master,
 //      the DMAs' events and the units' idle flags as wires)
-//   visibility DMA ◄── m_axi_vb (PS DDR): one 64-bit tile mask per triangle
+//   visibility DMA ◄── m_axi_vb (PS DDR): the tile's chunks of the visibility bitmap
 //        │ DataMover commands
 //        ▼
 //   triangle DMA (DataMover) ◄── m_axi_tri (PL DDR, 512-bit)

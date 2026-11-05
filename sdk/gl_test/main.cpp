@@ -257,9 +257,9 @@ static void draw_frame(void)
         gpu_vis_dma_counters_t vis;
         gpu_vis_dma_counters(&gpu, &vis);
         xil_printf("  visibility DMA a frame (mem_clk cycles): busy %d; waiting for visibility %d, commands %d, "
-                   "retire %d; triangles starved %d, held by the core %d\r\n",
+                   "retire %d; triangles starved %d, held by the core %d; %d commands\r\n",
                    (int)(vis.busy / n), (int)(vis.vb_wait / n), (int)(vis.cmd_wait / n), (int)(vis.retire_wait / n),
-                   (int)(vis.tri_starved / n), (int)(vis.tri_backpressure / n));
+                   (int)(vis.tri_starved / n), (int)(vis.tri_backpressure / n), (int)(vis.commands / n));
         gpu_vis_dma_counters_clear(&gpu);
         frames_drawn = frame_us = frame_us2 = front_us = cp_cycles = tile_cycles = 0;
         period_start = now;

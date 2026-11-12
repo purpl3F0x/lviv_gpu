@@ -41,8 +41,10 @@ typedef struct
     uint32_t *texels; // Morton order, in the pool
 } texture_t;
 
-// Read by the GPU's texture caches
-static uint32_t texture_pool[LVIV_GL_TEXTURE_BYTES / 4] __attribute__((aligned(4096)));
+// Read by the GPU's texture caches. Each texture goes at a multiple of its own size, so the
+// textures' LVIV_GL_TEXTURE_BYTES start at the pool's first multiple of the largest's (gl.pool)
+#define TEXTURE_ALIGN (4u << (2 * TEXTURE_MAX_LOG2))
+static uint32_t texture_pool[(LVIV_GL_TEXTURE_BYTES + TEXTURE_ALIGN - 4096) / 4] __attribute__((aligned(4096)));
 
 static struct
 {
@@ -88,7 +90,7 @@ static struct
 
     texture_t textures[TEXTURES];
     GLuint bound; // a GL name, 0 none
-    uint8_t *pool_next;
+    uint8_t *pool, *pool_next;
 } gl;
 
 static void set_error(GLenum error)
@@ -232,7 +234,8 @@ int lviv_gl_init(gpu_t *gpu, int width, int height, void *frame_memory, size_t f
     gl.state.global_ambient = (lviv_vec3_t){0.2f, 0.2f, 0.2f};
     gl.normal = (lviv_vec3_t){0, 0, 1};
     gl.color = 0xFFFFFFFFu;
-    gl.pool_next = (uint8_t *)texture_pool;
+    gl.pool = (uint8_t *)(((uintptr_t)texture_pool + TEXTURE_ALIGN - 1) & ~(uintptr_t)(TEXTURE_ALIGN - 1));
+    gl.pool_next = gl.pool;
     update_state();
     return 0;
 }
@@ -1134,7 +1137,7 @@ void glDeleteTextures(GLsizei n, const GLuint *textures)
             gl.bound = 0;
         memset(&gl.textures[name - 1], 0, sizeof gl.textures[name - 1]);
     }
-    gl.pool_next = (uint8_t *)texture_pool;
+    gl.pool_next = gl.pool;
     for (int t = 0; t < TEXTURES; t++)
     {
         const texture_t *texture = &gl.textures[t];
@@ -1214,7 +1217,7 @@ static texture_t *texture_memory(GLsizei width, GLsizei height, GLint border, co
     if (!t->loaded || t->log2_size != *log2_size)
     {
         const uintptr_t at = ((uintptr_t)gl.pool_next + bytes - 1) & ~(bytes - 1);
-        if (at + bytes > (uintptr_t)texture_pool + sizeof texture_pool)
+        if (at + bytes > (uintptr_t)gl.pool + LVIV_GL_TEXTURE_BYTES)
         {
             set_error(GL_OUT_OF_MEMORY);
             return NULL;

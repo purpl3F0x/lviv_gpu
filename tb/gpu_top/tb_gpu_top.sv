@@ -19,7 +19,7 @@ import gpu_types_pkg::*;
 //   5. a second write-back of the first tile must read the clear color everywhere
 //
 // Every triangle that reaches the core is checked against the next one the tile should get, so the
-// visibility DMA, the DataMover (its simulation model), triangle_stream_adapter and the clock
+// visibility DMA, the triangle DMA, triangle_stream_adapter and the clock
 // crossing are checked end to end; in the command processor's frame the tile comes from the
 // frontend's box (BB_MIN), which it sets before the tile's triangles. The image (the command
 // processor's) is written to +OUT (default gpu_top.tga), and make compares it with raster_sw's.

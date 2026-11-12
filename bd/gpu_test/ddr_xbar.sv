@@ -257,15 +257,15 @@ module ddr_xbar #(
       .m_axi_rd(xbar_s[2])
   );
 
-  // The L2: 8 threads, one per line in flight; the DMA and the adapter: one each
+  // The L2: 8 threads, one per line in flight; the DMA: 32 bursts; the adapter: one
   taxi_axi_crossbar #(
       .S_COUNT     (3),
       .M_COUNT     (1),
       .ADDR_W      (AddrW),
       .S_THREADS   ({32'd1, 32'd1, 32'd8}),
-      .S_ACCEPT    ({32'd2, 32'd2, 32'd8}),
+      .S_ACCEPT    ({32'd2, 32'd32, 32'd8}),
       .M_ADDR_W    (32'd32),
-      .M_ISSUE     (32'd16),
+      .M_ISSUE     (32'd64),
       .S_R_REG_TYPE(S_R_SKID ? {3{2'd2}} : {3{2'd0}}),
       .M_W_REG_TYPE(2'd0),
       .M_R_REG_TYPE(2'd2)

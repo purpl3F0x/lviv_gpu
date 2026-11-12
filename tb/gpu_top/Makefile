@@ -1,4 +1,4 @@
-# gpu_top with its raster core, on Verilator (run in WSL). The DataMover is its simulation model.
+# gpu_top with its raster core, on Verilator (run in WSL).
 VERILATOR = verilator
 MAGICK    = magick
 OBJ_DIR   = obj_dir
@@ -35,9 +35,9 @@ RTL_SRCS = ../../rtl/gpu_types_pkg.sv \
            $(SPINAL_GEN_DIR)/ApbClockCrossing.v \
            $(SPINAL_GEN_DIR)/AxiVisibilityDma.v \
            $(SPINAL_GEN_DIR)/AxiTileDma.v \
+           $(SPINAL_GEN_DIR)/AxiDataMover.v \
            ../../rtl/generated/triangle_unpack.sv \
            ../../rtl/triangle_stream_adapter.sv \
-           ../../rtl/triangle_datamover.sv \
            ../../rtl/gpu_top.sv
 TB_SRCS  = tb_gpu_top.sv ../common/axi_ram.v
 DPI_SRCS = ../../dv/common/dpi_functions.cpp

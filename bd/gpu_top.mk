@@ -30,8 +30,8 @@ GPU_TOP_RTL = ../../rtl/gpu_types_pkg.sv \
               $(SPINAL_GEN_DIR)/ApbClockCrossing.v \
               $(SPINAL_GEN_DIR)/AxiVisibilityDma.v \
               $(SPINAL_GEN_DIR)/AxiTileDma.v \
+              $(SPINAL_GEN_DIR)/AxiDataMover.v \
               ../../rtl/generated/triangle_unpack.sv \
               ../../rtl/triangle_stream_adapter.sv \
-              ../../rtl/triangle_datamover.sv \
               ../../rtl/gpu_top.sv \
               ../gpu_top_bd.v

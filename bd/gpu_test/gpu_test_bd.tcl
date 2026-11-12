@@ -149,7 +149,7 @@ for {set n 0} {$n < 4} {incr n} {
   connect_bd_intf_net [get_bd_intf_pins gpu_0/m_axi_tex$n] [get_bd_intf_pins L2Cache_0/s_axi_$n]
 }
 
-# PL DDR4 through ddr_xbar: the L2 with 8 lines in flight, the triangle DMA and the CPU one burst each
+# PL DDR4 through ddr_xbar: the L2 with 8 lines in flight, the triangle DMA 32 bursts, the CPU one
 connect_bd_intf_net [get_bd_intf_pins gpu_0/m_axi_tri] [get_bd_intf_pins ddr_xbar/s00_axi]
 connect_bd_intf_net [get_bd_intf_pins L2Cache_0/m_axi] [get_bd_intf_pins ddr_xbar/s01_axi]
 connect_bd_intf_net [get_bd_intf_pins $ps/M_AXI_HPM1_FPD] [get_bd_intf_pins ddr_xbar/s02_axi]

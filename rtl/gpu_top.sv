@@ -403,7 +403,7 @@ module gpu_top #(
   logic [  7:0] dm_sts_tdata;
   logic [511:0] tri_stream_tdata;
   logic [ 63:0] tri_stream_tkeep;
-  logic tri_stream_tvalid, tri_stream_tready;
+  logic tri_stream_tvalid, tri_stream_tready, tri_dma_idle;
   frontend_data_in_t adapted_tri, core_tri;
   logic adapted_tri_valid, adapted_tri_ready, core_tri_valid, core_tri_ready;
 
@@ -465,7 +465,7 @@ module gpu_top #(
       .m_tri_data(adapted_tri)
   );
 
-  triangle_datamover u_tri_dma (
+  AxiDataMover u_tri_dma (
       .aclk(mem_clk),
       .aresetn(mem_rst_n),
       .s_cmd_tvalid(vis_cmd_tvalid),
@@ -494,7 +494,8 @@ module gpu_top #(
       .m_axis_tlast(),
       .m_axis_tvalid(tri_stream_tvalid),
       .m_axis_tready(tri_stream_tready),
-      .mm2s_err(tri_dma_err)
+      .mm2s_err(tri_dma_err),
+      .idle(tri_dma_idle)
   );
 
   // Into the core, on the same clock as its frontend: a register slice. The core's own input FIFO
@@ -516,11 +517,11 @@ module gpu_top #(
 
   assign core_tri = frontend_data_in_t'(core_tri_bits);
 
-  // Nothing between the DataMover and the core: the stream and the skid buffer (its valid is set
-  // while it holds either of its two). The adapter holds a triangle for a few cycles, and the core's
+  // The DMA with nothing queued, in flight or buffered, and the skid buffer (its valid is set while
+  // it holds either of its two). The adapter holds a triangle for a few cycles, and the core's
   // input FIFO for a few more until the frontend takes it: the command processor's drain window
   // covers both.
-  assign tri_path_idle = !tri_stream_tvalid && !core_tri_valid;
+  assign tri_path_idle = tri_dma_idle && !core_tri_valid;
 
   //
   // Core

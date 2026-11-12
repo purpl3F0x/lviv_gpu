@@ -51,8 +51,8 @@ GPU_SRCS = ../../rtl/gpu_types_pkg.sv ../../rtl/int_modules.sv ../../rtl/delay_p
            ../../rtl/thread.sv ../../rtl/frame_buffer_ram.sv $(SPINAL_GEN_DIR)/ApbLutRam.v \
            ../../rtl/raster_core.sv $(SPINAL_GEN_DIR)/Axi4ToApbXbar.v $(SPINAL_GEN_DIR)/CommandProcessor.v \
            $(SPINAL_GEN_DIR)/ApbClockCrossing.v $(SPINAL_GEN_DIR)/AxiVisibilityDma.v \
-           $(SPINAL_GEN_DIR)/AxiTileDma.v ../../rtl/generated/triangle_unpack.sv \
-           ../../rtl/triangle_stream_adapter.sv ../../rtl/triangle_datamover.sv ../../rtl/gpu_top.sv
+           $(SPINAL_GEN_DIR)/AxiTileDma.v $(SPINAL_GEN_DIR)/AxiDataMover.v ../../rtl/generated/triangle_unpack.sv \
+           ../../rtl/triangle_stream_adapter.sv ../../rtl/gpu_top.sv
 SCENE_L2   = $(if $(NO_L2),,$(RTL_SRCS))
 SCENE_DIR  = obj_scene_$(if $(NO_L2),none,default)
 SCENE_TAG ?= scene

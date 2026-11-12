@@ -115,16 +115,3 @@ set_property -dict [list \
     CONFIG.Operation_Type {Float_to_fixed} \
     CONFIG.Result_Precision_Type {Custom}] [get_ips xil_fp_to_fx2_23]
 
-# Triangle DMA: MM2S only, 512-bit memory and stream. No DRE: gpu_top aligns every command to
-# 64 bytes and drops the leading half beat itself. 8 bursts in flight (3 by default): no more BRAM,
-# the store and forward FIFO's 256 beats fit its 512-deep blocks.
-create_ip -name axi_datamover -vendor xilinx.com -library ip -version 5.1 -module_name xil_triangle_datamover
-set_property -dict [list \
-    CONFIG.c_enable_s2mm {0} \
-    CONFIG.c_m_axi_mm2s_data_width {512} \
-    CONFIG.c_m_axis_mm2s_tdata_width {512} \
-    CONFIG.c_mm2s_btt_used {19} \
-    CONFIG.c_mm2s_burst_size {16} \
-    CONFIG.c_mm2s_addr_pipe_depth {8} \
-    CONFIG.c_include_mm2s_dre {false}] [get_ips xil_triangle_datamover]
-

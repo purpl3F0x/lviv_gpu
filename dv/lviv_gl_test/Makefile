@@ -11,7 +11,8 @@
 #
 # sw_raster's SIMD (sw_simd.h): on an x86-64 host AVX2 with FMA, SW_SIMD_FLAGS; for another, after
 # make clean, e.g. SW_SIMD_FLAGS=-DSW_RASTER_SIMD=1 (GCC's vector extensions, NEON's 4 lanes) or 0
-# (none). An AArch64 host has NEON as it is.
+# (none). An AArch64 host has NEON as it is. lviv_mip's resizer (stb_image_resize2) gets the same
+# flags: its AVX2 code with them, SSE2 without.
 
 CC = gcc
 CXX = g++
@@ -28,9 +29,9 @@ CXXFLAGS = -O2 -std=c++17 -Wall -Wextra -fno-exceptions -DGLM_FORCE_INTRINSICS -
 # The glTF loader (sdk/gltf) on fastgltf and simdjson, patched or not: their patches change nothing
 # on the host; its textures' images decoded by stb_image (SSE2 here). The frames' PNGs written by
 # stb_image_write, in main.c.
-OBJS = main.o sw_raster.o gl_api.o lviv_geom.o gltf_scene.o stb_image.o fastgltf.o base64.o io.o simdjson.o
-HDRS = ../../sdk/lviv_gl/lviv_geom.h ../../sdk/lviv_gl/lviv_gl.h ../../sdk/gltf/gltf_scene.h ../../sdk/src/gpu.h \
-       sw_raster.h sw_simd.h
+OBJS = main.o sw_raster.o gl_api.o lviv_geom.o lviv_mip.o gltf_scene.o stb_image.o fastgltf.o base64.o io.o simdjson.o
+HDRS = ../../sdk/lviv_gl/lviv_geom.h ../../sdk/lviv_gl/lviv_gl.h ../../sdk/lviv_gl/lviv_mip.h \
+       ../../sdk/gltf/gltf_scene.h ../../sdk/src/gpu.h sw_raster.h sw_simd.h
 ifneq ($(findstring x86_64,$(shell $(CC) -dumpmachine)),)
 SW_SIMD_FLAGS = -mavx2 -mfma
 ifeq ($(OS),Windows_NT)
@@ -39,7 +40,7 @@ ifeq ($(OS),Windows_NT)
 SW_SIMD_FLAGS += -Wa,-muse-unaligned-vector-move
 endif
 endif
-sw_raster.o: CFLAGS += $(SW_SIMD_FLAGS)
+sw_raster.o lviv_mip.o: CFLAGS += $(SW_SIMD_FLAGS)
 FRAMES = 300
 MODEL = ../../sdk/sdcard/suzanne.glb
 SUBMODULES = $(GLM)/glm/glm.hpp $(FASTGLTF)/include/fastgltf/core.hpp $(SIMDJSON)/simdjson.h $(STB)/stb_image.h

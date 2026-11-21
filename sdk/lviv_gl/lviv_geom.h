@@ -23,6 +23,7 @@ extern "C"
 #define LVIV_TILE_SIZE 128
 #define LVIV_MAX_TILES 64 // bits in a tile mask
 #define LVIV_MAX_LIGHTS 8 // GL_LIGHT0 to GL_LIGHT7 (GL's GL_MAX_LIGHTS)
+#define LVIV_MIP_LEVELS 3 // a texture's smaller levels, each half the one before
 
 // Vectors and matrices in C. Matrices are column-major, as OpenGL's (and GLM's).
 typedef struct
@@ -117,6 +118,9 @@ typedef struct
     int lrz;
     // The record's render state (gpu_types_pkg.sv encodings)
     uint8_t tex_id, texture_mode, texture_function, blend, depth_func;
+    // The texture's size and its mip levels, each a texture table entry: level k's at mip_id[k - 1].
+    // A triangle is drawn from the level whose texels are nearest its pixels in size.
+    uint8_t tex_log2, mip_levels, mip_id[LVIV_MIP_LEVELS];
 } lviv_state_t;
 
 // A frame being built
@@ -143,6 +147,24 @@ void lviv_geom_matrices(lviv_geom_t *g, const lviv_state_t *s);
 
 void lviv_geom_triangle(lviv_geom_t *g, const lviv_state_t *s, const lviv_vertex_t *v0, const lviv_vertex_t *v1,
                         const lviv_vertex_t *v2);
+
+// A vertex through the pipeline once, for the triangles that share it: lit when the first of them
+// is kept
+typedef struct
+{
+    lviv_vertex_t in;
+    lviv_vec4_t clip;   // clip space
+    lviv_vec4_t screen; // if inside: x, y in pixels from the top left, z in [0, 1], w = 1 / clip w
+    int32_t qx, qy;     // and its x, y in the GPU frontend's fixed point
+    uint32_t color;     // its own, or lit
+    uint8_t inside;     // every clip plane
+    uint8_t lit;
+} lviv_shaded_t;
+
+void lviv_geom_vertex(const lviv_geom_t *g, const lviv_state_t *s, const lviv_vertex_t *v, lviv_shaded_t *shaded);
+// lviv_geom_triangle for three of them, with the state they were made with
+void lviv_geom_shaded_triangle(lviv_geom_t *g, const lviv_state_t *s, lviv_shaded_t *v0, lviv_shaded_t *v1,
+                               lviv_shaded_t *v2);
 
 #ifdef __cplusplus
 }

@@ -44,7 +44,8 @@ int gltf_scene_has_camera(const gltf_scene_t *scene);
 
 // GL's state for it, before drawing it: the camera's projection for a width x height viewport,
 // the lights, lighting, the depth test (less), vertex and normal arrays; and, the first time, its
-// textures in lviv_gl's memory, the largest halved until they all fit (none, if not at 1 x 1)
+// textures in lviv_gl's memory, with mip levels, the largest halved until they all fit (none, if
+// not at 1 x 1)
 void gltf_scene_setup(gltf_scene_t *scene, int width, int height);
 
 // A frame of it: glClear, the camera's view, the lights' positions, then each primitive with its

@@ -698,6 +698,7 @@ static void setup_textures(gltf_scene_t *scene)
                 fit = false;
                 break;
             }
+            glGenerateMipmap(GL_TEXTURE_2D);
         }
         if (fit)
             break;

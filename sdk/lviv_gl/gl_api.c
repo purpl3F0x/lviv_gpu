@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "lviv_geom.h"
+#include "lviv_mip.h"
 
 // Capacities: the texture memory, the matrix stacks (GL's minimums). The triangles a frame keeps
 // (after clipping, culling and binning) are as many as the platform's frame memory holds
@@ -17,6 +18,7 @@
 // The GPU's texture table (gpu_map.h's GPU_TEXTURES, GPU_TEXTURE_MAX_LOG2); GL names are 1 more
 #define TEXTURES 128
 #define TEXTURE_MAX_LOG2 11
+#define MIP_MIN_LOG2 3 // the smallest mip level: a texture cache line, 8 x 8 texels
 
 // The record's encodings (gpu_types_pkg.sv)
 #define FRAGMENT_COLOR 5
@@ -39,12 +41,19 @@ typedef struct
     int tile_s, tile_t; // GL_REPEAT, else clamp
     uint32_t log2_size;
     uint32_t *texels; // Morton order, in the pool
+    // glGenerateMipmap: its smaller levels (build_mipmaps), each with a table entry of its own;
+    // stale: of the texels it had before
+    int mipmap, levels, stale;
+    uint8_t level_id[LVIV_MIP_LEVELS];
+    uint32_t *level_texels[LVIV_MIP_LEVELS];
 } texture_t;
 
 // Read by the GPU's texture caches. Each texture goes at a multiple of its own size, so the
-// textures' LVIV_GL_TEXTURE_BYTES start at the pool's first multiple of the largest's (gl.pool)
+// textures' LVIV_GL_TEXTURE_BYTES start at the pool's first multiple of the largest's (gl.pool);
+// after them their mip levels' MIP_BYTES, a third: the most they take
 #define TEXTURE_ALIGN (4u << (2 * TEXTURE_MAX_LOG2))
-static uint32_t texture_pool[(LVIV_GL_TEXTURE_BYTES + TEXTURE_ALIGN - 4096) / 4] __attribute__((aligned(4096)));
+#define MIP_BYTES (LVIV_GL_TEXTURE_BYTES / 3)
+static uint32_t texture_pool[(LVIV_GL_TEXTURE_BYTES + MIP_BYTES + TEXTURE_ALIGN) / 4] __attribute__((aligned(4096)));
 
 static struct
 {
@@ -90,7 +99,10 @@ static struct
 
     texture_t textures[TEXTURES];
     GLuint bound; // a GL name, 0 none
-    uint8_t *pool, *pool_next;
+    // Where the next texture goes, and the next mip level
+    uint8_t *pool, *pool_next, *mip_next;
+    uint8_t level_entry[TEXTURES]; // the table entries that hold a mip level
+    int mips_dirty;                // levels to build when the next frame starts
 } gl;
 
 static void set_error(GLenum error)
@@ -167,9 +179,16 @@ static void update_state(void)
                         : (uint8_t)(1u << GPU_SFACTOR_OP_SHIFT);
 
     const texture_t *t = gl.bound ? &gl.textures[gl.bound - 1] : NULL;
+    s->mip_levels = 0;
     if (gl.texture_2d && t && t->loaded)
     {
         s->tex_id = (uint8_t)(gl.bound - 1);
+        s->tex_log2 = (uint8_t)t->log2_size;
+        if (!t->stale)
+        {
+            s->mip_levels = (uint8_t)t->levels;
+            memcpy(s->mip_id, t->level_id, sizeof s->mip_id);
+        }
         s->texture_mode = (uint8_t)(t->tile_s << GPU_TEXTURE_MODE_U_SHIFT | t->tile_t << GPU_TEXTURE_MODE_V_SHIFT);
         s->texture_function = (uint8_t)texture_function(gl.tex_env);
     }
@@ -181,8 +200,110 @@ static void update_state(void)
     }
 }
 
+//
+// Mip levels
+//
+
+// Where the next texture goes, and the next mip level: after the last of each still there
+static void pool_ends(void)
+{
+    gl.pool_next = gl.pool;
+    gl.mip_next = gl.pool + LVIV_GL_TEXTURE_BYTES;
+    for (int i = 0; i < TEXTURES; i++)
+    {
+        const texture_t *t = &gl.textures[i];
+        uint8_t *end = (uint8_t *)t->texels + (4u << (2 * t->log2_size));
+        if (t->loaded && end > gl.pool_next)
+            gl.pool_next = end;
+        for (int k = 0; k < t->levels; k++)
+        {
+            end = (uint8_t *)t->level_texels[k] + (4u << (2 * (t->log2_size - k - 1)));
+            if (end > gl.mip_next)
+                gl.mip_next = end;
+        }
+    }
+}
+
+static void drop_levels(texture_t *t)
+{
+    for (int k = 0; k < t->levels; k++)
+        gl.level_entry[t->level_id[k]] = 0;
+    t->levels = 0;
+}
+
+// Every texture's levels, for a texture that needs a table entry of theirs: built again, in those
+// it leaves, when the next frame starts
+static void drop_mipmaps(void)
+{
+    for (int i = 0; i < TEXTURES; i++)
+        drop_levels(&gl.textures[i]);
+    pool_ends();
+    gl.mips_dirty = 1;
+    update_state();
+}
+
+// The first table entry no texture or level has, or the last; -1 if none
+static int free_entry(int last)
+{
+    for (int i = 0; i < TEXTURES; i++)
+    {
+        const int e = last ? TEXTURES - 1 - i : i;
+        if (!gl.textures[e].generated && !gl.level_entry[e])
+            return e;
+    }
+    return -1;
+}
+
+// The levels glGenerateMipmap's textures lack or have stale, when a frame starts: each from the one
+// above it (lviv_mip_halve), the largest first, so that none leaves a gap; a texture's until one
+// finds no table entry or memory
+static void build_mipmaps(void)
+{
+    gl.mips_dirty = 0;
+    for (int size = TEXTURE_MAX_LOG2 - 1; size >= MIP_MIN_LOG2; size--)
+    {
+        const size_t bytes = (size_t)4 << (2 * size);
+        for (int i = 0; i < TEXTURES; i++)
+        {
+            texture_t *t = &gl.textures[i];
+            const int k = (int)t->log2_size - size - 1; // this size is t's level k + 1
+            if (!t->loaded || !t->mipmap || k < 0 || k >= LVIV_MIP_LEVELS || k > t->levels)
+                continue;
+            if (k < t->levels && !t->stale)
+                continue;
+            if (k == t->levels)
+            {
+                const uintptr_t at = ((uintptr_t)gl.mip_next + bytes - 1) & ~(uintptr_t)(bytes - 1);
+                const int entry = free_entry(1);
+                if (entry < 0 || at + bytes > (uintptr_t)gl.pool + LVIV_GL_TEXTURE_BYTES + MIP_BYTES)
+                    continue;
+                t->level_texels[k] = (uint32_t *)at;
+                t->level_id[k] = (uint8_t)entry;
+            }
+            const uint32_t *above = k ? t->level_texels[k - 1] : t->texels;
+            if (lviv_mip_halve(t->level_texels[k], above, (uint32_t)size + 1, t->tile_s, t->tile_t) != 0 ||
+                gpu_set_texture(gl.gpu, t->level_id[k], t->level_texels[k], (uint32_t)size) != 0)
+            {
+                drop_levels(t);
+                continue;
+            }
+            if (k == t->levels)
+            {
+                gl.level_entry[t->level_id[k]] = 1;
+                gl.mip_next = (uint8_t *)t->level_texels[k] + bytes;
+                t->levels++;
+            }
+        }
+    }
+    for (int i = 0; i < TEXTURES; i++)
+        gl.textures[i].stale = 0;
+    update_state();
+}
+
 static void begin_frame(void)
 {
+    if (gl.mips_dirty)
+        build_mipmaps();
     lviv_geom_begin(&gl.geom, gl.triangles, gl.visibility, gl.capacity, gl.width, gl.height);
     gl.dropped = 0;
     gl.matrices_dirty = 1;
@@ -235,7 +356,7 @@ int lviv_gl_init(gpu_t *gpu, int width, int height, void *frame_memory, size_t f
     gl.normal = (lviv_vec3_t){0, 0, 1};
     gl.color = 0xFFFFFFFFu;
     gl.pool = (uint8_t *)(((uintptr_t)texture_pool + TEXTURE_ALIGN - 1) & ~(uintptr_t)(TEXTURE_ALIGN - 1));
-    gl.pool_next = gl.pool;
+    pool_ends();
     update_state();
     return 0;
 }
@@ -546,19 +667,31 @@ static int triangle_mode(GLenum mode)
            mode == GL_QUAD_STRIP || mode == GL_POLYGON;
 }
 
-static void triangle(const lviv_vertex_t *a, const lviv_vertex_t *b, const lviv_vertex_t *c)
+// Before vertices go to lviv_geom: its matrices, as they are now
+static void before_triangles(void)
 {
     if (gl.matrices_dirty)
     {
         lviv_geom_matrices(&gl.geom, &gl.state);
         gl.matrices_dirty = 0;
     }
-    lviv_geom_triangle(&gl.geom, &gl.state, a, b, c);
+}
+
+// After: GL_OUT_OF_MEMORY if one did not fit
+static void after_triangles(void)
+{
     if (gl.geom.dropped != gl.dropped)
     {
         gl.dropped = gl.geom.dropped;
         set_error(GL_OUT_OF_MEMORY);
     }
+}
+
+static void triangle(const lviv_vertex_t *a, const lviv_vertex_t *b, const lviv_vertex_t *c)
+{
+    before_triangles();
+    lviv_geom_triangle(&gl.geom, &gl.state, a, b, c);
+    after_triangles();
 }
 
 static void start_primitive(GLenum mode)
@@ -859,6 +992,38 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count)
     }
 }
 
+// glDrawElements' triangles share vertices: each goes through the pipeline once while it stays in
+// this cache, in the slot of its index's low bits, for the one call
+#define VERTEX_CACHE 4096
+typedef struct
+{
+    uint64_t call;
+    GLuint index;
+    lviv_shaded_t vertex;
+} cached_vertex_t;
+static cached_vertex_t vertex_cache[VERTEX_CACHE];
+static uint64_t draw_call; // glDrawElements', from 1
+
+static lviv_shaded_t *shared_vertex(GLuint i)
+{
+    cached_vertex_t *slot = &vertex_cache[i % VERTEX_CACHE];
+    if (slot->call != draw_call || slot->index != i)
+    {
+        const lviv_vertex_t v = fetch((GLint)i);
+        lviv_geom_vertex(&gl.geom, &gl.state, &v, &slot->vertex);
+        slot->call = draw_call;
+        slot->index = i;
+    }
+    return &slot->vertex;
+}
+
+static GLuint element_index(GLenum type, const GLvoid *indices, GLsizei k)
+{
+    return type == GL_UNSIGNED_BYTE    ? ((const uint8_t *)indices)[k]
+           : type == GL_UNSIGNED_SHORT ? ((const uint16_t *)indices)[k]
+                                       : ((const uint32_t *)indices)[k];
+}
+
 void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices)
 {
     if (type != GL_UNSIGNED_BYTE && type != GL_UNSIGNED_SHORT && type != GL_UNSIGNED_INT)
@@ -868,13 +1033,31 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indic
     }
     if (!can_draw(mode, count))
         return;
+    if (mode == GL_TRIANGLES)
+    {
+        before_triangles();
+        draw_call++;
+        for (GLsizei k = 0; k + 2 < count; k += 3)
+        {
+            const GLuint a = element_index(type, indices, k), b = element_index(type, indices, k + 1),
+                         c = element_index(type, indices, k + 2);
+            lviv_shaded_t *va = shared_vertex(a), *vb = shared_vertex(b), *vc = shared_vertex(c);
+            if (vertex_cache[a % VERTEX_CACHE].index == a && vertex_cache[b % VERTEX_CACHE].index == b)
+                lviv_geom_shaded_triangle(&gl.geom, &gl.state, va, vb, vc);
+            else
+            {
+                // one took another's slot
+                const lviv_vertex_t v[3] = {fetch((GLint)a), fetch((GLint)b), fetch((GLint)c)};
+                lviv_geom_triangle(&gl.geom, &gl.state, &v[0], &v[1], &v[2]);
+            }
+        }
+        after_triangles();
+        return;
+    }
     start_primitive(mode);
     for (GLsizei k = 0; k < count; k++)
     {
-        const GLint i = type == GL_UNSIGNED_BYTE    ? ((const uint8_t *)indices)[k]
-                        : type == GL_UNSIGNED_SHORT ? ((const uint16_t *)indices)[k]
-                                                    : (GLint)((const uint32_t *)indices)[k];
-        const lviv_vertex_t v = fetch(i);
+        const lviv_vertex_t v = fetch((GLint)element_index(type, indices, k));
         assemble(&v);
     }
 }
@@ -1103,10 +1286,13 @@ void glGenTextures(GLsizei n, GLuint *textures)
     }
     for (GLsizei i = 0; i < n; i++)
     {
-        GLuint name = 0; // the first not in use (glDeleteTextures gives them back)
-        for (GLuint t = 0; t < TEXTURES && !name; t++)
-            if (!gl.textures[t].generated)
-                name = t + 1;
+        int entry = free_entry(0); // the first not in use (glDeleteTextures gives them back)
+        if (entry < 0)
+        {
+            drop_mipmaps(); // a texture before the mip levels
+            entry = free_entry(0);
+        }
+        const GLuint name = (GLuint)(entry + 1);
         textures[i] = name;
         if (!name)
         {
@@ -1135,16 +1321,11 @@ void glDeleteTextures(GLsizei n, const GLuint *textures)
             continue;
         if (gl.bound == name)
             gl.bound = 0;
+        drop_levels(&gl.textures[name - 1]);
         memset(&gl.textures[name - 1], 0, sizeof gl.textures[name - 1]);
     }
-    gl.pool_next = gl.pool;
-    for (int t = 0; t < TEXTURES; t++)
-    {
-        const texture_t *texture = &gl.textures[t];
-        uint8_t *end = (uint8_t *)texture->texels + (4u << (2 * texture->log2_size));
-        if (texture->loaded && end > gl.pool_next)
-            gl.pool_next = end;
-    }
+    pool_ends();
+    gl.mips_dirty = 1; // room for others' levels
     update_state();
 }
 
@@ -1174,6 +1355,7 @@ void glTexParameteri(GLenum target, GLenum pname, GLint param)
     if (!gl.bound)
         return;
     texture_t *t = &gl.textures[gl.bound - 1];
+    int *tile = pname == GL_TEXTURE_WRAP_S ? &t->tile_s : &t->tile_t;
     switch (pname)
     {
     case GL_TEXTURE_WRAP_S:
@@ -1183,7 +1365,12 @@ void glTexParameteri(GLenum target, GLenum pname, GLint param)
             set_error(GL_INVALID_ENUM);
             return;
         }
-        *(pname == GL_TEXTURE_WRAP_S ? &t->tile_s : &t->tile_t) = param == GL_REPEAT;
+        if (*tile != (param == GL_REPEAT) && t->mipmap)
+        {
+            t->stale = 1; // its levels were filtered across the other edge
+            gl.mips_dirty = 1;
+        }
+        *tile = param == GL_REPEAT;
         break;
     case GL_TEXTURE_MIN_FILTER: // the GPU's own
     case GL_TEXTURE_MAG_FILTER:
@@ -1222,6 +1409,7 @@ static texture_t *texture_memory(GLsizei width, GLsizei height, GLint border, co
             set_error(GL_OUT_OF_MEMORY);
             return NULL;
         }
+        drop_levels(t); // of another size
         t->texels = (uint32_t *)at;
         gl.pool_next = (uint8_t *)(at + bytes);
     }
@@ -1239,10 +1427,13 @@ static void texture_written(texture_t *t, uint32_t log2_size)
     }
     t->loaded = 1;
     t->log2_size = log2_size;
+    t->stale = 1; // its levels, until the next frame starts
+    gl.mips_dirty |= t->mipmap;
     update_state();
 }
 
-// Level 0 only (the GPU has no mipmaps: other levels are taken and dropped), square, a power of two
+// Level 0 only (the mip levels are the driver's own, glGenerateMipmap: others are taken and
+// dropped), square, a power of two
 void glTexImage2D(GLenum target, GLint level, GLint internal_format, GLsizei width, GLsizei height, GLint border,
                   GLenum format, GLenum type, const GLvoid *pixels)
 {
@@ -1281,4 +1472,22 @@ void lviv_gl_tex_image(GLsizei size, const uint32_t *texels)
         return;
     memcpy(t->texels, texels, (size_t)4 << (2 * log2_size));
     texture_written(t, log2_size);
+}
+
+// The bound texture's mip levels: built when the next frame starts, and again after its texels change
+void glGenerateMipmap(GLenum target)
+{
+    if (target != GL_TEXTURE_2D)
+    {
+        set_error(GL_INVALID_ENUM);
+        return;
+    }
+    texture_t *t = gl.bound ? &gl.textures[gl.bound - 1] : NULL;
+    if (!t || !t->loaded)
+    {
+        set_error(GL_INVALID_OPERATION);
+        return;
+    }
+    t->mipmap = 1;
+    gl.mips_dirty = 1;
 }

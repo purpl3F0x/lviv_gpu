@@ -12,6 +12,9 @@
 //   - textures square, a power of two up to 2048, GL_RGBA, GL_RGB or GL_BGRA of GL_UNSIGNED_BYTE;
 //     the filters are the GPU's (glTexParameter takes the wrap modes only); 128 of them, one after
 //     another in 32 MiB (LVIV_GL_TEXTURE_BYTES), which glDeleteTextures gives back from the end
+//   - mip levels the driver's own (glGenerateMipmap, from OpenGL 3.0): up to three, each a Lanczos
+//     filter of the one above it, one for a whole triangle, in the table entries the textures
+//     leave and a third of their memory more
 //   - no depth mask, stencil, scissor, alpha test or fog; one frame size, at most 64 tiles of 128
 //     x 128 pixels (1280 x 720: 60)
 // A frame is everything drawn since the last glClear (which clears color and depth together, as
@@ -262,6 +265,7 @@ void glBindTexture(GLenum target, GLuint texture);
 void glTexParameteri(GLenum target, GLenum pname, GLint param);
 void glTexImage2D(GLenum target, GLint level, GLint internal_format, GLsizei width, GLsizei height, GLint border,
                   GLenum format, GLenum type, const GLvoid *pixels);
+void glGenerateMipmap(GLenum target);
 
 #ifdef __cplusplus
 }

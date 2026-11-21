@@ -101,13 +101,6 @@ lviv_vec4_t lviv_mat4_transform(const lviv_mat4_t *m, lviv_vec4_t v)
 // The pipeline
 //
 
-// The state's matrices, for a triangle's vertices
-struct transforms_t
-{
-    glm::mat4 mvp, modelview;
-    glm::mat3 normal;
-};
-
 // After the vertex shader
 struct clip_vertex_t
 {
@@ -171,10 +164,10 @@ static float clamp01(float x)
 // GL 1.x's fixed-function lighting of one vertex, in eye space: the emission and the global ambient,
 // then each light that is on adds its ambient, diffuse and specular terms, a positional light's
 // scaled by its attenuation and its spotlight
-static uint32_t light(const transforms_t &x, const lviv_state_t &s, const lviv_vertex_t &v)
+static uint32_t light(const lviv_geom_t &g, const lviv_state_t &s, const lviv_vertex_t &v)
 {
-    const glm::vec3 eye(x.modelview * glm::vec4(to_glm(v.position), 1.0f));
-    const glm::vec3 n = unit(x.normal * to_glm(v.normal));
+    const glm::vec3 eye(to_glm(s.modelview) * glm::vec4(to_glm(v.position), 1.0f));
+    const glm::vec3 n = unit(glm::mat3(to_glm(g.normal_matrix)) * to_glm(v.normal));
     const glm::vec3 to_eye = unit(-eye);
 
     const lviv_material_t &m = s.material;
@@ -214,16 +207,6 @@ static uint32_t light(const transforms_t &x, const lviv_state_t &s, const lviv_v
     const uint32_t b = (uint8_t)(clamp01(c.z) * 255.0f);
     const uint32_t a = (uint8_t)(clamp01(m.alpha) * 255.0f);
     return a << 24 | r << 16 | gr << 8 | b;
-}
-
-// The vertex in clip space, with its own color: lit later, if at all
-static clip_vertex_t transform_vertex(const transforms_t &x, const lviv_vertex_t &v)
-{
-    clip_vertex_t o;
-    o.position = x.mvp * glm::vec4(to_glm(v.position), 1.0f);
-    o.color = v.color;
-    o.texcoord = to_glm(v.texcoord);
-    return o;
 }
 
 // Distance to a clip plane: left, right, bottom, top, near, far
@@ -278,19 +261,18 @@ static int clip_plane(const clip_vertex_t *in, int n, clip_vertex_t *out, int pl
     return m;
 }
 
-static screen_vertex_t viewport(const lviv_geom_t &g, const lviv_state_t &s, const clip_vertex_t &v)
+// A clip-space position on the screen
+static glm::vec4 viewport(const lviv_geom_t &g, const lviv_state_t &s, const glm::vec4 &clip)
 {
-    const float inv_w = 1.0f / v.position.w;
-    const float ndc_x = v.position.x * inv_w, ndc_y = v.position.y * inv_w, ndc_z = v.position.z * inv_w;
+    const float inv_w = 1.0f / clip.w;
+    const float ndc_x = clip.x * inv_w, ndc_y = clip.y * inv_w, ndc_z = clip.z * inv_w;
     // y from the top: the viewport's top edge is height - (y + viewport height) rows down
     const float top = (float)(g.height - s.viewport_y - s.viewport_height);
-    screen_vertex_t o;
-    o.position.x = (float)s.viewport_x + (ndc_x + 1.0f) * (0.5f * (float)s.viewport_width);
-    o.position.y = top + (1.0f - ndc_y) * (0.5f * (float)s.viewport_height);
-    o.position.z = (ndc_z + 1.0f) * 0.5f;
-    o.position.w = inv_w;
-    o.texcoord = v.texcoord;
-    o.color = v.color;
+    glm::vec4 o;
+    o.x = (float)s.viewport_x + (ndc_x + 1.0f) * (0.5f * (float)s.viewport_width);
+    o.y = top + (1.0f - ndc_y) * (0.5f * (float)s.viewport_height);
+    o.z = (ndc_z + 1.0f) * 0.5f;
+    o.w = inv_w;
     return o;
 }
 
@@ -380,10 +362,8 @@ static uint64_t bin(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t
 
 // The triangle on the screen as the GPU sees it, its x and y in the frontend's fixed point (q): its
 // area there, or 0 if degenerate or culled
-static int64_t screen_area(const lviv_state_t &s, const screen_vertex_t *v, fixed_xy_t *q)
+static int64_t screen_area(const lviv_state_t &s, const fixed_xy_t *q)
 {
-    for (int k = 0; k < 3; k++)
-        q[k] = {frontend_fixed(v[k].position.x), frontend_fixed(v[k].position.y)};
     const int64_t area = edge(q[0], q[1], q[2]);
     if (area == 0)
         return 0; // degenerate
@@ -415,6 +395,25 @@ static inline void zero_line(void *line)
 #endif
 }
 
+// The table entry of the mip level a triangle is drawn from: the one whose texels are nearest its
+// pixels in area, short of one that puts a texel on more than two pixels in a row
+static uint8_t mip_entry(const lviv_state_t &s, const screen_vertex_t *v)
+{
+    const float size = (float)(1u << s.tex_log2);
+    const glm::vec2 p1(v[1].position - v[0].position), p2(v[2].position - v[0].position);
+    const glm::vec2 t1 = (v[1].texcoord - v[0].texcoord) * size, t2 = (v[2].texcoord - v[0].texcoord) * size;
+    // Twice its area in pixels and in texels; the texels along a pixel in x and in y, times the former
+    const float pixels = std::fabs(p1.x * p2.y - p2.x * p1.y), texels = std::fabs(t1.x * t2.y - t2.x * t1.y);
+    const glm::vec2 dx = t1 * p2.y - t2 * p1.y, dy = t2 * p1.x - t1 * p2.x;
+    const float spread = glm::dot(dx, dx) + glm::dot(dy, dy);
+    // Level k needs 2 * 4^(k - 1) texels a pixel, and 2^(k - 1) along a pixel where they are fewest
+    int level = 0;
+    for (float q = pixels; level < s.mip_levels && texels >= 2.0f * q; q *= 4.0f, level++)
+        if (pixels * (texels * texels + q * q) < q * spread)
+            break;
+    return level ? s.mip_id[level - 1] : s.tex_id;
+}
+
 static void record(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t *v, uint64_t mask)
 {
     gpu_triangle_t *t = &g.triangles[g.count];
@@ -422,7 +421,7 @@ static void record(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t 
     for (int i = 0; i < 3; i++)
         t->v[i] = gpu_vertex_t{v[i].position.x, v[i].position.y, v[i].position.z, v[i].position.w,
                                v[i].color,      v[i].texcoord.x, v[i].texcoord.y};
-    t->tex_id = s.tex_id;
+    t->tex_id = s.mip_levels ? mip_entry(s, v) : s.tex_id;
     t->texture_mode = s.texture_mode;
     t->texture_function = s.texture_function;
     t->blend = s.blend;
@@ -444,50 +443,70 @@ static void record(lviv_geom_t &g, const lviv_state_t &s, const screen_vertex_t 
     }
 }
 
-void lviv_geom_triangle(lviv_geom_t *g, const lviv_state_t *s, const lviv_vertex_t *v0, const lviv_vertex_t *v1,
-                        const lviv_vertex_t *v2)
+void lviv_geom_vertex(const lviv_geom_t *g, const lviv_state_t *s, const lviv_vertex_t *v, lviv_shaded_t *o)
 {
-    const transforms_t x = {to_glm(g->mvp), to_glm(s->modelview), glm::mat3(to_glm(g->normal_matrix))};
-    const lviv_vertex_t *v[3] = {v0, v1, v2};
-    clip_vertex_t poly[2][CLIP_MAX];
-    bool inside = true;
-    for (int k = 0; k < 3; k++)
+    const glm::vec4 clip = to_glm(g->mvp) * glm::vec4(to_glm(v->position), 1.0f);
+    o->in = *v;
+    o->clip = {clip.x, clip.y, clip.z, clip.w};
+    o->color = v->color;
+    o->lit = !s->lighting;
+    o->inside = 1;
+    for (int plane = 0; plane < 6; plane++)
+        o->inside = o->inside && plane_distance(clip, plane) >= 0.0f;
+    if (o->inside)
     {
-        poly[0][k] = transform_vertex(x, *v[k]);
-        for (int plane = 0; plane < 6; plane++)
-            inside = inside && plane_distance(poly[0][k].position, plane) >= 0.0f;
+        const glm::vec4 p = viewport(*g, *s, clip);
+        o->screen = {p.x, p.y, p.z, p.w};
+        o->qx = frontend_fixed(p.x);
+        o->qy = frontend_fixed(p.y);
     }
+}
+
+// Its color: lit the first time
+static uint32_t lit(const lviv_geom_t &g, const lviv_state_t &s, lviv_shaded_t &v)
+{
+    if (!v.lit)
+    {
+        v.color = light(g, s, v.in);
+        v.lit = 1;
+    }
+    return v.color;
+}
+
+void lviv_geom_shaded_triangle(lviv_geom_t *g, const lviv_state_t *s, lviv_shaded_t *v0, lviv_shaded_t *v1,
+                               lviv_shaded_t *v2)
+{
+    lviv_shaded_t *v[3] = {v0, v1, v2};
 
     // Inside every clip plane, as clipping leaves it: culled and binned first, lit (most of the
     // work) only if kept
-    if (inside)
+    if (v0->inside && v1->inside && v2->inside)
     {
-        screen_vertex_t sv[3] = {viewport(*g, *s, poly[0][0]), viewport(*g, *s, poly[0][1]),
-                                 viewport(*g, *s, poly[0][2])};
-        fixed_xy_t q[3];
-        const int64_t area = screen_area(*s, sv, q);
+        fixed_xy_t q[3] = {{v0->qx, v0->qy}, {v1->qx, v1->qy}, {v2->qx, v2->qy}};
+        const int64_t area = screen_area(*s, q);
         if (area == 0)
             return;
         if (area < 0 && s->flip_clockwise)
         {
-            std::swap(sv[1], sv[2]);
             std::swap(q[1], q[2]);
             std::swap(v[1], v[2]);
         }
+        screen_vertex_t sv[3];
+        for (int k = 0; k < 3; k++)
+            sv[k] = {to_glm(v[k]->screen), to_glm(v[k]->in.texcoord), 0};
         const uint64_t mask = place(*g, *s, sv, q);
         if (!mask)
             return;
-        if (s->lighting)
-            for (int k = 0; k < 3; k++)
-                sv[k].color = light(x, *s, *v[k]);
+        for (int k = 0; k < 3; k++)
+            sv[k].color = lit(*g, *s, *v[k]);
         record(*g, *s, sv, mask);
         return;
     }
 
     // Across a plane: lit first, the colors clipped with the rest
-    if (s->lighting)
-        for (int k = 0; k < 3; k++)
-            poly[0][k].color = light(x, *s, *v[k]);
+    clip_vertex_t poly[2][CLIP_MAX];
+    for (int k = 0; k < 3; k++)
+        poly[0][k] = {to_glm(v[k]->clip), to_glm(v[k]->in.texcoord), lit(*g, *s, *v[k])};
     int n = 3, cur = 0;
     for (int plane = 0; plane < 6; plane++)
     {
@@ -500,10 +519,15 @@ void lviv_geom_triangle(lviv_geom_t *g, const lviv_state_t *s, const lviv_vertex
     // A fan from the first corner, each triangle culled and binned as the GPU sees it
     for (int i = 2; i < n; i++)
     {
-        screen_vertex_t sv[3] = {viewport(*g, *s, poly[cur][0]), viewport(*g, *s, poly[cur][i - 1]),
-                                 viewport(*g, *s, poly[cur][i])};
+        screen_vertex_t sv[3];
         fixed_xy_t q[3];
-        const int64_t area = screen_area(*s, sv, q);
+        for (int k = 0; k < 3; k++)
+        {
+            const clip_vertex_t &c = poly[cur][k ? i - 2 + k : 0];
+            sv[k] = {viewport(*g, *s, c.position), c.texcoord, c.color};
+            q[k] = {frontend_fixed(sv[k].position.x), frontend_fixed(sv[k].position.y)};
+        }
+        const int64_t area = screen_area(*s, q);
         if (area == 0)
             continue;
         if (area < 0 && s->flip_clockwise)
@@ -515,4 +539,14 @@ void lviv_geom_triangle(lviv_geom_t *g, const lviv_state_t *s, const lviv_vertex
         if (mask)
             record(*g, *s, sv, mask);
     }
+}
+
+void lviv_geom_triangle(lviv_geom_t *g, const lviv_state_t *s, const lviv_vertex_t *v0, const lviv_vertex_t *v1,
+                        const lviv_vertex_t *v2)
+{
+    lviv_shaded_t v[3];
+    lviv_geom_vertex(g, s, v0, &v[0]);
+    lviv_geom_vertex(g, s, v1, &v[1]);
+    lviv_geom_vertex(g, s, v2, &v[2]);
+    lviv_geom_shaded_triangle(g, s, &v[0], &v[1], &v[2]);
 }

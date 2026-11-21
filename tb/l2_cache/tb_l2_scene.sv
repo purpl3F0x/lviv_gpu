@@ -28,7 +28,7 @@ module tb_l2_scene;
   localparam logic [31:0] VbBase = 32'h0000_1000;
   localparam logic [31:0] TriBase = 32'h0000_8000;
   localparam logic [31:0] ImgBase = 32'h0002_0000;
-  localparam int VbAddrW = 21, TriAddrW = 24, ImgAddrW = 22, TexWordsW = 23;
+  localparam int VbAddrW = 21, TriAddrW = 24, ImgAddrW = 22, TexWordsW = 24;
   localparam int MaxTriangles = ((1 << TriAddrW) - int'(TriBase)) / TriangleStride;
 
   // Control map (tb_gpu_top's)

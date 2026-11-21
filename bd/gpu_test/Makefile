@@ -35,9 +35,9 @@ RTL = $(GPU_TOP_RTL) $(SPINAL_GEN_DIR)/L2Cache.v $(DDR_XBAR_RTL) $(CTRL_XBAR_RTL
 # with OpenGL 1.x calls, in sdk/gl_test (C++): the files read by sdk/gltf (C++ on the submodules
 # sdk/third_party/fastgltf and simdjson, patched for the BSP: VITIS_PATCHES; their textures'
 # images decoded by the submodule sdk/third_party/stb's stb_image), drawn by lviv_gl in
-# sdk/lviv_gl (C, its transform in C++ on GLM, the submodule sdk/third_party/glm; libm). libstdc++
-# is linked with the BSP's libraries, whose system calls it needs (the link would search them
-# before it otherwise).
+# sdk/lviv_gl (C, its transform in C++ on GLM, the submodule sdk/third_party/glm, its mip levels
+# by stb's stb_image_resize2; libm). libstdc++ is linked with the BSP's libraries, whose system
+# calls it needs (the link would search them before it otherwise).
 VITIS_APPS = raster_test gl_test
 VITIS_APP_SRC_raster_test = ../../sdk/src ../../sdk/raster_test
 VITIS_APP_INCLUDES_raster_test = ../../sdk/include

@@ -194,6 +194,8 @@ gpu_status_t lviv_gl_frame(uint32_t *target, uint32_t stride, uint32_t *failed_t
 gpu_status_t lviv_gl_frame_again(uint32_t *target, uint32_t stride, uint32_t *failed_tile);
 // The triangles the last frame sent to the GPU (after clipping, culling and binning).
 uint32_t lviv_gl_triangles(void);
+// Whether the triangles drawn from now on use glGenerateMipmap's levels: they do from the start.
+void lviv_gl_mipmaps(int on);
 // glTexImage2D for the bound texture with the GPU's own texels, copied as they are: size x size
 // words a << 24 | r << 16 | g << 8 | b, in Morton order (gpu_texel_index), row 0 at t = 0; size a
 // power of two up to 2048. The errors are glTexImage2D's.

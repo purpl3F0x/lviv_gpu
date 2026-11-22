@@ -103,6 +103,7 @@ static struct
     uint8_t *pool, *pool_next, *mip_next;
     uint8_t level_entry[TEXTURES]; // the table entries that hold a mip level
     int mips_dirty;                // levels to build when the next frame starts
+    int mipmaps;                   // lviv_gl_mipmaps
 } gl;
 
 static void set_error(GLenum error)
@@ -184,7 +185,7 @@ static void update_state(void)
     {
         s->tex_id = (uint8_t)(gl.bound - 1);
         s->tex_log2 = (uint8_t)t->log2_size;
-        if (!t->stale)
+        if (gl.mipmaps && !t->stale)
         {
             s->mip_levels = (uint8_t)t->levels;
             memcpy(s->mip_id, t->level_id, sizeof s->mip_id);
@@ -355,7 +356,8 @@ int lviv_gl_init(gpu_t *gpu, int width, int height, void *frame_memory, size_t f
     gl.state.global_ambient = (lviv_vec3_t){0.2f, 0.2f, 0.2f};
     gl.normal = (lviv_vec3_t){0, 0, 1};
     gl.color = 0xFFFFFFFFu;
-    gl.pool = (uint8_t *)(((uintptr_t)texture_pool + TEXTURE_ALIGN - 1) & ~(uintptr_t)(TEXTURE_ALIGN - 1));
+    gl.mipmaps = 1;
+    gl.pool =(uint8_t *)(((uintptr_t)texture_pool + TEXTURE_ALIGN - 1) & ~(uintptr_t)(TEXTURE_ALIGN - 1));
     pool_ends();
     update_state();
     return 0;
@@ -400,6 +402,12 @@ gpu_status_t lviv_gl_frame_again(uint32_t *target, uint32_t stride, uint32_t *fa
 uint32_t lviv_gl_triangles(void)
 {
     return gl.last_triangles;
+}
+
+void lviv_gl_mipmaps(int on)
+{
+    gl.mipmaps = on != 0;
+    update_state();
 }
 
 GLenum glGetError(void)

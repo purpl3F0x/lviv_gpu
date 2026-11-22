@@ -6,13 +6,13 @@
 // Keys:
 //   1, 2  who draws it: 1 the CPU, tile by tile; 2 the command processor, in one START
 //   s     the model turning, or still again
+//   f     the front end every frame, or once and its triangles again
+//   p     mip levels used, or not
 //   r     drawing again, after a frame that failed
-//   l     the glTF models (.gltf, .glb) on the SD card, numbered
-//   o     another model: its number in l's list, then Enter
 //   m     the setup menu (menu.cpp), alone on the screen while it is up, nothing drawn: the test
-//         pattern, the settings (the DP output: 1280 x 720, or 1920 x 1080 with the 1280 x 720
-//         picture in its center), or one of the SD card's models. Its keys: the arrows (or w, a, s
-//         and d), Enter, Esc
+//         pattern, the settings (who draws, mip levels, the front end; the DP output: 1280 x 720,
+//         or 1920 x 1080 with the 1280 x 720 picture in its center), or one of the SD card's
+//         models (.gltf, .glb). Its keys: the arrows (or w, a, s and d), Enter, Esc
 //   ?     the keys
 //
 // Output goes to the PS UART.
@@ -105,11 +105,11 @@ static XScuGic gic; // static: the DP output's interrupt handlers hold on to it
 
 static bool drawing;       // a frame after another
 static bool pattern_shown; // the test pattern on the screen, not the model
-static gpu_mode_t mode = GPU_MODE_CPU;
+static gpu_mode_t mode = GPU_MODE_CP;
 
 // The setup menu: up or not, its page and the item selected on it, a line about that one. The main
 // page: the test pattern, the settings, then the SD card's glTF files as when the menu came up; the
-// settings: the output, back.
+// settings: who draws, mip levels, the front end, the output, back.
 #define MENU_MODELS 64
 enum menu_page_t
 {
@@ -124,6 +124,9 @@ enum
 };
 enum
 {
+    ITEM_MODE,
+    ITEM_MIPS,
+    ITEM_FRONT_END,
     ITEM_OUTPUT,
     ITEM_BACK,
     SETTINGS_ITEMS,
@@ -146,6 +149,7 @@ static float angle;
 static bool turning;
 // f: the front end once, then its triangles again every frame (kept: lviv_gl holds them)
 static bool keep_triangles, triangles_kept;
+static bool mipmaps = true; // p: the textures' mip levels used
 
 // Since the last report, from period_start: the frames drawn, the sum of their times (us) and of
 // their squares, of the front end's times (us), of the command processor's cycle counts and of the
@@ -187,7 +191,7 @@ static void start_drawing(void)
 {
     if (!scene)
     {
-        xil_printf("no model: l lists the SD card's, o opens one, m the menu\r\n");
+        xil_printf("no model: m the menu, for the SD card's\r\n");
         return;
     }
     gpu_set_mode(&gpu, mode);
@@ -270,7 +274,15 @@ static void draw_frame(void)
 static void print_keys(void)
 {
     xil_printf("keys: 1 CPU, 2 command processor; s turn the model or stop it; f front end every frame or "
-               "once; r draw again; l SD card; o open a model; m menu; ? keys\r\n");
+               "once; p mip levels or none; r draw again; m menu; ? keys\r\n");
+}
+
+// The textures' mip levels used or not, from the next front end on
+static void set_mipmaps(bool on)
+{
+    mipmaps = on;
+    lviv_gl_mipmaps(on);
+    triangles_kept = false;
 }
 
 // A key from the UART console, or -1 if there is none.
@@ -281,56 +293,11 @@ static int read_key(void)
     return (int)(XUartPs_ReadReg(STDIN_BASEADDRESS, XUARTPS_FIFO_OFFSET) & 0xFF);
 }
 
-// A number typed at the console, echoed, up to Enter; -1 for none, or Esc
-static int read_number(void)
-{
-    int n = -1;
-    for (;;)
-    {
-        const int key = read_key();
-        if (key >= '0' && key <= '9' && n < 100000)
-        {
-            n = (n < 0 ? 0 : n * 10) + (key - '0');
-            xil_printf("%c", key);
-        }
-        else if ((key == '\b' || key == 0x7f) && n >= 0)
-        {
-            n = n >= 10 ? n / 10 : -1;
-            xil_printf("\b \b");
-        }
-        else if (key == '\r' || key == '\n' || key == 0x1b)
-        {
-            xil_printf("\r\n");
-            return key == 0x1b ? -1 : n;
-        }
-    }
-}
-
-// The glTF files (.gltf, .glb) in the SD card's root, numbered from 1 in the directory's order, for
-// l (wanted 0: printed) and o (the path of the one wanted, in path; none found, empty)
-struct sd_listing
-{
-    int wanted;
-    int models; // the glTF files so far
-    char path[300];
-};
-
+// A glTF file (.gltf, .glb) of the SD card's
 static bool is_gltf(const sd_entry_t *entry)
 {
     const char *dot = std::strrchr(entry->name, '.');
     return !entry->directory && dot && (strcasecmp(dot, ".gltf") == 0 || strcasecmp(dot, ".glb") == 0);
-}
-
-static void list_entry(const sd_entry_t *entry, void *user)
-{
-    sd_listing &l = *static_cast<sd_listing *>(user);
-    if (!is_gltf(entry))
-        return;
-    l.models++;
-    if (l.wanted == 0)
-        xil_printf("  %4d  %s  %u bytes\r\n", l.models, entry->name, (unsigned)entry->size);
-    else if (l.models == l.wanted)
-        std::snprintf(l.path, sizeof l.path, "0:/%s", entry->name);
 }
 
 // The SD card's glTF file at path ("0:/...") drawn from then on, from the front, by mode. The model
@@ -374,24 +341,6 @@ static bool load_model(const char *path)
     return true;
 }
 
-// The SD card's glTF file n (l's numbers), as load_model
-static void open_model(int n)
-{
-    sd_listing l = {n, 0, ""};
-    const int error = sd_scan("0:/", list_entry, &l);
-    if (error != 0)
-    {
-        xil_printf("SD card: %s\r\n", sd_error_name(error));
-        return;
-    }
-    if (l.path[0] == '\0')
-    {
-        xil_printf("model: no glTF file %d on the SD card, of %d\r\n", n, l.models);
-        return;
-    }
-    load_model(l.path);
-}
-
 // The frame buffer to draw the next screen into: the GPU's frame's place in it
 static ui_canvas_t back_canvas(void)
 {
@@ -422,13 +371,30 @@ static void menu_describe(void)
 {
     const char *about = nullptr;
     if (menu_page == MENU_SETTINGS)
-        about = menu_selected == ITEM_BACK ? "Back to the menu"
-                : wide                     ? "The DisplayPort output, the 1280 x 720 picture in its center"
-                                           : "The DisplayPort output, the 1280 x 720 picture as it is";
+        switch (menu_selected)
+        {
+        case ITEM_MODE:
+            about = mode == GPU_MODE_CP ? "The command processor draws the frame, in one START"
+                                        : "The CPU draws the frame, tile by tile";
+            break;
+        case ITEM_MIPS:
+            about = mipmaps ? "Textures drawn from their mip levels" : "Textures drawn at their full size only";
+            break;
+        case ITEM_FRONT_END:
+            about = keep_triangles ? "The front end once, then its triangles again every frame"
+                                   : "The front end makes the triangles every frame";
+            break;
+        case ITEM_OUTPUT:
+            about = wide ? "The DisplayPort output, the 1280 x 720 picture in its center"
+                         : "The DisplayPort output, the 1280 x 720 picture as it is";
+            break;
+        default:
+            about = "Back to the menu";
+        }
     else if (menu_selected == ITEM_PATTERN)
         about = "Color bars and ramps: a check of the display";
     else if (menu_selected == ITEM_SETTINGS)
-        about = "The DisplayPort output's resolution";
+        about = "Who draws, mip levels, the front end, the DisplayPort output";
     if (about)
     {
         std::snprintf(menu_about, sizeof menu_about, "%s", about);
@@ -447,6 +413,11 @@ static void menu_render(const ui_canvas_t *c)
     char now[96];
     if (menu_page == MENU_SETTINGS)
     {
+        std::snprintf(labels[ITEM_MODE], sizeof labels[0], "Drawn By: [%s]",
+                      mode == GPU_MODE_CP ? "Command Processor" : "CPU");
+        std::snprintf(labels[ITEM_MIPS], sizeof labels[0], "Mip Levels: [%s]", mipmaps ? "On" : "Off");
+        std::snprintf(labels[ITEM_FRONT_END], sizeof labels[0], "Front End: [%s]",
+                      keep_triangles ? "Once" : "Every Frame");
         std::snprintf(labels[ITEM_OUTPUT], sizeof labels[0], "Display Output: [%s]", output_name());
         std::snprintf(labels[ITEM_BACK], sizeof labels[0], "Back");
         std::snprintf(now, sizeof now, "Output: %s at 60 Hz, the picture 1280 x 720", output_name());
@@ -516,6 +487,32 @@ static void set_output(bool to_wide)
         xil_printf("DisplayPort: no %d x %d mode\r\n", w, h);
 }
 
+// A setting's other value, the menu showing it
+static void change_setting(int item)
+{
+    switch (item)
+    {
+    case ITEM_MODE:
+        mode = mode == GPU_MODE_CP ? GPU_MODE_CPU : GPU_MODE_CP;
+        if (drawing)
+            gpu_set_mode(&gpu, mode);
+        break;
+    case ITEM_MIPS:
+        set_mipmaps(!mipmaps);
+        break;
+    case ITEM_FRONT_END:
+        keep_triangles = !keep_triangles;
+        break;
+    case ITEM_OUTPUT:
+        set_output(!wide); // shows the menu itself
+        return;
+    default:
+        return;
+    }
+    menu_describe();
+    menu_show();
+}
+
 static void menu_entry(const sd_entry_t *entry, void *user)
 {
     (void)user;
@@ -570,15 +567,15 @@ static void menu_close(void)
 }
 
 // The selected item. On the main page: the test pattern, the settings, or the model loaded (the menu
-// up still if it does not load). On the settings': the other output, or back.
+// up still if it does not load). On the settings': the setting's other value, or back.
 static void menu_choose(void)
 {
     if (menu_page == MENU_SETTINGS)
     {
-        if (menu_selected == ITEM_OUTPUT)
-            set_output(!wide);
-        else
+        if (menu_selected == ITEM_BACK)
             menu_go(MENU_MAIN, ITEM_SETTINGS);
+        else
+            change_setting(menu_selected);
         return;
     }
     if (menu_selected == ITEM_PATTERN)
@@ -590,7 +587,7 @@ static void menu_choose(void)
     }
     if (menu_selected == ITEM_SETTINGS)
     {
-        menu_go(MENU_SETTINGS, ITEM_OUTPUT);
+        menu_go(MENU_SETTINGS, ITEM_MODE);
         return;
     }
     const char *name = menu_names[menu_selected - ITEM_FIRST_MODEL];
@@ -623,7 +620,7 @@ static int read_key_within(int ms)
 }
 
 // A key while the menu is up: the arrows (ESC [ or ESC O, then A, B, C or D) or w, s, d and a. Up
-// and down move, left and right change the output on its line, Enter chooses; Esc alone or m goes
+// and down move, left and right change the setting on its line, Enter chooses; Esc alone or m goes
 // back: to the main page, or the menu down.
 static void menu_key(int key)
 {
@@ -650,8 +647,8 @@ static void menu_key(int key)
         break;
     case 'a':
     case 'd':
-        if (menu_page == MENU_SETTINGS && menu_selected == ITEM_OUTPUT)
-            set_output(!wide);
+        if (menu_page == MENU_SETTINGS)
+            change_setting(menu_selected);
         return;
     case '\r':
     case '\n':
@@ -740,26 +737,13 @@ int main(void)
             keep_triangles = !keep_triangles;
             xil_printf("front end: %s\r\n", keep_triangles ? "once, then the GPU alone" : "every frame");
             break;
+        case 'p':
+            set_mipmaps(!mipmaps);
+            xil_printf("mip levels: %s\r\n", mipmaps ? "used" : "not used");
+            break;
         case 'r':
             start_drawing();
             break;
-        case 'l': {
-            xil_printf("glTF files on the SD card, 0:/ (o and a number to draw one)\r\n");
-            sd_listing l = {0, 0, ""};
-            const int error = sd_scan("0:/", list_entry, &l);
-            if (error != 0)
-                xil_printf("SD card: %s\r\n", sd_error_name(error));
-            else if (l.models == 0)
-                xil_printf("  none\r\n");
-            break;
-        }
-        case 'o': {
-            xil_printf("model (its number in l's list, Enter): ");
-            const int n = read_number();
-            if (n >= 0)
-                open_model(n);
-            break;
-        }
         case 'm':
             menu_open();
             break;

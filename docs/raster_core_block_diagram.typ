@@ -1,5 +1,5 @@
 #import "@preview/fletcher:0.5.8" as fletcher: diagram, edge, node
-#import "@preview/splash:0.5.0": google, gruvbox
+#import "@preview/splash:0.5.0": tol-light
 
 
 // #import "@preview/meshpad:0.1.2": grid-paper
@@ -10,24 +10,16 @@
 #set text(font: "DejaVu Sans Mono", size: 9pt, fill: black)
 
 // Color palette
-// #let colors = (
-//   forest: rgb("44aa99"),
-//   yellow: gruvbox.bright-yellow,
-//   green: gruvbox.bright-aqua,
-//   purple: gruvbox.bright-purple,
-//   blue: gruvbox.bright-blue,
-//   red: gruvbox.bright-red.lighten(20%),
-//   orange: gruvbox.bright-orange,
-// )
 
 #let colors = (
-  forest: rgb("34a089"),
-  yellow: google.dark-yellow-1,
-  green: google.light-green-1,
-  purple: google.light-magenta-1,
-  blue: google.light-cyan-1,
-  red: google.light-red-berry-2,
-  orange: google.light-orange-1.darken(5%),
+  forest: tol-light.light-blue,
+  yellow: tol-light.light-yellow,
+  green: tol-light.mint,
+  purple: tol-light.pink,
+  blue: tol-light.light-cyan.darken(15%),
+  red: tol-light.orange,
+  orange: tol-light.pear,
+  gray: tol-light.pale-grey,
 )
 
 
@@ -43,8 +35,8 @@
 
 #diagram(
   node-stroke: 1pt + black,
-  node-corner-radius: 1pt,
-  edge-corner-radius: 0.5pt,
+  node-corner-radius: 0pt,
+  edge-corner-radius: 0pt,
   edge-stroke: 1.6pt + black,
   mark-scale: 60%,
   spacing: (40pt, 30pt),
@@ -116,7 +108,7 @@
 
   node(
     (0, 3.5),
-    fill: white,
+    fill: colors.gray,
     width: 35pt,
     height: 60pt,
     inset: -1pt,
@@ -197,7 +189,7 @@
   edge(<tri_fifo>, <front>),
 
   node(
-    (1, 3.3),
+    (1, 3.25),
     inset: 4pt,
     fill: colors.yellow,
     layer: 100000,
@@ -210,8 +202,9 @@
   node(
     (1, 3),
     fill: colors.blue,
-    inset: 40pt,
-    width: 250pt,
+    inset: 0pt,
+    width: 200pt,
+    height: 80pt,
     name: <orch>,
     [
       #align(center)[
